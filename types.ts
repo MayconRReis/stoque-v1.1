@@ -23,7 +23,8 @@ export enum SlotContent {
   CONTAINER_LP = 'CONTAINER_LP',
   CONTAINER_CP = 'CONTAINER_CP',
   CLEAN_BUCKET = 'CLEAN_BUCKET',
-  DIRTY_BUCKET = 'DIRTY_BUCKET'
+  DIRTY_BUCKET = 'DIRTY_BUCKET',
+  CRADLE = 'CRADLE'
 }
 
 export enum HistoryType {
@@ -60,9 +61,11 @@ export interface InspectionData {
   bottles: number;
   caps: number;
   boxes: number;
+  cradles: number; // Berço
   assignedSlot?: string;
   contentType: SlotContent;
   palletNumber?: number;
+  supplyDescription?: string; // Descrição do insumo
 }
 
 export interface SheetRow {
@@ -98,7 +101,8 @@ export const translateSlotContent = (content: SlotContent): string => {
     [SlotContent.CONTAINER_LP]: 'Container LP',
     [SlotContent.CONTAINER_CP]: 'Container CP',
     [SlotContent.CLEAN_BUCKET]: 'Balde Limpo',
-    [SlotContent.DIRTY_BUCKET]: 'Balde Sujo'
+    [SlotContent.DIRTY_BUCKET]: 'Balde Sujo',
+    [SlotContent.CRADLE]: 'Berço'
   };
   return translations[content] || content;
 };

@@ -216,21 +216,29 @@ export const supabaseService = {
   },
 
   async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    
-    // Get profile info (name)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) return null;
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return null;
       
-    return {
-      id: user.id,
-      name: profile?.name || user.email?.split('@')[0] || 'Usuário',
-      role: profile?.role || 'operator'
-    };
+      // Get profile info (name)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      return {
+        id: user.id,
+        name: profile?.name || user.email?.split('@')[0] || 'Usuário',
+        role: profile?.role || 'operator'
+      };
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   },
 
   // Real-time Subscriptions

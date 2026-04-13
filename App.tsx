@@ -1,6 +1,32 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  LayoutDashboard, 
+  Package, 
+  ArrowLeftRight, 
+  History, 
+  FileUp, 
+  ClipboardCheck, 
+  LogOut, 
+  Menu, 
+  X, 
+  FlaskConical, 
+  Warehouse, 
+  Boxes, 
+  CheckCircle2, 
+  AlertCircle,
+  Share2,
+  Download,
+  ArrowRight,
+  Truck,
+  Search,
+  Trash2,
+  Info,
+  Send,
+  Plus
+} from 'lucide-react';
 import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType, translateSlotContent } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
@@ -35,24 +61,15 @@ const generateSlots = (): WarehouseSlot[] => {
 const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
   const isSm = size === 'sm';
   return (
-    <div className="flex items-center gap-3">
-      <svg 
-        width={isSm ? "32" : "44"} 
-        height={isSm ? "32" : "44"} 
-        viewBox="0 0 40 40" 
-        fill="none" 
-        xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0"
-      >
-        <rect x="4" y="24" width="32" height="8" rx="3" fill="#3B82F6"/>
-        <rect x="4" y="12" width="18" height="8" rx="3" fill="#3B82F6"/>
-        <path d="M28 10V20M23 15H33" stroke="#3B82F6" strokeWidth="4" strokeLinecap="round"/>
-      </svg>
+    <div className="flex items-center gap-2">
+      <div className={`${isSm ? 'w-8 h-8' : 'w-10 h-10'} bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20`}>
+        <Warehouse className={`${isSm ? 'w-5 h-5' : 'w-6 h-6'} text-white`} />
+      </div>
       <div>
-        <h1 className={`${isSm ? 'text-xl' : 'text-3xl'} font-black tracking-tighter text-white flex items-center`}>
+        <h1 className={`${isSm ? 'text-lg' : 'text-2xl'} font-black tracking-tighter text-white flex items-center leading-none`}>
           Stoque<span className="text-blue-500">+</span>
         </h1>
-        {!isSm && <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em] -mt-1">Ybera Paris</p>}
+        {!isSm && <p className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5">Ybera Paris</p>}
       </div>
     </div>
   );
@@ -278,9 +295,11 @@ const App: React.FC = () => {
         date: new Date().toLocaleDateString(),
         status: StockStatus.INSPECTED,
         inspections: [{
-          bottles: 0,
-          caps: 0,
-          boxes: 0,
+          bottles: entryData.supplyDetails?.bottles || 0,
+          caps: entryData.supplyDetails?.caps || 0,
+          boxes: entryData.supplyDetails?.boxes || 0,
+          cradles: entryData.supplyDetails?.cradles || 0,
+          supplyDescription: entryData.supplyDetails?.description || '',
           assignedSlot: entryData.slotId,
           contentType: entryData.contentType,
           palletNumber: 1
@@ -781,79 +800,61 @@ const App: React.FC = () => {
     };
 
     return (
-      <div className="bg-slate-900 p-4 md:p-6 rounded-3xl border border-slate-800 shadow-xl overflow-hidden mb-8">
+      <div className="bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-800/50 shadow-2xl overflow-hidden mb-6">
         <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
-             <div className={`w-2 h-6 rounded-full ${rack === 'D' ? 'bg-green-600' : rack === 'A' ? 'bg-blue-600' : 'bg-amber-600'}`}></div>
+             <div className={`w-1.5 h-8 rounded-full ${rack === 'D' ? 'bg-green-600' : rack === 'A' ? 'bg-blue-600' : 'bg-amber-600'}`}></div>
              <div className="flex flex-col">
-                <h4 className="text-lg md:text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                  Porta Pallet {rack} - {rackTitles[rack]}
+                <h4 className="text-lg font-black text-white uppercase tracking-tighter flex items-center gap-2">
+                  Porta Pallet {rack} <span className="text-slate-500 font-medium text-sm">/ {rackTitles[rack]}</span>
                 </h4>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Topografia Interna</p>
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Topografia Interna</p>
              </div>
           </div>
           
-          <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800 flex items-center gap-6">
+          <div className="bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-800/50 flex items-center gap-6">
             <div className="flex flex-col items-center">
-              <span className="text-[7px] text-slate-600 font-black uppercase mb-0.5">Livres</span>
+              <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Livres</span>
               <span className="text-sm font-black text-blue-500">{freeCount}</span>
             </div>
-            <div className="w-px h-6 bg-slate-800"></div>
+            <div className="w-px h-6 bg-slate-800/50"></div>
             <div className="flex flex-col items-center">
-              <span className="text-[7px] text-slate-600 font-black uppercase mb-0.5">Total</span>
+              <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Total</span>
               <span className="text-sm font-black text-white">{totalCount}</span>
             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-2.5">
-          {rackSlots.map(slot => (
-            <div key={slot.id} className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative ${
-              slot.status === SlotContent.EMPTY ? 'bg-slate-950/50 border-slate-800 hover:border-slate-700' : 
-              slot.status === SlotContent.BOTTLES ? 'bg-blue-600/20 border-blue-600/50' : 
-              slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/20 border-amber-600/50' :
-              'bg-green-600/20 border-green-600/50'
-            }`}>
-              <span className="text-[7px] md:text-[8px] font-black text-slate-600 mb-0.5">{slot.id}</span>
-              <i className={`fa-solid ${
-                slot.status === SlotContent.EMPTY ? 'fa-plus' :
-                slot.status === SlotContent.BOTTLES ? 'fa-flask' : 
-                slot.status === SlotContent.FINISHED_PRODUCT ? 'fa-dolly' :
-                'fa-pallet'
-              } ${slot.status === SlotContent.EMPTY ? 'text-[8px] md:text-[9px]' : 'text-[10px] md:text-[11px]'} ${
-                slot.status === SlotContent.EMPTY ? 'text-slate-800' : 
-                slot.status === SlotContent.BOTTLES ? 'text-blue-500' : 
-                slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
-                'text-green-500'
-              }`}></i>
-              {slot.occupiedBy && (
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 transition-opacity border border-slate-700">
-                  <span className="text-[6px] md:text-[7px] font-black text-white px-1 text-center leading-tight">{slot.occupiedBy}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const DonutChart = ({ percentage, color, label }: { percentage: number, color: string, label: string }) => {
-    const radius = 36;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-    return (
-      <div className="flex flex-col items-center">
-        <div className="relative w-24 h-24 md:w-32 md:h-32">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-            <circle className="text-slate-800 stroke-current" strokeWidth="8" fill="transparent" r={radius} cx="50" cy="50" />
-            <circle className={`${color} stroke-current transition-all duration-1000 ease-out`} strokeWidth="8" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" fill="transparent" r={radius} cx="50" cy="50" />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xl md:text-2xl font-black text-white">{percentage}%</span>
-            <span className="text-[6px] md:text-[8px] font-black text-slate-500 uppercase">{label}</span>
-          </div>
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
+          {rackSlots.map(slot => {
+            const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : slot.status === SlotContent.BOTTLES ? FlaskConical : slot.status === SlotContent.FINISHED_PRODUCT ? Truck : Package;
+            
+            return (
+              <div key={slot.id} className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative ${
+                slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
+                slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
+                slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
+                'bg-green-600/10 border-green-600/30'
+              }`}>
+                <span className="text-[7px] font-bold text-slate-600 mb-1">{slot.id.split('.').slice(1).join('.')}</span>
+                {ContentIcon ? (
+                  <ContentIcon className={`w-3.5 h-3.5 ${
+                    slot.status === SlotContent.BOTTLES ? 'text-blue-500' : 
+                    slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
+                    'text-green-500'
+                  }`} />
+                ) : (
+                  <div className="w-1 h-1 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
+                )}
+                
+                {slot.occupiedBy && (
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 transition-opacity border border-slate-700 p-1">
+                    <span className="text-[7px] font-bold text-white text-center leading-tight line-clamp-3">{slot.occupiedBy}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -881,14 +882,25 @@ const App: React.FC = () => {
     );
   };
 
-  const NavItem = ({ tab, icon, label, badge }: { tab: typeof activeTab, icon: string, label: string, badge?: number }) => (
+  const NavItem = ({ tab, icon: Icon, label, badge }: { tab: typeof activeTab, icon: React.ElementType, label: string, badge?: number }) => (
     <button 
       onClick={() => { setActiveTab(tab); setIsSidebarOpen(false); }} 
-      className={`w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl transition-all ${activeTab === tab ? 'bg-blue-600 shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400'} text-white shadow-xl`}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${activeTab === tab ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'}`}
     >
-      <i className={`fa-solid ${icon} text-sm opacity-70`}></i>
-      <span className="font-bold text-sm">{label}</span>
-      {badge ? <span className="ml-auto text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-950 text-blue-400">{badge}</span> : null}
+      <Icon className={`w-4 h-4 ${activeTab === tab ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+      <span className="font-semibold text-sm">{label}</span>
+      {badge ? (
+        <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-950 text-blue-400 border border-blue-900/30">
+          {badge}
+        </span>
+      ) : null}
+      {activeTab === tab && (
+        <motion.div 
+          layoutId="activeTab"
+          className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+      )}
     </button>
   );
 
@@ -918,7 +930,7 @@ const App: React.FC = () => {
         {notifications.map(n => (
           <div key={n.id} className={`bg-slate-900 border ${n.type === 'error' ? 'border-red-500/30' : 'border-green-500/30'} text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-300 pointer-events-auto`}>
             <div className={`w-8 h-8 md:w-10 md:h-10 ${n.type === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'} rounded-xl flex items-center justify-center border shrink-0`}>
-              <i className={`fa-solid ${n.type === 'error' ? 'fa-circle-exclamation' : 'fa-check'}`}></i>
+              {n.type === 'error' ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
             </div>
             <p className="text-xs md:text-sm font-black uppercase tracking-tight line-clamp-2">{n.message}</p>
           </div>
@@ -939,47 +951,47 @@ const App: React.FC = () => {
           <div className="p-8 border-b border-slate-800/60 flex justify-between items-center">
             <Logo />
             <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition-colors">
-              <i className="fa-solid fa-xmark text-xl"></i>
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          <nav className="p-5 py-8 space-y-2.5 flex-1 overflow-y-auto">
-            <NavItem tab="dashboard" icon="fa-chart-line" label="Dashboard" />
-            <NavItem tab="movement" icon="fa-dolly" label="Movimentação" />
-            <NavItem tab="inventory" icon="fa-boxes-stacked" label="Estoque Geral" />
-            <NavItem tab="map" icon="fa-warehouse" label="Mapa de vagas" />
-            <NavItem tab="import" icon="fa-file-import" label="Importar CSV" />
-            <NavItem tab="analysis" icon="fa-clipboard-check" label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
-            <NavItem tab="history" icon="fa-clock-rotate-left" label="Histórico" />
+          <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
+            <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
+            <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" />
+            <NavItem tab="inventory" icon={Package} label="Estoque Geral" />
+            <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" />
+            <NavItem tab="import" icon={FileUp} label="Importar CSV" />
+            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
+            <NavItem tab="history" icon={History} label="Histórico" />
           </nav>
 
-          <div className="p-4 space-y-4">
-            <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-xs font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
+          <div className="p-4 space-y-3">
+            <div className="p-5 bg-slate-900/40 border border-slate-800 rounded-2xl">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600/10 flex items-center justify-center text-[10px] font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-xs font-black text-white uppercase tracking-tighter">{user?.name}</p>
+                    <p className="text-[11px] font-black text-white uppercase tracking-tight">{user?.name}</p>
                     <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">{user?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setIsLogoutConfirmOpen(true)}
-                  className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-900/20"
+                  className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg"
                   title="Sair do Sistema"
                 >
-                  <i className="fa-solid fa-right-from-bracket text-xs"></i>
+                  <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>Carga Armazém</span>
+                  <span>Ocupação G0</span>
                   <span>{stats.occupancyRate}%</span>
                 </div>
-                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden shadow-inner">
-                   <div className="h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
+                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                   <div className="h-full bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
                 </div>
               </div>
             </div>
@@ -989,18 +1001,18 @@ const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen lg:h-screen overflow-hidden">
-        <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-900/50 p-4 md:p-6 lg:px-10 flex justify-between items-center sticky top-0 z-30">
+        <header className="bg-slate-950/50 backdrop-blur-xl border-b border-slate-900/50 h-16 px-6 md:px-10 flex justify-between items-center sticky top-0 z-30">
           <div className="flex items-center gap-4">
             {!isPublicView && (
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden w-10 h-10 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
+                className="lg:hidden w-9 h-9 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
               >
-                <i className="fa-solid fa-bars"></i>
+                <Menu className="w-5 h-5" />
               </button>
             )}
             {isPublicView && <Logo isSm={true} />}
-            <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic line-clamp-1">
+            <h2 className="text-lg md:text-xl font-black text-white tracking-tight uppercase italic line-clamp-1">
               {isPublicView ? 'Dashboard Público' : (
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
@@ -1015,17 +1027,19 @@ const App: React.FC = () => {
             </h2>
           </div>
           
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
              {isPublicView && (
                <button 
                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
-                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
+                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[9px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
                >
                  Acessar App
                </button>
              )}
-             <span className={`w-2.5 h-2.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`}></span>
-             <span className="hidden sm:inline text-[11px] font-black text-slate-500 uppercase tracking-widest">{isSearching ? 'Sincronizando...' : 'Sistema Ativo'}</span>
+             <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800/50">
+               <span className={`w-1.5 h-1.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`}></span>
+               <span className="hidden sm:inline text-[9px] font-bold text-slate-500 uppercase tracking-widest">{isSearching ? 'Sincronizando' : 'Online'}</span>
+             </div>
           </div>
         </header>
 
@@ -1033,7 +1047,7 @@ const App: React.FC = () => {
           {activeTab === 'movement' && (
             <div className="max-w-4xl mx-auto text-center space-y-8 py-20 animate-in fade-in slide-in-from-bottom-10 duration-700">
               <div className="w-24 h-24 bg-blue-600/10 text-blue-500 rounded-[32px] flex items-center justify-center mx-auto border border-blue-500/20 shadow-2xl shadow-blue-900/20 mb-8">
-                <i className="fa-solid fa-dolly text-4xl"></i>
+                <Truck className="w-10 h-10" />
               </div>
               <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase italic">Gestão de Movimentação</h2>
               <p className="text-slate-500 text-sm md:text-base font-bold uppercase tracking-[0.3em] max-w-xl mx-auto leading-relaxed">
@@ -1044,172 +1058,251 @@ const App: React.FC = () => {
                   onClick={() => setIsMovementModalOpen(true)}
                   className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 flex items-center gap-4 mx-auto"
                 >
-                  Abrir Painel de Movimentação <i className="fa-solid fa-plus"></i>
+                  Abrir Painel de Movimentação <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
           )}
 
           {(activeTab === 'dashboard' || isPublicView) && (
-            <div className="max-w-7xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
+            <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
                 {/* Dashboard Actions */}
-                <div className="flex flex-wrap justify-end gap-4">
+                <div className="flex flex-wrap justify-end gap-3">
                     {!isPublicView && (
                       <button 
                           onClick={handleShareDashboard}
-                          className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all border border-slate-800 hover:border-amber-500/50 group"
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-amber-500/30 group"
                       >
-                          <i className="fa-solid fa-share-nodes text-amber-500 group-hover:scale-110 transition-transform"></i> Compartilhar Dashboard
+                          <Share2 className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" /> Compartilhar
                       </button>
                     )}
                     <button 
                         onClick={handleExportInventory}
-                        className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all border border-slate-800 hover:border-blue-500/50 group"
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-blue-500/30 group"
                     >
-                        <i className="fa-solid fa-file-export text-blue-500 group-hover:scale-110 transition-transform"></i> Exportar Estoque Geral
+                        <Download className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" /> Exportar CSV
                     </button>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-blue-500/50 transition-all">
-                       <div className="flex justify-between items-center mb-4">
-                         <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-900/20"><i className="fa-solid fa-pallet"></i></div>
-                         <span className="text-[7px] md:text-[8px] font-black text-slate-600 uppercase tracking-widest italic">Capacidade G0</span>
-                       </div>
-                       <p className="text-[10px] md:text-[11px] text-slate-500 font-black uppercase mb-1 tracking-widest">Pallets Alocados</p>
-                       <p className="text-4xl md:text-6xl font-black text-white tracking-tighter">{stats.occupiedSlots}</p>
-                       <div className="h-1 bg-slate-950 rounded-full mt-4 overflow-hidden"><div className="h-full bg-blue-600" style={{width: `${stats.occupancyRate}%`}}></div></div>
+                {/* Occupancy Progress Bar */}
+                <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Utilização do Armazém G0</h4>
+                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade em tempo real</p>
                     </div>
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-amber-500/50 transition-all">
-                       <div className="flex justify-between items-center mb-4">
-                         <div className="w-10 h-10 md:w-12 md:h-12 bg-amber-600/10 text-amber-500 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-900/20"><i className="fa-solid fa-warehouse"></i></div>
-                       </div>
-                       <p className="text-[10px] md:text-[11px] text-slate-500 font-black uppercase mb-1 tracking-widest">Vagas Disponíveis</p>
-                       <p className="text-4xl md:text-6xl font-black text-white tracking-tighter">{stats.freeSlots}</p>
-                       <p className="text-[8px] md:text-[10px] text-slate-600 font-bold mt-2 uppercase italic tracking-widest">Total: {stats.totalSlots}</p>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                     </div>
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-indigo-500/50 transition-all">
-                       <div className="flex justify-between items-center mb-4">
-                         <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600/10 text-indigo-500 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-lg shadow-indigo-900/20"><i className="fa-solid fa-clipboard-list"></i></div>
+                  </div>
+                  <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${stats.occupancyRate}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className={`h-full rounded-full shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all ${
+                        stats.occupancyRate > 90 ? 'bg-red-500 shadow-red-900/40' : 
+                        stats.occupancyRate > 75 ? 'bg-amber-500 shadow-amber-900/40' : 
+                        'bg-blue-600'
+                      }`}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                    <span>0%</span>
+                    <span>{stats.occupiedSlots} / {stats.totalSlots} Vagas</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+
+                {/* Top Stats Row: Flasks, Free, Occupied */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                    {/* Flasks - Smaller as requested */}
+                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-blue-500/30 transition-all">
+                       <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
+                         <FlaskConical className="w-5 h-5" />
                        </div>
-                       <p className="text-[10px] md:text-[11px] text-slate-500 font-black uppercase mb-1 tracking-widest">Cargas Pendentes</p>
-                       <p className="text-4xl md:text-6xl font-black text-white tracking-tighter">{stats.pendingEntries}</p>
-                       <p className="text-[8px] md:text-[10px] text-slate-600 font-bold mt-2 uppercase italic tracking-widest">Aguardando Análise</p>
+                       <div>
+                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Total de Frascos</p>
+                         <p className="text-2xl font-black text-white tracking-tight">{stats.totalBottles.toLocaleString()}</p>
+                       </div>
                     </div>
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-green-500/50 transition-all">
-                       <div className="flex justify-between items-center mb-4">
-                         <div className="w-10 h-10 md:w-12 md:h-12 bg-green-600/10 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 shadow-lg shadow-green-900/20"><i className="fa-solid fa-clock-rotate-left"></i></div>
+
+                    {/* Free Slots */}
+                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-green-500/30 transition-all">
+                       <div className="w-10 h-10 bg-green-600/10 text-green-500 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
+                         <CheckCircle2 className="w-5 h-5" />
                        </div>
-                       <p className="text-[10px] md:text-[11px] text-slate-500 font-black uppercase mb-1 tracking-widest">Movimentações</p>
-                       <p className="text-4xl md:text-6xl font-black text-white tracking-tighter">{stats.dailyMovements}</p>
-                       <p className="text-[8px] md:text-[10px] text-slate-600 font-bold mt-2 uppercase italic tracking-widest">Últimas 24 Horas</p>
+                       <div>
+                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Livres</p>
+                         <p className="text-2xl font-black text-white tracking-tight">{stats.freeSlots}</p>
+                       </div>
+                       <div className="ml-auto text-right">
+                         <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Total: {stats.totalSlots}</p>
+                       </div>
+                    </div>
+
+                    {/* Occupied Slots */}
+                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
+                       <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
+                         <Boxes className="w-5 h-5" />
+                       </div>
+                       <div>
+                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Ocupadas</p>
+                         <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
+                       </div>
+                       <div className="ml-auto text-right">
+                         <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">{stats.occupancyRate}% Ocupação</p>
+                       </div>
                     </div>
                 </div>
 
-                {/* Charts Area */}
+                {/* Bottom Stats Row: Movements, Pending */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    {/* Movements */}
+                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-indigo-500/30 transition-all relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                         <History className="w-32 h-32" />
+                       </div>
+                       <div className="flex justify-between items-start mb-6">
+                         <div className="w-12 h-12 bg-indigo-600/10 text-indigo-500 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-lg shadow-indigo-900/20">
+                           <History className="w-6 h-6" />
+                         </div>
+                         <div className="text-right">
+                           <h4 className="text-sm font-black text-white uppercase italic tracking-tight">Movimentações</h4>
+                           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Últimas 24 Horas</p>
+                         </div>
+                       </div>
+                       <div className="flex items-baseline gap-3">
+                         <p className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.dailyMovements}</p>
+                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Registros</p>
+                       </div>
+                       <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between">
+                         <div className="flex gap-2">
+                           <div className="px-2 py-1 rounded-lg bg-green-500/10 text-green-500 text-[8px] font-bold uppercase border border-green-500/20">Entradas: {history.filter(h => h.type === HistoryType.ENTRY).length}</div>
+                           <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-[8px] font-bold uppercase border border-blue-500/20">Saídas: {history.filter(h => h.type === HistoryType.EXIT).length}</div>
+                         </div>
+                         <button onClick={() => setActiveTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                           Ver tudo <ArrowRight className="w-3 h-3" />
+                         </button>
+                       </div>
+                    </div>
+
+                    {/* Pending Entries */}
+                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-red-500/30 transition-all relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                         <Truck className="w-32 h-32" />
+                       </div>
+                       <div className="flex justify-between items-start mb-6">
+                         <div className="w-12 h-12 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center border border-red-500/20 shadow-lg shadow-red-900/20">
+                           <Truck className="w-6 h-6" />
+                         </div>
+                         <div className="text-right">
+                           <h4 className="text-sm font-black text-white uppercase italic tracking-tight">Entradas Pendentes</h4>
+                           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Aguardando Análise</p>
+                         </div>
+                       </div>
+                       <div className="flex items-baseline gap-3">
+                         <p className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.pendingEntries}</p>
+                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cargas</p>
+                       </div>
+                       <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${stats.pendingEntries > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-700'}`}></div>
+                           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                             {stats.pendingEntries > 0 ? 'Ação Necessária' : 'Tudo em dia'}
+                           </p>
+                         </div>
+                         <button onClick={() => setActiveTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                           Ir para Análise <ArrowRight className="w-3 h-3" />
+                         </button>
+                       </div>
+                    </div>
+                </div>
+
+                {/* Charts Area - Keeping some but making them more modern */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
-                  {/* Occupancy Chart */}
-                  <div className="bg-slate-900 p-6 md:p-10 rounded-[32px] md:rounded-[48px] border border-slate-800 shadow-3xl">
+                  {/* Rack Distribution Chart */}
+                  <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                       <div>
-                        <h4 className="text-lg md:text-xl font-black text-white uppercase italic tracking-tighter">Ocupação do Armazém</h4>
-                        <p className="text-[8px] md:text-[10px] text-slate-600 font-black uppercase tracking-widest">Análise Geográfica de Vagas</p>
+                        <h4 className="text-lg font-black text-white uppercase italic tracking-tighter">Distribuição por Rack</h4>
+                        <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Ocupação Setorial G0</p>
                       </div>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-600"></div><span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Ocupado</span></div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-800"></div><span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Livre</span></div>
+                      <div className="flex gap-3">
+                        <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span></div>
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center gap-8 md:gap-12">
-                       <DonutChart percentage={stats.occupancyRate} color="text-blue-600" label="Ocupação" />
-                       <div className="flex-1 space-y-6 w-full">
-                          <div className="grid grid-cols-2 gap-3 md:gap-4">
-                             <div className="p-3 md:p-4 bg-slate-950/50 rounded-2xl md:rounded-3xl border border-slate-800/50 text-center">
-                                <p className="text-[7px] md:text-[9px] font-black text-slate-600 uppercase mb-1">Total Vagas</p>
-                                <p className="text-lg md:text-xl font-black text-white italic">{stats.totalSlots}</p>
-                             </div>
-                             <div className="p-3 md:p-4 bg-slate-950/50 rounded-2xl md:rounded-3xl border border-slate-800/50 text-center">
-                                <p className="text-[7px] md:text-[9px] font-black text-slate-600 uppercase mb-1">Vagas Livres</p>
-                                <p className="text-lg md:text-xl font-black text-blue-500 italic">{stats.freeSlots}</p>
-                             </div>
+                    <div className="space-y-6">
+                      {['A', 'B', 'C', 'D'].map(rack => {
+                        const rackSlots = slots.filter(s => s.rack === rack);
+                        const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
+                        const total = rackSlots.length;
+                        const rate = Math.round((occupied / total) * 100);
+                        const color = rack === 'A' ? 'bg-blue-600' : rack === 'B' ? 'bg-amber-600' : rack === 'C' ? 'bg-indigo-600' : 'bg-green-600';
+                        
+                        return (
+                          <div key={rack} className="space-y-2">
+                            <div className="flex justify-between items-end">
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Porta Pallet {rack}</span>
+                              <span className="text-[10px] font-black text-slate-400">{rate}% ({occupied}/{total})</span>
+                            </div>
+                            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${rate}%` }}
+                                className={`h-full ${color} rounded-full`}
+                              />
+                            </div>
                           </div>
-                          <p className="text-[10px] md:text-[11px] text-slate-500 font-bold leading-relaxed italic text-center sm:text-left">
-                            O armazém G0 opera com <span className="text-white font-black">{stats.occupancyRate}%</span> de utilização total.
-                          </p>
-                       </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Pending Movements Chart */}
-                  <div className="bg-slate-900 p-6 md:p-10 rounded-[32px] md:rounded-[48px] border border-slate-800 shadow-3xl">
-                    <div className="flex justify-between items-center mb-8">
+                  {/* Product Distribution Card */}
+                  <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                       <div>
-                        <h4 className="text-lg md:text-xl font-black text-white uppercase italic tracking-tighter">Logística de Pendências</h4>
-                        <p className="text-[8px] md:text-[10px] text-slate-600 font-black uppercase tracking-widest">Status de Movimentação</p>
+                        <h4 className="text-lg font-black text-white uppercase italic tracking-tighter">Distribuição por Produto</h4>
+                        <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Ocupação por Categoria G0</p>
                       </div>
-                      <i className="fa-solid fa-truck-moving text-slate-800 text-xl md:text-2xl"></i>
-                    </div>
-                    <div className="flex flex-col justify-center min-h-[132px]">
-                      <BarChart data={[
-                        { label: 'Pendentes de Inspeção', value: stats.pendingEntries, color: 'bg-indigo-600' },
-                        { label: 'Armazenados (Estoque)', value: stats.occupiedSlots, color: 'bg-green-600' },
-                        { label: 'Saídas Realizadas', value: history.filter(h => h.type === HistoryType.EXIT).length, color: 'bg-blue-600' }
-                      ]} />
-                    </div>
-                  </div>
-
-                  {/* Bottles Counter Chart */}
-                  <div className="bg-slate-900 p-6 md:p-10 rounded-[32px] md:rounded-[48px] border border-slate-800 shadow-3xl xl:col-span-2">
-                    <div className="flex justify-between items-center mb-8">
-                      <div>
-                        <h4 className="text-lg md:text-xl font-black text-white uppercase italic tracking-tighter">Total de Frascos em Estoque</h4>
-                        <p className="text-[8px] md:text-[10px] text-slate-600 font-black uppercase tracking-widest">Contagem Unitária Consolidada</p>
-                      </div>
-                      <div className="w-12 h-12 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-900/20">
-                        <i className="fa-solid fa-flask text-xl"></i>
+                      <div className="flex gap-3">
+                        <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Categoria</span></div>
                       </div>
                     </div>
-                    <div className="flex flex-col md:flex-row items-center gap-10">
-                      <div className="flex-1 w-full space-y-6">
-                        <div className="flex items-baseline gap-4">
-                          <span className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.totalBottles.toLocaleString()}</span>
-                          <span className="text-slate-500 font-black uppercase text-xs tracking-widest">Unidades</span>
-                        </div>
-                        <div className="h-4 bg-slate-950 rounded-full border border-slate-800 overflow-hidden p-1">
-                          <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.4)]" style={{ width: '100%' }}></div>
-                        </div>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
-                          Este valor representa a soma total de frascos registrados em todos os pallets atualmente alocados no armazém G0.
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0">
-                        <div className="p-6 bg-slate-950/50 rounded-3xl border border-slate-800/50 text-center">
-                          <p className="text-[8px] font-black text-slate-600 uppercase mb-2">Média por Pallet</p>
-                          <p className="text-2xl font-black text-white italic">
-                            {stats.occupiedSlots > 0 ? Math.round(stats.totalBottles / stats.occupiedSlots) : 0}
-                          </p>
-                        </div>
-                        <div className="p-6 bg-slate-950/50 rounded-3xl border border-slate-800/50 text-center">
-                          <p className="text-[8px] font-black text-slate-600 uppercase mb-2">Capacidade Max</p>
-                          <p className="text-2xl font-black text-blue-500 italic">∞</p>
-                        </div>
-                      </div>
+                    <div className="space-y-6">
+                      {[
+                        { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600' },
+                        { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600' },
+                        { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
+                        { type: SlotContent.RETURN, label: 'Retorno', color: 'bg-red-600' },
+                        { type: 'OTHER', label: 'Outros', color: 'bg-slate-600' }
+                      ].map(item => {
+                        const count = item.type === 'OTHER' 
+                          ? slots.filter(s => s.status !== SlotContent.EMPTY && ![SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT, SlotContent.RETURN].includes(s.status)).length
+                          : slots.filter(s => s.status === item.type).length;
+                        
+                        const totalOccupied = stats.occupiedSlots || 1;
+                        const rate = Math.round((count / totalOccupied) * 100);
+                        
+                        return (
+                          <div key={item.label} className="space-y-2">
+                            <div className="flex justify-between items-end">
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest italic">{item.label}</span>
+                              <span className="text-[10px] font-black text-slate-400">{rate}% ({count})</span>
+                            </div>
+                            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${rate}%` }}
+                                className={`h-full ${item.color} rounded-full`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-
-                {/* Map Shortcut Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-[32px] md:rounded-[48px] p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between overflow-hidden relative group cursor-pointer gap-6" onClick={() => setActiveTab('map')}>
-                   <div className="absolute inset-0 bg-blue-600/5 opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
-                   <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-8 relative z-10 text-center sm:text-left">
-                     <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-950 rounded-2xl md:rounded-3xl flex items-center justify-center border border-slate-800 shadow-2xl group-hover:border-blue-600/50 transition-all duration-500"><i className="fa-solid fa-warehouse text-2xl md:text-3xl text-blue-500"></i></div>
-                     <div>
-                        <h4 className="text-xl md:text-2xl font-black text-white uppercase italic tracking-tighter">Mapa de vagas G0</h4>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-black uppercase tracking-widest mt-1">Visualize a alocação física de cada pallet nos racks</p>
-                     </div>
-                   </div>
-                   <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-900/40 transform group-hover:scale-110 transition-all duration-500 shrink-0"><i className="fa-solid fa-arrow-right"></i></div>
                 </div>
             </div>
           )}
@@ -1233,35 +1326,45 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'history' && (
-            <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
+            <div className="max-w-5xl mx-auto space-y-3 animate-in fade-in duration-500">
                 {history.length === 0 ? (
-                    <div className="py-40 text-center border-2 border-dashed border-slate-900 rounded-[48px]">
-                        <i className="fa-solid fa-clock-rotate-left text-5xl text-slate-800 mb-6"></i>
-                        <p className="text-slate-700 font-black uppercase text-xs tracking-[0.4em]">Sem movimentações registradas</p>
+                    <div className="py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
+                        <History className="w-12 h-12 text-slate-800 mx-auto mb-4" />
+                        <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">Sem movimentações registradas</p>
                     </div>
                 ) : (
                     history.map(entry => (
-                        <div key={entry.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-8 hover:border-slate-700 transition-all">
-                            <div className="flex flex-col items-start min-w-[140px] w-full md:w-auto">
-                                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border mb-3 ${
-                                    entry.type === HistoryType.ENTRY ? 'bg-green-600/10 text-green-500 border-green-500/20' : 
-                                    entry.type === HistoryType.EXIT ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' : 
-                                    entry.type === HistoryType.TRANSFER ? 'bg-amber-600/10 text-amber-500 border-amber-500/20' :
-                                    'bg-red-600/10 text-red-500 border-red-500/20'
+                        <div key={entry.id} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:border-slate-700 transition-all group">
+                            <div className="flex flex-col items-start min-w-[120px]">
+                                <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border mb-2 ${
+                                    entry.type === HistoryType.ENTRY ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
+                                    entry.type === HistoryType.EXIT ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                                    entry.type === HistoryType.TRANSFER ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                    'bg-red-500/10 text-red-500 border-red-500/20'
                                 }`}>
-                                  {entry.type === HistoryType.ENTRY && 'Entrada G0'}
-                                  {entry.type === HistoryType.EXIT && 'Saída Matriz'}
-                                  {entry.type === HistoryType.TRANSFER && 'Transferência'}
+                                  {entry.type === HistoryType.ENTRY && 'Entrada'}
+                                  {entry.type === HistoryType.EXIT && 'Saída'}
+                                  {entry.type === HistoryType.TRANSFER && 'Transf.'}
                                   {entry.type === HistoryType.REMOVAL && 'Removido'}
                                 </span>
-                                <p className="text-[10px] text-slate-600 font-black font-mono">{entry.timestamp}</p>
+                                <p className="text-[9px] text-slate-600 font-bold font-mono">{entry.timestamp}</p>
                             </div>
-                            <div className="flex-1 space-y-2 w-full md:w-auto">
-                                <div className="flex items-center gap-3"><p className="text-[10px] font-black text-slate-400">ID: {entry.loadingId}</p><div className="h-px flex-1 bg-slate-800 rounded-full"></div><span className="text-[10px] font-black text-slate-600 uppercase italic">Vaga {entry.slot}</span></div>
-                                <h4 className="text-white font-black uppercase text-sm leading-tight">{entry.description}</h4>
-                                <div className="flex flex-wrap gap-4"><span className="text-[10px] font-bold text-blue-500">OP {entry.op}</span><span className="text-[10px] font-bold text-amber-500">Lote {entry.lot}</span><span className="text-[10px] font-bold text-slate-500">P{entry.palletNumber}/{entry.totalPallets}</span></div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">ID: {entry.loadingId}</p>
+                                  <div className="h-px flex-1 bg-slate-800/50"></div>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase italic">Vaga {entry.slot}</span>
+                                </div>
+                                <h4 className="text-white font-bold uppercase text-xs truncate">{entry.description}</h4>
+                                <div className="flex flex-wrap gap-3 mt-1">
+                                  <span className="text-[9px] font-bold text-blue-500/80">OP {entry.op}</span>
+                                  <span className="text-[9px] font-bold text-amber-500/80">Lote {entry.lot}</span>
+                                  <span className="text-[9px] font-bold text-slate-500">P{entry.palletNumber}/{entry.totalPallets}</span>
+                                </div>
                             </div>
-                            <div className="bg-slate-950 px-6 py-4 rounded-2xl border border-slate-800/50 min-w-[160px] w-full md:w-auto text-center"><p className="text-[11px] font-black text-white uppercase">{entry.details}</p></div>
+                            <div className="bg-slate-950/50 px-4 py-2.5 rounded-xl border border-slate-800/50 min-w-[140px] text-center">
+                              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{entry.details}</p>
+                            </div>
                         </div>
                     ))
                 )}
@@ -1269,95 +1372,92 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'inventory' && (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+            <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
                 {/* Search and Filter Area */}
-                <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="flex flex-col md:flex-row gap-3 items-center">
                     <div className="relative flex-1 w-full">
-                        <i className="fa-solid fa-magnifying-glass absolute left-6 top-1/2 -translate-y-1/2 text-slate-700"></i>
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 w-4 h-4" />
                         <input 
                             type="text" 
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
                             placeholder="Buscar por OP, Produto ou Lote..." 
-                            className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-14 py-4 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
                     {selectedPallets.length > 0 && (
                         <button 
                             onClick={() => setIsBulkConfirmOpen(true)}
-                            className="w-full md:w-auto px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-purple-900/20 animate-in zoom-in duration-200"
+                            className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
                         >
-                            <i className="fa-solid fa-paper-plane"></i> Enviar Selecionados ({selectedPallets.length})
+                            <Send className="w-3.5 h-3.5" /> Enviar Selecionados ({selectedPallets.length})
                         </button>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                     {filteredInventory.length === 0 ? (
-                        <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-900 rounded-[48px]">
-                            <p className="text-slate-700 font-black uppercase text-xs tracking-[0.4em]">Nenhum item encontrado no estoque</p>
+                        <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-900 rounded-[32px]">
+                            <p className="text-slate-700 font-black uppercase text-[10px] tracking-[0.3em]">Nenhum item encontrado no estoque</p>
                         </div>
                     ) : (
                         filteredInventory.map(({ row: item, inspection: insp, idx }) => {
                             const isSelected = selectedPallets.includes(`${item.id}::${idx}`);
+                            const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : Package;
+                            
                             return (
-                                <div 
+                                <motion.div 
+                                    layout
                                     key={`${item.id}::${idx}`} 
                                     onClick={() => togglePalletSelection(item.id, idx)}
-                                    className={`bg-slate-900/40 backdrop-blur-xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-slate-800 shadow-2xl group hover:-translate-y-1.5 transition-all duration-500 border-t-8 cursor-pointer relative overflow-hidden flex flex-col justify-between h-full min-h-[320px] ${isSelected ? 'border-t-purple-500 ring-2 ring-purple-500/50 bg-purple-900/10' : insp.contentType === SlotContent.BOTTLES ? 'border-t-blue-600' : insp.contentType === SlotContent.SUPPLIES ? 'border-t-amber-600' : 'border-t-green-600'}`}
+                                    className={`bg-slate-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-slate-800 shadow-xl group hover:border-slate-700 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between h-full min-h-[280px] ${isSelected ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50' : ''}`}
                                 >
                                   {/* Selection Indicator */}
-                                  <div className={`absolute top-6 left-6 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-950/50 border-slate-800 text-transparent'}`}>
-                                    <i className="fa-solid fa-check text-[10px]"></i>
+                                  <div className={`absolute top-4 left-4 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-950/50 border-slate-800 text-transparent'}`}>
+                                    <CheckCircle2 className="w-3 h-3" />
                                   </div>
 
-                                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-50"></div>
-                                  
                                   <div className="mt-4">
-                                    <div className="flex justify-between items-start mb-6">
-                                      <div className={`w-12 h-12 md:w-14 md:h-14 bg-slate-950/80 rounded-2xl flex items-center justify-center border border-slate-800 shadow-inner ${insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 'text-green-500'}`}>
-                                        <i className={`fa-solid ${
-                                            insp.contentType === SlotContent.BOTTLES ? 'fa-flask' : 
-                                            insp.contentType === SlotContent.FINISHED_PRODUCT ? 'fa-dolly' :
-                                            'fa-box-open'
-                                        } text-xl md:text-2xl`}></i>
+                                    <div className="flex justify-between items-start mb-4">
+                                      <div className={`w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800 shadow-inner ${insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 'text-green-500'}`}>
+                                        <ContentIcon className="w-5 h-5" />
                                       </div>
-                                      <div className="flex flex-col items-end gap-1.5">
-                                        <span className={`bg-slate-950/90 text-[8px] md:text-[10px] font-black px-3 md:px-4 py-1.5 rounded-xl border border-slate-800 uppercase shadow-xl tracking-widest ${insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 'text-slate-300'}`}>VAGA {insp.assignedSlot}</span>
-                                        <span className="text-[8px] md:text-[9px] text-slate-500 font-black uppercase tracking-widest">Pallet {idx + 1} de {item.pallets}</span>
+                                      <div className="flex flex-col items-end gap-1">
+                                        <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 'text-slate-300'}`}>VAGA {insp.assignedSlot}</span>
+                                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Pallet {idx + 1}/{item.pallets}</span>
                                       </div>
                                     </div>
 
-                                    <h4 className="font-black text-white text-sm md:text-base mb-6 uppercase tracking-tight min-h-[3rem] md:min-h-[3.5rem] overflow-hidden leading-tight line-clamp-3">{item.description}</h4>
+                                    <h4 className="font-bold text-white text-sm mb-4 uppercase tracking-tight line-clamp-2 leading-tight min-h-[2.5rem]">{item.description}</h4>
 
-                                    <div className="grid grid-cols-2 gap-3 mb-6">
-                                       <div className="bg-slate-950/80 p-3 md:p-3.5 rounded-2xl border border-slate-800/50 flex flex-col items-center">
-                                          <p className="text-[7px] md:text-[8px] text-slate-600 font-black uppercase mb-1 tracking-widest">OP</p>
-                                          <p className="text-sm md:text-base font-black text-blue-400 font-mono italic">{item.originOP}</p>
+                                    <div className="grid grid-cols-2 gap-2 mb-4">
+                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">OP</p>
+                                          <p className="text-xs font-black text-blue-400 font-mono italic">{item.originOP}</p>
                                        </div>
-                                       <div className="bg-slate-950/80 p-3 md:p-3.5 rounded-2xl border border-slate-800/50 flex flex-col items-center">
-                                          <p className="text-[7px] md:text-[8px] text-slate-600 font-black uppercase mb-1 tracking-widest">Lote</p>
-                                          <p className="text-sm md:text-base font-black text-amber-400 font-mono italic">{item.lot}</p>
+                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Lote</p>
+                                          <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
                                        </div>
                                     </div>
                                   </div>
                                   
-                                  <div className="flex gap-2.5">
+                                  <div className="flex gap-2">
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); setDetailContext({ row: item, inspection: insp, idx }); }} 
-                                      className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+                                      className="flex-1 py-2 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
                                     >
-                                      <i className="fa-solid fa-circle-info"></i> Detalhes
+                                      <Info className="w-3 h-3" /> Detalhes
                                     </button>
                                     
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); setDeleteContext({ type: 'pallet', rowId: item.id, palletIdx: idx }); }} 
-                                      className="w-12 h-12 bg-slate-950 hover:bg-red-500/10 text-slate-600 hover:text-red-500 border border-slate-800 hover:border-red-600/50 rounded-2xl transition-all flex items-center justify-center shrink-0"
+                                      className="w-9 h-9 bg-slate-950 hover:bg-red-500/10 text-slate-600 hover:text-red-500 border border-slate-800 hover:border-red-600/50 rounded-xl transition-all flex items-center justify-center shrink-0"
                                     >
-                                      <i className="fa-solid fa-trash-alt text-xs"></i>
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
-                                </div>
+                                </motion.div>
                             );
                         })
                     )}
@@ -1389,7 +1489,7 @@ const App: React.FC = () => {
       {deleteContext && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><i className="fa-solid fa-exclamation-triangle text-xl md:text-2xl"></i></div>
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertCircle className="w-8 h-8" /></div>
             <h3 className="text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Exclusão</h3>
             <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed">{deleteContext.type === 'row' ? 'Deseja remover este carregamento da fila?' : 'Deseja remover este pallet do inventário?'}</p>
             <div className="flex gap-4 pt-4"><button onClick={() => setDeleteContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-800 text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Cancelar</button><button onClick={confirmDelete} className="flex-1 py-3 md:py-3.5 bg-red-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95">Remover</button></div>
@@ -1400,7 +1500,7 @@ const App: React.FC = () => {
       {matrixConfirmContext && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-blue-900/20"><i className="fa-solid fa-dolly text-xl md:text-2xl"></i></div>
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-blue-900/20"><Truck className="w-8 h-8" /></div>
             <h3 className="text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Envio</h3>
             <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja enviar este pallet para processamento na Matriz?</p>
             <div className="flex gap-4 pt-4">
@@ -1415,7 +1515,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-300">
             <div className="w-16 h-16 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-red-900/20">
-              <i className="fa-solid fa-right-from-bracket text-2xl"></i>
+              <LogOut className="w-8 h-8" />
             </div>
             <div>
               <h3 className="text-white font-black uppercase text-xl italic tracking-tight mb-2">Encerrar Sessão</h3>

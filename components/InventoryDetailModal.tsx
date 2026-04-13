@@ -1,6 +1,14 @@
 
 import React from 'react';
 import { SheetRow, InspectionData, SlotContent } from '../types';
+import { 
+  FlaskConical, 
+  Truck, 
+  Package, 
+  X, 
+  Info, 
+  Box 
+} from 'lucide-react';
 
 interface InventoryDetailModalProps {
   isOpen: boolean;
@@ -15,6 +23,9 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
 
   const isBottles = inspection.contentType === SlotContent.BOTTLES;
   const isFinished = inspection.contentType === SlotContent.FINISHED_PRODUCT;
+  const isSupplies = inspection.contentType === SlotContent.SUPPLIES;
+
+  const Icon = isBottles ? FlaskConical : isFinished ? Truck : Package;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
@@ -25,13 +36,10 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-3 ${
                 isBottles ? 'bg-blue-600 shadow-blue-900/40' : 
                 isFinished ? 'bg-green-600 shadow-green-900/40' :
+                isSupplies ? 'bg-indigo-600 shadow-indigo-900/40' :
                 'bg-amber-600 shadow-amber-900/40'
              }`}>
-                <i className={`fa-solid ${
-                    isBottles ? 'fa-flask' : 
-                    isFinished ? 'fa-dolly' :
-                    'fa-box-open'
-                } text-white text-xl`}></i>
+                <Icon className="text-white w-6 h-6" />
              </div>
              <div>
                 <h3 className="font-black text-xl italic uppercase tracking-tighter text-white">Detalhes do Item</h3>
@@ -39,7 +47,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
              </div>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-950/50 rounded-xl text-slate-500 hover:text-white transition-all">
-            <i className="fa-solid fa-times"></i>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -58,6 +66,11 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
           <div className="space-y-4">
             <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest italic">Descrição do Produto</p>
             <h4 className="text-lg text-white font-black uppercase leading-tight tracking-tight">{row.description}</h4>
+            {isSupplies && inspection.supplyDescription && (
+              <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider bg-indigo-500/5 p-3 rounded-xl border border-indigo-500/10 flex items-center gap-2">
+                <Info className="w-4 h-4" /> {inspection.supplyDescription}
+              </p>
+            )}
             <div className="flex gap-4">
                <span className="bg-blue-600/10 text-blue-500 text-[10px] font-black px-3 py-1 rounded-lg border border-blue-500/20 uppercase tracking-widest">OP {row.originOP}</span>
                <span className="bg-amber-600/10 text-amber-500 text-[10px] font-black px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Lote {row.lot}</span>
@@ -66,13 +79,14 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
 
           <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40">
             <div className="flex justify-between items-center mb-6">
-               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Conferência Técnica</p>
-               <span className="bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-400 border border-slate-800 uppercase italic">Vaga {inspection.assignedSlot}</span>
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Conferência Técnica</p>
+                <span className="bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-400 border border-slate-800 uppercase italic">Vaga {inspection.assignedSlot}</span>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Unidades</p><p className={`text-xl font-black ${inspection.bottles > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.bottles}</p></div>
-              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Tampas</p><p className={`text-xl font-black ${inspection.caps > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.caps}</p></div>
-              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Caixas</p><p className={`text-xl font-black ${inspection.boxes > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.boxes}</p></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Caixas</p><p className={`text-lg font-black ${inspection.boxes > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.boxes}</p></div>
+              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Frascos</p><p className={`text-lg font-black ${inspection.bottles > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.bottles}</p></div>
+              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Berços</p><p className={`text-lg font-black ${inspection.cradles > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.cradles}</p></div>
+              <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Tampas</p><p className={`text-lg font-black ${inspection.caps > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.caps}</p></div>
             </div>
           </div>
 

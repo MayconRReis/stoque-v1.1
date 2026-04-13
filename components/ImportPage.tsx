@@ -1,7 +1,9 @@
 
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
-import { WarehouseSlot, SlotContent, SheetRow, StockStatus, InspectionData, translateSlotContent } from '../types';
+import { WarehouseSlot, SlotContent, SheetRow, StockStatus, translateSlotContent } from '../types';
+import { FileUp, Upload, Check, CheckCircle2, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ImportPageProps {
   availableSlots: WarehouseSlot[];
@@ -31,7 +33,6 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
       complete: (results) => {
         const parsedData = results.data as any[];
         
-        // Map CSV columns to our internal format and suggest slots
         const mappedItems = parsedData.map((row, index) => {
           const op = row.op || row.OP || '';
           const nome = row.nome || row.NOME || row.description || '';
@@ -44,7 +45,6 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
           else if (tipo.includes('ACABADO')) contentType = SlotContent.FINISHED_PRODUCT;
           else if (tipo.includes('INSUMO')) contentType = SlotContent.SUPPLIES;
 
-          // Suggest slot based on type (same logic as MovementModal)
           let suggestedSlot: string | undefined;
           const usedSlotsInThisImport = parsedData.slice(0, index).map(p => p.suggestedSlot).filter(Boolean);
           const trulyAvailable = availableSlots.filter(s => !usedSlotsInThisImport.includes(s.id));
@@ -95,22 +95,23 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
         const tempId = Math.random().toString(36).substring(2, 8).toUpperCase();
         const row: SheetRow = {
           id: `ROW-${Date.now()}-${Math.random()}`,
-          loadingId: tempId, // Temporary ID until analysis
+          loadingId: tempId,
           originOP: item.op,
           description: item.nome,
           lot: item.lote,
-          pallets: 1, // Default to 1 pallet per row for individual analysis
+          pallets: 1,
           date: new Date().toLocaleDateString('pt-BR'),
           status: StockStatus.PENDING,
           inspections: [{
             bottles: item.contentType === SlotContent.BOTTLES ? parseInt(item.quantidade) : 0,
             caps: 0,
             boxes: 0,
+            cradles: 0,
             contentType: item.contentType,
             palletNumber: 1
           }]
         };
-        return { row, slotId: '' }; // No slot assigned yet
+        return { row, slotId: '' };
       });
 
       await onProcess(entries);
@@ -124,13 +125,14 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="bg-slate-900 p-8 md:p-12 rounded-[48px] border border-slate-800 shadow-3xl text-center">
-        <div className="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-[32px] flex items-center justify-center mx-auto mb-8 border border-blue-500/20 shadow-xl">
-          <i className="fa-solid fa-file-import text-3xl"></i>
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+      <div className="bg-slate-900/40 backdrop-blur-xl p-8 md:p-16 rounded-[2.5rem] border border-slate-800 shadow-3xl text-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent"></div>
+        <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-blue-500/20 shadow-xl">
+          <FileUp className="w-8 h-8" />
         </div>
-        <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter mb-4">Importar Carregamento</h3>
-        <p className="text-slate-500 text-xs md:text-sm font-bold uppercase tracking-widest leading-relaxed mb-10 max-w-md mx-auto">
+        <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight mb-4">Importar Carregamento</h3>
+        <p className="text-slate-500 text-[11px] md:text-xs font-bold uppercase tracking-widest leading-relaxed mb-10 max-w-md mx-auto">
           Selecione um arquivo CSV para pré-carregar os pallets. Após a importação, eles ficarão na aba <span className="text-blue-400">Análise</span> para conferência e alocação.
         </p>
         
@@ -144,100 +146,107 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
         />
         <label 
           htmlFor="csv-upload"
-          className="inline-flex items-center gap-3 px-10 py-5 bg-slate-950 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] border border-slate-800 transition-all cursor-pointer shadow-xl active:scale-95"
+          className="inline-flex items-center gap-2.5 px-8 py-4 bg-slate-950 hover:bg-slate-800 text-white rounded-xl font-bold text-[11px] uppercase tracking-widest border border-slate-800 transition-all cursor-pointer shadow-xl active:scale-95 group"
         >
-          Selecionar Arquivo <i className="fa-solid fa-upload"></i>
+          <Upload className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" /> Selecionar Arquivo
         </label>
       </div>
 
-      {items.length > 0 && (
-        <div className="bg-slate-900 rounded-[48px] border border-slate-800 shadow-3xl overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
-          <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
-            <div>
-              <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">Validar Pallets</h4>
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">{items.length} itens encontrados no arquivo</p>
+      <AnimatePresence>
+        {items.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="bg-slate-900/40 backdrop-blur-xl rounded-[2.5rem] border border-slate-800 shadow-3xl overflow-hidden"
+          >
+            <div className="p-6 md:p-8 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-center bg-slate-800/20 gap-4">
+              <div>
+                <h4 className="text-lg font-black text-white uppercase italic tracking-tight">Validar Pallets</h4>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{items.length} itens encontrados no arquivo</p>
+              </div>
+              <button 
+                onClick={handleProcess}
+                disabled={isProcessing}
+                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all"
+              >
+                {isProcessing ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando</>
+                ) : (
+                  <><CheckCircle2 className="w-3.5 h-3.5" /> Processar Selecionados</>
+                )}
+              </button>
             </div>
-            <button 
-              onClick={handleProcess}
-              disabled={isProcessing}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-xl shadow-blue-900/20 transition-all"
-            >
-              {isProcessing ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processando...</>
-              ) : (
-                <><i className="fa-solid fa-check-double"></i> Processar Selecionados</>
-              )}
-            </button>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-950/50">
-                  <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">Status</th>
-                  <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">OP / Nome</th>
-                  <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">Lote</th>
-                  <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">Qtd / Tipo</th>
-                  <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">Vaga Sugerida</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {items.map((item, idx) => (
-                  <tr key={idx} className={`hover:bg-slate-800/20 transition-colors ${!item.selected ? 'opacity-50' : ''}`}>
-                    <td className="p-6">
-                      <button 
-                        onClick={() => {
-                          const newItems = [...items];
-                          newItems[idx].selected = !newItems[idx].selected;
-                          setItems(newItems);
-                        }}
-                        className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${item.selected ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-950 border-slate-800 text-transparent'}`}
-                      >
-                        <i className="fa-solid fa-check text-[10px]"></i>
-                      </button>
-                    </td>
-                    <td className="p-6">
-                      <p className="text-blue-400 font-black text-xs font-mono mb-1">{item.op}</p>
-                      <p className="text-white font-bold text-sm uppercase tracking-tight line-clamp-1">{item.nome}</p>
-                    </td>
-                    <td className="p-6">
-                      <p className="text-amber-500 font-black text-xs font-mono">{item.lote}</p>
-                    </td>
-                    <td className="p-6">
-                      <div className="flex items-center gap-3">
-                        <span className="text-white font-black text-sm">{item.quantidade}</span>
-                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
-                          item.contentType === SlotContent.BOTTLES ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' :
-                          item.contentType === SlotContent.FINISHED_PRODUCT ? 'bg-green-600/10 text-green-500 border-green-500/20' :
-                          'bg-amber-600/10 text-amber-500 border-amber-500/20'
-                        }`}>
-                          {translateSlotContent(item.contentType)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <select 
-                        value={item.suggestedSlot}
-                        onChange={(e) => {
-                          const newItems = [...items];
-                          newItems[idx].suggestedSlot = e.target.value;
-                          setItems(newItems);
-                        }}
-                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase outline-none focus:border-blue-600 transition-all"
-                      >
-                        <option value="">Selecionar Vaga</option>
-                        {availableSlots.map(slot => (
-                          <option key={slot.id} value={slot.id}>{slot.id}</option>
-                        ))}
-                      </select>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-950/50">
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Status</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">OP / Nome</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Lote</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Qtd / Tipo</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Vaga Sugerida</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                </thead>
+                <tbody className="divide-y divide-slate-800/30">
+                  {items.map((item, idx) => (
+                    <tr key={idx} className={`hover:bg-slate-800/20 transition-colors ${!item.selected ? 'opacity-40' : ''}`}>
+                      <td className="p-5">
+                        <button 
+                          onClick={() => {
+                            const newItems = [...items];
+                            newItems[idx].selected = !newItems[idx].selected;
+                            setItems(newItems);
+                          }}
+                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${item.selected ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-950 border-slate-800 text-transparent'}`}
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </td>
+                      <td className="p-5">
+                        <p className="text-blue-400 font-black text-[10px] font-mono mb-0.5">{item.op}</p>
+                        <p className="text-white font-bold text-xs uppercase tracking-tight line-clamp-1">{item.nome}</p>
+                      </td>
+                      <td className="p-5">
+                        <p className="text-amber-500 font-black text-[10px] font-mono">{item.lote}</p>
+                      </td>
+                      <td className="p-5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-black text-xs">{item.quantidade}</span>
+                          <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
+                            item.contentType === SlotContent.BOTTLES ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' :
+                            item.contentType === SlotContent.FINISHED_PRODUCT ? 'bg-green-600/10 text-green-500 border-green-500/20' :
+                            'bg-amber-600/10 text-amber-500 border-amber-500/20'
+                          }`}>
+                            {translateSlotContent(item.contentType)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-5">
+                        <select 
+                          value={item.suggestedSlot}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[idx].suggestedSlot = e.target.value;
+                            setItems(newItems);
+                          }}
+                          className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-[9px] font-bold text-white uppercase outline-none focus:border-blue-600 transition-all"
+                        >
+                          <option value="">Vaga</option>
+                          {availableSlots.map(slot => (
+                            <option key={slot.id} value={slot.id}>{slot.id}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
