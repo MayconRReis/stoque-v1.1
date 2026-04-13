@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType } from './types';
+import Papa from 'papaparse';
+import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType, translateSlotContent } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
 import { supabaseService } from './services/supabaseService';
@@ -60,6 +61,7 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
 const App: React.FC = () => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isPublicView, setIsPublicView] = useState(false);
   const [data, setData] = useState<SheetRow[]>([]);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis'>('dashboard');
@@ -90,6 +92,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if we are in public view mode via URL param
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view') === 'public') {
+          setIsPublicView(true);
+          setIsAuthLoading(false);
+          return;
+        }
+
         const currentUser = await supabaseService.getCurrentUser();
         setUser(currentUser);
       } catch (error) {
@@ -102,7 +112,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user && !isPublicView) return;
 
     const loadData = async () => {
       try {
@@ -198,6 +208,53 @@ const App: React.FC = () => {
     };
   }, [user]);
 
+  const handleExportInventory = () => {
+    try {
+      // Prepare data for export
+      // We want: op, nome, lote, quantidade, tipo
+      const exportData = data.flatMap(row => {
+        // Only export items that are in stock (not pending analysis)
+        if (row.status === StockStatus.PENDING) return [];
+
+        return (row.inspections || []).map(insp => ({
+          op: row.originOP,
+          nome: row.description,
+          lote: row.lot,
+          quantidade: insp.bottles || 0,
+          tipo: translateSlotContent(insp.contentType)
+        }));
+      });
+
+      if (exportData.length === 0) {
+        showNotification('Não há dados para exportar.', 'error');
+        return;
+      }
+
+      const csv = Papa.unparse(exportData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `estoque_geral_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showNotification('Estoque exportado com sucesso!');
+    } catch (error) {
+      console.error('Export error:', error);
+      showNotification('Erro ao exportar estoque.', 'error');
+    }
+  };
+
+  const handleShareDashboard = () => {
+    const publicUrl = `${window.location.origin}${window.location.pathname}?view=public`;
+    navigator.clipboard.writeText(publicUrl);
+    showNotification('Link do Dashboard Público copiado para a área de transferência!');
+  };
+
   const handleLogout = async () => {
     try {
       await supabaseService.signOut();
@@ -258,7 +315,7 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: entryData.quantity,
         slot: entryData.slotId,
-        details: `Entrada manual. ID Gerado: ${entryData.id}`
+        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}`
       });
 
       showNotification(`Entrada realizada com sucesso! ID: ${entryData.id}`);
@@ -305,7 +362,7 @@ const App: React.FC = () => {
             palletNumber: 1,
             totalPallets: 1,
             slot: slotId,
-            details: `Importação via CSV. ID: ${row.loadingId}`
+            details: `Importação via CSV por ${user?.name || 'Sistema'}. ID: ${row.loadingId}`
           });
         }
       }
@@ -375,7 +432,7 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: 1,
         slot: slotId,
-        details: `Entrada confirmada após análise. ID Final: ${finalId}`
+        details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}`
       };
 
       await Promise.all([
@@ -454,7 +511,7 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: transferData.toSlot,
-        details: `Transferência de ${transferData.fromSlot} para ${transferData.toSlot}`
+        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}`
       });
 
       showNotification('Transferência concluída com sucesso.');
@@ -497,7 +554,7 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: occupiedSlot?.id || 'N/A',
-        details: `Saída: ${exitData.reason}`
+        details: `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`
       });
 
       showNotification('Saída registrada com sucesso.');
@@ -846,7 +903,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
+  if (!user && !isPublicView) {
     return <Login onLoginSuccess={async () => {
       const currentUser = await supabaseService.getCurrentUser();
       setUser(currentUser);
@@ -877,79 +934,96 @@ const App: React.FC = () => {
       )}
 
       {/* Sidebar Navigation */}
-      <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
-        <div className="p-8 border-b border-slate-800/60 flex justify-between items-center">
-          <Logo />
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition-colors">
-            <i className="fa-solid fa-xmark text-xl"></i>
-          </button>
-        </div>
+      {!isPublicView && (
+        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
+          <div className="p-8 border-b border-slate-800/60 flex justify-between items-center">
+            <Logo />
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition-colors">
+              <i className="fa-solid fa-xmark text-xl"></i>
+            </button>
+          </div>
 
-        <nav className="p-5 py-8 space-y-2.5 flex-1 overflow-y-auto">
-          <NavItem tab="dashboard" icon="fa-chart-line" label="Dashboard" />
-          <NavItem tab="movement" icon="fa-dolly" label="Movimentação" />
-          <NavItem tab="inventory" icon="fa-boxes-stacked" label="Estoque Geral" />
-          <NavItem tab="map" icon="fa-warehouse" label="Mapa de vagas" />
-          <NavItem tab="import" icon="fa-file-import" label="Importar CSV" />
-          <NavItem tab="analysis" icon="fa-clipboard-check" label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
-          <NavItem tab="history" icon="fa-clock-rotate-left" label="Histórico" />
-        </nav>
+          <nav className="p-5 py-8 space-y-2.5 flex-1 overflow-y-auto">
+            <NavItem tab="dashboard" icon="fa-chart-line" label="Dashboard" />
+            <NavItem tab="movement" icon="fa-dolly" label="Movimentação" />
+            <NavItem tab="inventory" icon="fa-boxes-stacked" label="Estoque Geral" />
+            <NavItem tab="map" icon="fa-warehouse" label="Mapa de vagas" />
+            <NavItem tab="import" icon="fa-file-import" label="Importar CSV" />
+            <NavItem tab="analysis" icon="fa-clipboard-check" label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
+            <NavItem tab="history" icon="fa-clock-rotate-left" label="Histórico" />
+          </nav>
 
-        <div className="p-4 space-y-4">
-          <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-xs font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
-                  {user.name.charAt(0).toUpperCase()}
+          <div className="p-4 space-y-4">
+            <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-xs font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
+                    {user?.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-white uppercase tracking-tighter">{user?.name}</p>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">{user?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-black text-white uppercase tracking-tighter">{user.name}</p>
-                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">{user.role === 'admin' ? 'Administrador' : 'Operador'}</p>
+                <button 
+                  onClick={() => setIsLogoutConfirmOpen(true)}
+                  className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-900/20"
+                  title="Sair do Sistema"
+                >
+                  <i className="fa-solid fa-right-from-bracket text-xs"></i>
+                </button>
+              </div>
+              <div className="space-y-2.5">
+                <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                  <span>Carga Armazém</span>
+                  <span>{stats.occupancyRate}%</span>
                 </div>
-              </div>
-              <button 
-                onClick={() => setIsLogoutConfirmOpen(true)}
-                className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-900/20"
-                title="Sair do Sistema"
-              >
-                <i className="fa-solid fa-right-from-bracket text-xs"></i>
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                <span>Carga Armazém</span>
-                <span>{stats.occupancyRate}%</span>
-              </div>
-              <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden shadow-inner">
-                 <div className="h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
+                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden shadow-inner">
+                   <div className="h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen lg:h-screen overflow-hidden">
         <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-900/50 p-4 md:p-6 lg:px-10 flex justify-between items-center sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden w-10 h-10 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
-            >
-              <i className="fa-solid fa-bars"></i>
-            </button>
+            {!isPublicView && (
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden w-10 h-10 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
+              >
+                <i className="fa-solid fa-bars"></i>
+              </button>
+            )}
+            {isPublicView && <Logo isSm={true} />}
             <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic line-clamp-1">
-              {activeTab === 'dashboard' && 'Painel de Controle'}
-              {activeTab === 'movement' && 'Movimentação'}
-              {activeTab === 'inventory' && 'Inventário G0'}
-              {activeTab === 'map' && 'Mapa de vagas'}
-              {activeTab === 'import' && 'Importar CSV'}
-              {activeTab === 'analysis' && 'Análise de Recebimento'}
-              {activeTab === 'history' && 'Histórico'}
+              {isPublicView ? 'Dashboard Público' : (
+                <>
+                  {activeTab === 'dashboard' && 'Painel de Controle'}
+                  {activeTab === 'movement' && 'Movimentação'}
+                  {activeTab === 'inventory' && 'Inventário G0'}
+                  {activeTab === 'map' && 'Mapa de vagas'}
+                  {activeTab === 'import' && 'Importar CSV'}
+                  {activeTab === 'analysis' && 'Análise de Recebimento'}
+                  {activeTab === 'history' && 'Histórico'}
+                </>
+              )}
             </h2>
           </div>
           
           <div className="flex items-center gap-2.5 shrink-0">
+             {isPublicView && (
+               <button 
+                 onClick={() => window.location.href = window.location.origin + window.location.pathname}
+                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
+               >
+                 Acessar App
+               </button>
+             )}
              <span className={`w-2.5 h-2.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`}></span>
              <span className="hidden sm:inline text-[11px] font-black text-slate-500 uppercase tracking-widest">{isSearching ? 'Sincronizando...' : 'Sistema Ativo'}</span>
           </div>
@@ -976,8 +1050,26 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'dashboard' && (
+          {(activeTab === 'dashboard' || isPublicView) && (
             <div className="max-w-7xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
+                {/* Dashboard Actions */}
+                <div className="flex flex-wrap justify-end gap-4">
+                    {!isPublicView && (
+                      <button 
+                          onClick={handleShareDashboard}
+                          className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all border border-slate-800 hover:border-amber-500/50 group"
+                      >
+                          <i className="fa-solid fa-share-nodes text-amber-500 group-hover:scale-110 transition-transform"></i> Compartilhar Dashboard
+                      </button>
+                    )}
+                    <button 
+                        onClick={handleExportInventory}
+                        className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all border border-slate-800 hover:border-blue-500/50 group"
+                    >
+                        <i className="fa-solid fa-file-export text-blue-500 group-hover:scale-110 transition-transform"></i> Exportar Estoque Geral
+                    </button>
+                </div>
+
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
                     <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-blue-500/50 transition-all">
