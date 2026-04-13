@@ -511,6 +511,7 @@ const App: React.FC = () => {
   const stats = useMemo((): DashboardStats => {
     const occupied = slots.filter(s => s.status !== SlotContent.EMPTY).length;
     const total = slots.length;
+    const pendingCount = data.filter(r => r.status === StockStatus.PENDING).length;
     
     // Calculate total bottles from inventory data
     const totalBottles = data.reduce((acc, row) => {
@@ -525,7 +526,7 @@ const App: React.FC = () => {
 
     return {
       freeSlots: total - occupied,
-      pendingEntries: 0,
+      pendingEntries: pendingCount,
       occupancyRate: Math.round((occupied / total) * 100),
       dailyMovements: history.length,
       totalSlots: total,
@@ -1002,7 +1003,7 @@ const App: React.FC = () => {
                        </div>
                        <p className="text-[10px] md:text-[11px] text-slate-500 font-black uppercase mb-1 tracking-widest">Cargas Pendentes</p>
                        <p className="text-4xl md:text-6xl font-black text-white tracking-tighter">{stats.pendingEntries}</p>
-                       <p className="text-[8px] md:text-[10px] text-slate-600 font-bold mt-2 uppercase italic tracking-widest">Aguardando Inspeção</p>
+                       <p className="text-[8px] md:text-[10px] text-slate-600 font-bold mt-2 uppercase italic tracking-widest">Aguardando Análise</p>
                     </div>
                     <div className="bg-slate-900/60 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-2xl hover:border-green-500/50 transition-all">
                        <div className="flex justify-between items-center mb-4">

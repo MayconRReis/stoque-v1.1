@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SlotContent, WarehouseSlot, HistoryType } from '../types';
+import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
 
 interface MovementModalProps {
   isOpen: boolean;
