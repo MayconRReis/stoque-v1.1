@@ -196,7 +196,7 @@ const App: React.FC = () => {
     });
 
     const notificationsChannel = supabaseService.subscribeToNotifications((payload) => {
-      if (payload.user !== user.id) {
+      if (payload.user !== user?.id) {
         showNotification(payload.message, payload.type || 'info');
       }
     });
@@ -206,7 +206,7 @@ const App: React.FC = () => {
       slotsChannel.unsubscribe();
       notificationsChannel.unsubscribe();
     };
-  }, [user]);
+  }, [user, isPublicView]);
 
   const handleExportInventory = () => {
     try {
