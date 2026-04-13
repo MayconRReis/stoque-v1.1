@@ -1,0 +1,7 @@
+{
+  "name": "Stoque+ v1",
+  "description": "Sistema de gerenciamento de estoque para o depósito G0 da Ybera Paris, controlando fluxos entre a Sede e a Matriz com inspeção automatizada de pallets.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
