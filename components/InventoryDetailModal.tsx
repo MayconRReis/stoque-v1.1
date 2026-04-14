@@ -24,6 +24,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
   const isBottles = inspection.contentType === SlotContent.BOTTLES;
   const isFinished = inspection.contentType === SlotContent.FINISHED_PRODUCT;
   const isSupplies = inspection.contentType === SlotContent.SUPPLIES;
+  const isUseConsumption = inspection.contentType === SlotContent.USE_CONSUMPTION;
 
   const Icon = isBottles ? FlaskConical : isFinished ? Truck : Package;
 
@@ -37,6 +38,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                 isBottles ? 'bg-blue-600 shadow-blue-900/40' : 
                 isFinished ? 'bg-green-600 shadow-green-900/40' :
                 isSupplies ? 'bg-indigo-600 shadow-indigo-900/40' :
+                isUseConsumption ? 'bg-purple-600 shadow-purple-900/40' :
                 'bg-amber-600 shadow-amber-900/40'
              }`}>
                 <Icon className="text-white w-6 h-6" />
@@ -72,8 +74,12 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
               </p>
             )}
             <div className="flex gap-4">
-               <span className="bg-blue-600/10 text-blue-500 text-[10px] font-black px-3 py-1 rounded-lg border border-blue-500/20 uppercase tracking-widest">OP {row.originOP}</span>
-               <span className="bg-amber-600/10 text-amber-500 text-[10px] font-black px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Lote {row.lot}</span>
+               {row.originOP && (
+                 <span className="bg-blue-600/10 text-blue-500 text-[10px] font-black px-3 py-1 rounded-lg border border-blue-500/20 uppercase tracking-widest">OP {row.originOP}</span>
+               )}
+               {row.lot && (
+                 <span className="bg-amber-600/10 text-amber-500 text-[10px] font-black px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Lote {row.lot}</span>
+               )}
             </div>
           </div>
 

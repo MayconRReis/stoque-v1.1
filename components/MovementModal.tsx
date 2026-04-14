@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
 import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +25,14 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   inventoryData
 }) => {
   const [type, setType] = useState<'entry' | 'transfer' | 'exit'>('entry');
+
+  const sortedAvailableSlots = useMemo(() => {
+    return [...availableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [availableSlots]);
+
+  const sortedOccupiedSlots = useMemo(() => {
+    return [...occupiedSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [occupiedSlots]);
   
   // Entry Fields
   const [op, setOp] = useState('');
@@ -84,8 +92,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
       if (contentType === SlotContent.BOTTLES) {
         suggestedSlot = availableSlots.find(s => s.rack === 'A' && s.position <= 16);
-      } else if (contentType === SlotContent.SUPPLIES) {
-        suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16);
+      } else if (contentType === SlotContent.SUPPLIES || contentType === SlotContent.USE_CONSUMPTION) {
+        // Prioritize Rack D for Supplies and Use & Consumption
+        suggestedSlot = availableSlots.find(s => s.rack === 'D');
+        // Fallback to B or C if D is full
+        if (!suggestedSlot && contentType === SlotContent.SUPPLIES) {
+          suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16);
+        }
       } else if (contentType === SlotContent.FINISHED_PRODUCT) {
         suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14);
       } else {
@@ -173,12 +186,11 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     { value: SlotContent.BOTTLES, label: 'Frasco' },
     { value: SlotContent.SUPPLIES, label: 'Insumo' },
     { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
+    { value: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' },
     { value: SlotContent.RETURN, label: 'Retorno' },
     { value: SlotContent.CONTAINER_SJ, label: 'Container SJ' },
     { value: SlotContent.CONTAINER_LP, label: 'Container LP' },
     { value: SlotContent.CONTAINER_CP, label: 'Container CP' },
-    { value: SlotContent.CLEAN_BUCKET, label: 'Balde Limpo' },
-    { value: SlotContent.DIRTY_BUCKET, label: 'Balde Sujo' },
   ];
 
   return (
@@ -247,24 +259,26 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">OP (Opcional)</label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        value={op}
-                        onChange={e => setOp(e.target.value)}
-                        placeholder="Ex: 410-152"
-                        className={`w-full bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-800'} rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all`}
-                      />
-                      {isAutoFilled && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 flex items-center gap-1">
-                          <Check className="w-4 h-4" />
-                          <span className="text-[8px] font-black uppercase italic">Dados Encontrados</span>
-                        </div>
-                      )}
+                  {contentType !== SlotContent.USE_CONSUMPTION && (
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">OP (Opcional)</label>
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          value={op}
+                          onChange={e => setOp(e.target.value)}
+                          placeholder="Ex: 410-152"
+                          className={`w-full bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-800'} rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all`}
+                        />
+                        {isAutoFilled && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 flex items-center gap-1">
+                            <Check className="w-4 h-4" />
+                            <span className="text-[8px] font-black uppercase italic">Dados Encontrados</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -274,20 +288,22 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       type="text" 
                       value={name}
                       onChange={e => setName(e.target.value)}
-                      placeholder="Ex: SELANTE 500G"
+                      placeholder={contentType === SlotContent.USE_CONSUMPTION ? "Ex: PAPEL TOALHA" : "Ex: SELANTE 500G"}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Lote (Opcional)</label>
-                    <input 
-                      type="text" 
-                      value={lot}
-                      onChange={e => setLot(e.target.value)}
-                      placeholder="Ex: 01260307143"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
-                    />
-                  </div>
+                  {contentType !== SlotContent.USE_CONSUMPTION && (
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Lote (Opcional)</label>
+                      <input 
+                        type="text" 
+                        value={lot}
+                        onChange={e => setLot(e.target.value)}
+                        placeholder="Ex: 01260307143"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -308,7 +324,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all appearance-none"
                     >
                       <option value="">Selecione uma vaga</option>
-                      {availableSlots.map(slot => (
+                      {sortedAvailableSlots.map(slot => (
                         <option key={slot.id} value={slot.id}>{slot.id}</option>
                       ))}
                     </select>
@@ -396,7 +412,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-amber-600 outline-none transition-all appearance-none"
                     >
                       <option value="">Selecione a origem</option>
-                      {occupiedSlots
+                      {sortedOccupiedSlots
                         .filter(slot => {
                           if (!transferId) return true;
                           const item = inventoryData.find(i => i.id === transferId);
@@ -415,7 +431,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-amber-600 outline-none transition-all appearance-none"
                     >
                       <option value="">Selecione o destino</option>
-                      {availableSlots.map(slot => (
+                      {sortedAvailableSlots.map(slot => (
                         <option key={slot.id} value={slot.id}>{slot.id}</option>
                       ))}
                     </select>

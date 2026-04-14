@@ -25,11 +25,13 @@ import {
   Trash2,
   Info,
   Send,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType, translateSlotContent } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
+import { EditPalletModal } from './components/EditPalletModal';
 import { supabaseService } from './services/supabaseService';
 import { Login } from './components/Login';
 import { MovementModal } from './components/MovementModal';
@@ -99,6 +101,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<{ id: string, message: string, type?: 'info' | 'error' }[]>([]);
   
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
+  const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [searchLoadingId, setSearchLoadingId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
@@ -643,6 +646,28 @@ const App: React.FC = () => {
     details: details
   });
 
+  const handleUpdatePallet = async (updatedData: { description: string; op: string; lot: string }) => {
+    if (!editPalletContext) return;
+
+    try {
+      const { row } = editPalletContext;
+      const updatedRow = { ...row };
+      
+      updatedRow.description = updatedData.description;
+      updatedRow.originOP = updatedData.op;
+      updatedRow.lot = updatedData.lot;
+
+      await supabaseService.saveInventoryItem(updatedRow);
+      setData(prev => prev.map(r => r.id === updatedRow.id ? updatedRow : r));
+      
+      showNotification('Dados do pallet atualizados com sucesso!');
+      setEditPalletContext(null);
+    } catch (error: any) {
+      console.error('Update error:', error);
+      showNotification('Erro ao atualizar pallet', 'error');
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteContext) return;
     try {
@@ -784,7 +809,11 @@ const App: React.FC = () => {
         }
       });
     });
-    return allPallets;
+    return allPallets.sort((a, b) => {
+      const slotA = a.inspection.assignedSlot || '';
+      const slotB = b.inspection.assignedSlot || '';
+      return slotA.localeCompare(slotB, undefined, { numeric: true });
+    });
   }, [inspectedItems, inventorySearch]);
 
   const RackView = ({ rack }: { rack: 'A' | 'B' | 'C' | 'D' }) => {
@@ -1403,6 +1432,7 @@ const App: React.FC = () => {
                     ) : (
                         filteredInventory.map(({ row: item, inspection: insp, idx }) => {
                             const isSelected = selectedPallets.includes(`${item.id}::${idx}`);
+                            const isUseConsumption = insp.contentType === SlotContent.USE_CONSUMPTION;
                             const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : Package;
                             
                             return (
@@ -1428,17 +1458,27 @@ const App: React.FC = () => {
                                       </div>
                                     </div>
 
-                                    <h4 className="font-bold text-white text-sm mb-4 uppercase tracking-tight line-clamp-2 leading-tight min-h-[2.5rem]">{item.description}</h4>
+                                    <h4 className="font-bold text-white text-[13px] mb-4 uppercase tracking-tight leading-snug min-h-[3rem] line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</h4>
 
                                     <div className="grid grid-cols-2 gap-2 mb-4">
-                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">OP</p>
-                                          <p className="text-xs font-black text-blue-400 font-mono italic">{item.originOP}</p>
-                                       </div>
-                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Lote</p>
-                                          <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
-                                       </div>
+                                       {item.originOP && (
+                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">OP</p>
+                                            <p className="text-xs font-black text-blue-400 font-mono italic">{item.originOP}</p>
+                                         </div>
+                                       )}
+                                       {item.lot && (
+                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Lote</p>
+                                            <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
+                                         </div>
+                                       )}
+                                       {isUseConsumption && (
+                                         <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Tipo</p>
+                                            <p className="text-xs font-black text-purple-400 uppercase italic">Uso e Consumo</p>
+                                         </div>
+                                       )}
                                     </div>
                                   </div>
                                   
@@ -1448,6 +1488,13 @@ const App: React.FC = () => {
                                       className="flex-1 py-2 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
                                     >
                                       <Info className="w-3 h-3" /> Detalhes
+                                    </button>
+
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); setEditPalletContext({ row: item, inspection: insp, idx }); }} 
+                                      className="flex-1 py-2 bg-slate-950 hover:bg-blue-600/10 text-blue-400 border border-slate-800 hover:border-blue-500/50 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                                    >
+                                      <Pencil className="w-3 h-3" /> Editar
                                     </button>
                                     
                                     <button 
@@ -1540,6 +1587,15 @@ const App: React.FC = () => {
       )}
 
       {detailContext && <InventoryDetailModal isOpen={!!detailContext} onClose={() => setDetailContext(null)} row={detailContext.row} inspection={detailContext.inspection} palletIdx={detailContext.idx} />}
+      
+      {editPalletContext && (
+        <EditPalletModal 
+          isOpen={!!editPalletContext}
+          onClose={() => setEditPalletContext(null)}
+          onSave={handleUpdatePallet}
+          pallet={editPalletContext}
+        />
+      )}
       
       <MovementModal 
         isOpen={isMovementModalOpen} 

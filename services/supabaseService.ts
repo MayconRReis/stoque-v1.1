@@ -110,7 +110,9 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('warehouse_slots')
       .select('*')
-      .order('id');
+      .order('rack')
+      .order('level')
+      .order('position');
     
     if (error) throw error;
     return (data || []).map(slot => ({

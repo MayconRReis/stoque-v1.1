@@ -22,9 +22,8 @@ export enum SlotContent {
   CONTAINER_SJ = 'CONTAINER_SJ',
   CONTAINER_LP = 'CONTAINER_LP',
   CONTAINER_CP = 'CONTAINER_CP',
-  CLEAN_BUCKET = 'CLEAN_BUCKET',
-  DIRTY_BUCKET = 'DIRTY_BUCKET',
-  CRADLE = 'CRADLE'
+  CRADLE = 'CRADLE',
+  USE_CONSUMPTION = 'USE_CONSUMPTION'
 }
 
 export enum HistoryType {
@@ -100,9 +99,8 @@ export const translateSlotContent = (content: SlotContent): string => {
     [SlotContent.CONTAINER_SJ]: 'Container SJ',
     [SlotContent.CONTAINER_LP]: 'Container LP',
     [SlotContent.CONTAINER_CP]: 'Container CP',
-    [SlotContent.CLEAN_BUCKET]: 'Balde Limpo',
-    [SlotContent.DIRTY_BUCKET]: 'Balde Sujo',
-    [SlotContent.CRADLE]: 'Berço'
+    [SlotContent.CRADLE]: 'Berço',
+    [SlotContent.USE_CONSUMPTION]: 'Uso e Consumo'
   };
   return translations[content] || content;
 };
