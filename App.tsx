@@ -190,6 +190,7 @@ const App: React.FC = () => {
   ]);
 
   const navigateToTab = (tab: typeof activeTab) => {
+    if (isPublicView) return;
     if (tab !== activeTab) {
       window.history.pushState({ tab }, '');
       setActiveTab(tab);
@@ -401,8 +402,12 @@ const App: React.FC = () => {
 
   const handleShareDashboard = () => {
     const publicUrl = `${window.location.origin}${window.location.pathname}?view=public`;
-    navigator.clipboard.writeText(publicUrl);
-    showNotification('Link do Dashboard Público copiado para a área de transferência!');
+    navigator.clipboard.writeText(publicUrl).then(() => {
+      showNotification('Link do Dashboard Público copiado!', 'info');
+    }).catch(err => {
+      console.error('Erro ao copiar link:', err);
+      showNotification('Erro ao copiar link.', 'error');
+    });
   };
 
   const handleLogout = async () => {
@@ -1472,7 +1477,7 @@ const App: React.FC = () => {
             <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
                 {/* Dashboard Actions */}
                 <div className="flex flex-wrap gap-3">
-                    {selectedPallets.length > 0 && (
+                    {!isPublicView && selectedPallets.length > 0 && (
                         <button 
                             onClick={() => setIsShipmentModalOpen(true)}
                             className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
@@ -1480,12 +1485,22 @@ const App: React.FC = () => {
                             <Truck className="w-3.5 h-3.5" /> Enviar para Carregamento ({selectedPallets.length})
                         </button>
                     )}
-                    <button 
-                        onClick={handleExportInventory}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-blue-500/30 group"
-                    >
-                        <Download className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" /> Exportar CSV
-                    </button>
+                    {!isPublicView && (
+                      <>
+                        <button 
+                            onClick={handleExportInventory}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-blue-500/30 group"
+                        >
+                            <Download className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" /> Exportar CSV
+                        </button>
+                        <button 
+                            onClick={handleShareDashboard}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-purple-500/30 group"
+                        >
+                            <Share2 className="w-3.5 h-3.5 text-purple-500 group-hover:scale-110 transition-transform" /> Compartilhar Dashboard
+                        </button>
+                      </>
+                    )}
                 </div>
 
                 {/* Occupancy Progress Bar */}
@@ -1496,13 +1511,15 @@ const App: React.FC = () => {
                       <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade em tempo real</p>
                     </div>
                     <div className="text-right flex items-center gap-4">
-                      <button 
-                        onClick={handleResyncSlots}
-                        className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
-                        title="Sincronizar Vagas"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
-                      </button>
+                      {!isPublicView && (
+                        <button 
+                          onClick={handleResyncSlots}
+                          className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
+                          title="Sincronizar Vagas"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
+                        </button>
+                      )}
                       <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                     </div>
                   </div>
@@ -1553,9 +1570,11 @@ const App: React.FC = () => {
                            <div className="px-2 py-1 rounded-lg bg-green-500/10 text-green-500 text-[8px] font-bold uppercase border border-green-500/20">Entradas: {history.filter(h => h.type === HistoryType.ENTRY).length}</div>
                            <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-[8px] font-bold uppercase border border-blue-500/20">Saídas: {history.filter(h => h.type === HistoryType.EXIT).length}</div>
                          </div>
-                         <button onClick={() => navigateToTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
-                           Ver tudo <ArrowRight className="w-3 h-3" />
-                         </button>
+                         {!isPublicView && (
+                           <button onClick={() => navigateToTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                             Ver tudo <ArrowRight className="w-3 h-3" />
+                           </button>
+                         )}
                        </div>
                     </div>
 
@@ -1584,9 +1603,11 @@ const App: React.FC = () => {
                              {stats.pendingEntries > 0 ? 'Ação Necessária' : 'Tudo em dia'}
                            </p>
                          </div>
-                         <button onClick={() => navigateToTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
-                           Ir para Análise <ArrowRight className="w-3 h-3" />
-                         </button>
+                         {!isPublicView && (
+                           <button onClick={() => navigateToTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                             Ir para Análise <ArrowRight className="w-3 h-3" />
+                           </button>
+                         )}
                        </div>
                     </div>
                 </div>
