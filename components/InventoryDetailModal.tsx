@@ -99,9 +99,15 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
           )}
 
           {!isSupplies && (
-            <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 flex justify-between items-center">
-               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Localização</p>
-               <span className="bg-slate-950 px-6 py-2.5 rounded-full text-xs font-black text-blue-400 border border-slate-800 uppercase italic tracking-widest">Vaga {inspection.assignedSlot}</span>
+            <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 space-y-4">
+               <div className="flex justify-between items-center">
+                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Localização</p>
+                  <span className="bg-slate-950 px-6 py-2.5 rounded-full text-xs font-black text-blue-400 border border-slate-800 uppercase italic tracking-widest">Vaga {inspection.assignedSlot}</span>
+               </div>
+               <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
+                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Quantidade Total</p>
+                  <span className="text-lg font-black text-green-400 font-mono">{row.pallets}</span>
+               </div>
             </div>
           )}
 

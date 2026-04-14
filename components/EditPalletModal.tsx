@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface EditPalletModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updatedData: { description: string; op: string; lot: string }) => void;
+  onSave: (updatedData: { description: string; op: string; lot: string; quantity: number }) => void;
   pallet: { row: SheetRow; inspection: InspectionData; idx: number } | null;
 }
 
@@ -22,12 +22,14 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
+  const [quantity, setQuantity] = useState(0);
 
   useEffect(() => {
     if (pallet) {
       setDescription(pallet.row.description);
       setOp(pallet.row.originOP);
       setLot(pallet.row.lot);
+      setQuantity(pallet.row.pallets);
     }
   }, [pallet]);
 
@@ -94,6 +96,18 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+              <Hash className="w-3 h-3" /> Quantidade
+            </label>
+            <input 
+              type="number" 
+              value={quantity}
+              onChange={e => setQuantity(Number(e.target.value))}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+            />
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button 
               onClick={onClose}
@@ -102,7 +116,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
               Cancelar
             </button>
             <button 
-              onClick={() => onSave({ description, op, lot })}
+              onClick={() => onSave({ description, op, lot, quantity })}
               className="flex-[2] py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/40 transition-all flex items-center justify-center gap-2 active:scale-95"
             >
               Salvar Alterações <Save className="w-4 h-4" />

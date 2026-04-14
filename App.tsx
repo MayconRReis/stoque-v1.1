@@ -109,6 +109,114 @@ const App: React.FC = () => {
 
   const [processedIds, setProcessedIds] = useState<string[]>([]);
 
+  // Helper to close all modals and sidebar
+  const closeAllModals = () => {
+    setIsMovementModalOpen(false);
+    setDeleteContext(null);
+    setMatrixConfirmContext(null);
+    setDetailContext(null);
+    setEditPalletContext(null);
+    setIsBulkConfirmOpen(false);
+    setIsLogoutConfirmOpen(false);
+    setImportConfirmationContext(null);
+    setIsSidebarOpen(false);
+  };
+
+  // Handle Browser/Smartphone Back Button
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // If there's a modal open, the back button should close it first
+      const anyModalOpen = 
+        isMovementModalOpen || 
+        !!deleteContext || 
+        !!matrixConfirmContext || 
+        !!detailContext || 
+        !!editPalletContext || 
+        isBulkConfirmOpen || 
+        isLogoutConfirmOpen || 
+        !!importConfirmationContext ||
+        isSidebarOpen;
+
+      if (anyModalOpen) {
+        closeAllModals();
+        return;
+      }
+
+      // If no modal was open, handle tab navigation
+      if (event.state && event.state.tab) {
+        setActiveTab(event.state.tab);
+      } else {
+        setActiveTab('dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    // Initialize history state if not present
+    if (!window.history.state) {
+      window.history.replaceState({ tab: activeTab }, '');
+    }
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    isMovementModalOpen, 
+    deleteContext, 
+    matrixConfirmContext, 
+    detailContext, 
+    editPalletContext, 
+    isBulkConfirmOpen, 
+    isLogoutConfirmOpen, 
+    importConfirmationContext,
+    isSidebarOpen,
+    activeTab
+  ]);
+
+  // Helper to change tab with history support
+  const navigateToTab = (tab: typeof activeTab) => {
+    if (tab !== activeTab) {
+      window.history.pushState({ tab }, '');
+      setActiveTab(tab);
+    }
+  };
+
+  // Push state when opening a modal so back button can close it
+  useEffect(() => {
+    const anyModalOpen = 
+      isMovementModalOpen || 
+      !!deleteContext || 
+      !!matrixConfirmContext || 
+      !!detailContext || 
+      !!editPalletContext || 
+      isBulkConfirmOpen || 
+      isLogoutConfirmOpen || 
+      !!importConfirmationContext ||
+      isSidebarOpen;
+
+    if (anyModalOpen) {
+      // Only push if the current state isn't already a modal state to avoid loops
+      if (!window.history.state?.isModal) {
+        window.history.pushState({ isModal: true, tab: activeTab }, '');
+      }
+    } else {
+      // If all modals are closed but we are still in a modal state in history,
+      // it means they were closed manually. We should go back to clear the history.
+      if (window.history.state?.isModal) {
+        window.history.back();
+      }
+    }
+  }, [
+    isMovementModalOpen, 
+    !!deleteContext, 
+    !!matrixConfirmContext, 
+    !!detailContext, 
+    !!editPalletContext, 
+    isBulkConfirmOpen, 
+    isLogoutConfirmOpen, 
+    !!importConfirmationContext,
+    isSidebarOpen,
+    activeTab
+  ]);
+
   // Load data from Supabase
   useEffect(() => {
     const checkAuth = async () => {
@@ -440,9 +548,9 @@ const App: React.FC = () => {
 
       // If they were imported as PENDING, go to analysis
       if (entries[0]?.row.status === StockStatus.PENDING) {
-        setActiveTab('analysis');
+        navigateToTab('analysis');
       } else {
-        setActiveTab('inventory');
+        navigateToTab('inventory');
       }
     } catch (error: any) {
       console.error('Import processing error:', error);
@@ -726,7 +834,7 @@ const App: React.FC = () => {
     details: details
   });
 
-  const handleUpdatePallet = async (updatedData: { description: string; op: string; lot: string }) => {
+  const handleUpdatePallet = async (updatedData: { description: string; op: string; lot: string; quantity: number }) => {
     if (!editPalletContext) return;
 
     try {
@@ -736,6 +844,7 @@ const App: React.FC = () => {
       updatedRow.description = updatedData.description;
       updatedRow.originOP = updatedData.op;
       updatedRow.lot = updatedData.lot;
+      updatedRow.pallets = updatedData.quantity;
 
       await supabaseService.saveInventoryItem(updatedRow);
       setData(prev => prev.map(r => r.id === updatedRow.id ? updatedRow : r));
@@ -993,7 +1102,10 @@ const App: React.FC = () => {
 
   const NavItem = ({ tab, icon: Icon, label, badge }: { tab: typeof activeTab, icon: React.ElementType, label: string, badge?: number }) => (
     <button 
-      onClick={() => { setActiveTab(tab); setIsSidebarOpen(false); }} 
+      onClick={() => { 
+        setIsSidebarOpen(false);
+        navigateToTab(tab); 
+      }} 
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${activeTab === tab ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'}`}
     >
       <Icon className={`w-4 h-4 ${activeTab === tab ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
@@ -1109,19 +1221,19 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen lg:h-screen overflow-hidden">
-        <header className="bg-slate-950/50 backdrop-blur-xl border-b border-slate-900/50 h-16 px-6 md:px-10 flex justify-between items-center sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-900/50 h-16 px-4 md:px-10 flex justify-between items-center sticky top-0 z-40 shrink-0">
+          <div className="flex items-center gap-3 md:gap-4">
             {!isPublicView && (
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden w-9 h-9 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
+                className="lg:hidden w-10 h-10 bg-slate-900/80 border border-slate-800/50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95 shadow-lg"
               >
                 <Menu className="w-5 h-5" />
               </button>
             )}
             {isPublicView && <Logo isSm={true} />}
-            <h2 className="text-lg md:text-xl font-black text-white tracking-tight uppercase italic line-clamp-1">
+            <h2 className="text-base md:text-xl font-black text-white tracking-tight uppercase italic line-clamp-1">
               {isPublicView ? 'Dashboard Público' : (
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
@@ -1145,14 +1257,13 @@ const App: React.FC = () => {
                  Acessar App
                </button>
              )}
-             <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800/50">
-               <span className={`w-1.5 h-1.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`}></span>
-               <span className="hidden sm:inline text-[9px] font-bold text-slate-500 uppercase tracking-widest">{isSearching ? 'Sincronizando' : 'Online'}</span>
+             <div className="flex items-center justify-center w-10 h-6 bg-slate-900/50 rounded-full border border-slate-800/50">
+               <span className={`w-1.5 h-1.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></span>
              </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-4 md:p-8 lg:p-14">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 lg:p-14 scroll-smooth">
           {activeTab === 'movement' && (
             <div className="max-w-4xl mx-auto text-center space-y-8 py-20 animate-in fade-in slide-in-from-bottom-10 duration-700">
               <div className="w-24 h-24 bg-blue-600/10 text-blue-500 rounded-[32px] flex items-center justify-center mx-auto border border-blue-500/20 shadow-2xl shadow-blue-900/20 mb-8">
@@ -1297,7 +1408,7 @@ const App: React.FC = () => {
                            <div className="px-2 py-1 rounded-lg bg-green-500/10 text-green-500 text-[8px] font-bold uppercase border border-green-500/20">Entradas: {history.filter(h => h.type === HistoryType.ENTRY).length}</div>
                            <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-[8px] font-bold uppercase border border-blue-500/20">Saídas: {history.filter(h => h.type === HistoryType.EXIT).length}</div>
                          </div>
-                         <button onClick={() => setActiveTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                         <button onClick={() => navigateToTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
                            Ver tudo <ArrowRight className="w-3 h-3" />
                          </button>
                        </div>
@@ -1328,7 +1439,7 @@ const App: React.FC = () => {
                              {stats.pendingEntries > 0 ? 'Ação Necessária' : 'Tudo em dia'}
                            </p>
                          </div>
-                         <button onClick={() => setActiveTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+                         <button onClick={() => navigateToTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
                            Ir para Análise <ArrowRight className="w-3 h-3" />
                          </button>
                        </div>
@@ -1560,6 +1671,10 @@ const App: React.FC = () => {
                                             <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
                                          </div>
                                        )}
+                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Qtd</p>
+                                          <p className="text-xs font-black text-green-400 font-mono italic">{item.pallets}</p>
+                                       </div>
                                        {isUseConsumption && (
                                          <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
                                             <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Tipo</p>
