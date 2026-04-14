@@ -26,7 +26,8 @@ import {
   Info,
   Send,
   Plus,
-  Pencil
+  Pencil,
+  RefreshCw
 } from 'lucide-react';
 import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType, translateSlotContent } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
@@ -151,7 +152,34 @@ const App: React.FC = () => {
           await supabaseService.bulkUpdateSlots(initialSlots);
           setSlots(initialSlots);
         } else {
-          setSlots(slotData);
+          // Auto-sanitize slots based on inventory to prevent ghost data
+          const occupiedSlotsMap = new Map();
+          invData.forEach(item => {
+            if (item.inspections && item.inspections[0]?.assignedSlot) {
+              occupiedSlotsMap.set(item.inspections[0].assignedSlot, {
+                status: item.inspections[0].contentType,
+                occupiedBy: item.originOP || item.description
+              });
+            }
+          });
+
+          const sanitizedSlots = slotData.map(slot => {
+            const inventoryInfo = occupiedSlotsMap.get(slot.id);
+            if (inventoryInfo) {
+              return {
+                ...slot,
+                status: inventoryInfo.status,
+                occupiedBy: inventoryInfo.occupiedBy
+              };
+            }
+            return {
+              ...slot,
+              status: SlotContent.EMPTY,
+              occupiedBy: undefined
+            };
+          });
+
+          setSlots(sanitizedSlots);
         }
 
         // Extract processed IDs from inventory
@@ -584,6 +612,58 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Exit error:', error);
       showNotification('Erro ao registrar saída.', 'error');
+    }
+  };
+
+  const handleResyncSlots = async () => {
+    try {
+      showNotification('Iniciando sincronização de vagas...', 'info');
+      
+      // 1. Get current inventory and slots
+      const [invData, slotData] = await Promise.all([
+        supabaseService.getInventory(),
+        supabaseService.getSlots()
+      ]);
+
+      // 2. Map of occupied slots from inventory
+      const occupiedSlotsMap = new Map();
+      invData.forEach(item => {
+        if (item.inspections && item.inspections[0]?.assignedSlot) {
+          occupiedSlotsMap.set(item.inspections[0].assignedSlot, {
+            status: item.inspections[0].contentType,
+            occupiedBy: item.originOP || item.description
+          });
+        }
+      });
+
+      // 3. Prepare updated slots
+      const updatedSlots = slotData.map(slot => {
+        const inventoryInfo = occupiedSlotsMap.get(slot.id);
+        if (inventoryInfo) {
+          return {
+            ...slot,
+            status: inventoryInfo.status,
+            occupiedBy: inventoryInfo.occupiedBy
+          };
+        } else {
+          return {
+            ...slot,
+            status: SlotContent.EMPTY,
+            occupiedBy: undefined
+          };
+        }
+      });
+
+      // 4. Bulk update in Supabase
+      await supabaseService.bulkUpdateSlots(updatedSlots);
+      
+      // 5. Update local state
+      setSlots(updatedSlots);
+      
+      showNotification('Vagas sincronizadas com sucesso!', 'info');
+    } catch (error: any) {
+      console.error('Resync error:', error);
+      showNotification(`Erro ao sincronizar: ${error.message}`, 'error');
     }
   };
 
@@ -1120,7 +1200,14 @@ const App: React.FC = () => {
                       <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Utilização do Armazém G0</h4>
                       <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade em tempo real</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex items-center gap-4">
+                      <button 
+                        onClick={handleResyncSlots}
+                        className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
+                        title="Sincronizar Vagas"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
+                      </button>
                       <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                     </div>
                   </div>

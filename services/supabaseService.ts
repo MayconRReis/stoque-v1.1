@@ -92,9 +92,12 @@ export const supabaseService = {
         date: item.date,
         status: item.status,
         inspections: item.inspections || []
-      })
-      .select();
-    if (error) throw error;
+      });
+    
+    if (error) {
+      console.error('Supabase saveInventoryItem error:', error);
+      throw new Error(`Erro ao salvar item no estoque: ${error.message} (${error.details || 'Sem detalhes'})`);
+    }
   },
 
   async deleteInventoryItem(id: string) {
@@ -136,9 +139,12 @@ export const supabaseService = {
         status: slot.status,
         occupied_by: slot.occupiedBy,
         updated_at: new Date().toISOString()
-      })
-      .select();
-    if (error) throw error;
+      });
+    
+    if (error) {
+      console.error('Supabase updateSlot error:', error);
+      throw new Error(`Erro ao atualizar vaga: ${error.message}`);
+    }
   },
 
   async bulkUpdateSlots(slots: WarehouseSlot[]) {
@@ -195,9 +201,12 @@ export const supabaseService = {
         total_pallets: entry.totalPallets,
         slot: entry.slot,
         details: entry.details
-      })
-      .select();
-    if (error) throw error;
+      });
+    
+    if (error) {
+      console.error('Supabase addHistoryEntry error:', error);
+      throw new Error(`Erro ao salvar histórico: ${error.message}`);
+    }
   },
 
   // Auth
