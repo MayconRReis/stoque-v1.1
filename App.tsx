@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Package, 
@@ -29,10 +29,26 @@ import {
   Pencil,
   RefreshCw
 } from 'lucide-react';
-import { SheetRow, StockStatus, InspectionData, DashboardStats, WarehouseSlot, SlotContent, HistoryEntry, HistoryType, translateSlotContent } from './types';
+import { 
+  SheetRow, 
+  StockStatus, 
+  InspectionData, 
+  DashboardStats, 
+  WarehouseSlot, 
+  SlotContent, 
+  HistoryEntry, 
+  HistoryType, 
+  translateSlotContent,
+  Shipment,
+  ShipmentType,
+  ShipmentStatus
+} from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
 import { EditPalletModal } from './components/EditPalletModal';
+import { ShipmentPage } from './components/ShipmentPage';
+import { ShipmentModal } from './components/ShipmentModal';
+import { ShipmentDetailModal } from './components/ShipmentDetailModal';
 import { supabaseService } from './services/supabaseService';
 import { Login } from './components/Login';
 import { MovementModal } from './components/MovementModal';
@@ -40,24 +56,17 @@ import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
 import { User as AppUser } from './types';
 
-const SPREADSHEET_ID = '1BBsxodwfNx-sB7xtcxA93JRAQCRZ7z_BGC2efOPxu4M';
-const SHEET_NAME = 'Dados_Carregamentos';
-const GOOGLE_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
-
 const generateSlots = (): WarehouseSlot[] => {
   const slots: WarehouseSlot[] = [];
-  for (let l = 1; l <= 3; l++) {
-    for (let p = 1; p <= 16; p++) slots.push({ id: `A.${l}.${p}`, rack: 'A', level: l, position: p, status: SlotContent.EMPTY });
-  }
-  for (let l = 1; l <= 3; l++) {
-    for (let p = 1; p <= 16; p++) slots.push({ id: `B.${l}.${p}`, rack: 'B', level: l, position: p, status: SlotContent.EMPTY });
-  }
-  for (let l = 1; l <= 3; l++) {
-    for (let p = 1; p <= 16; p++) slots.push({ id: `C.${l}.${p}`, rack: 'C', level: l, position: p, status: SlotContent.EMPTY });
-  }
-  for (let l = 1; l <= 3; l++) {
-    for (let p = 1; p <= 18; p++) slots.push({ id: `D.${l}.${p}`, rack: 'D', level: l, position: p, status: SlotContent.EMPTY });
-  }
+  const racks: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
+  racks.forEach(rack => {
+    const positions = rack === 'D' ? 18 : 16;
+    for (let l = 1; l <= 3; l++) {
+      for (let p = 1; p <= positions; p++) {
+        slots.push({ id: `${rack}.${l}.${p}`, rack, level: l, position: p, status: SlotContent.EMPTY });
+      }
+    }
+  });
   return slots;
 };
 
@@ -84,7 +93,7 @@ const App: React.FC = () => {
   const [isPublicView, setIsPublicView] = useState(false);
   const [data, setData] = useState<SheetRow[]>([]);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
@@ -98,16 +107,28 @@ const App: React.FC = () => {
 
   const [deleteContext, setDeleteContext] = useState<{ type: 'row' | 'pallet', rowId: string, palletIdx?: number } | null>(null);
   const [matrixConfirmContext, setMatrixConfirmContext] = useState<{ rowId: string, palletIdx: number, slotId?: string } | null>(null);
-  const [importConfirmationContext, setImportConfirmationContext] = useState<{ targetId: string, entries: SheetRow[] } | null>(null);
   const [notifications, setNotifications] = useState<{ id: string, message: string, type?: 'info' | 'error' }[]>([]);
   
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
-  const [searchLoadingId, setSearchLoadingId] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
+  const [shipmentDetailContext, setShipmentDetailContext] = useState<Shipment | null>(null);
 
-  const [processedIds, setProcessedIds] = useState<string[]>([]);
+  // Helper to map Supabase data to SheetRow
+  const mapInventoryItem = useCallback((item: any): SheetRow => ({
+    id: item.id,
+    loadingId: item.loading_id,
+    originOP: item.origin_op,
+    description: item.description,
+    lot: item.lot,
+    pallets: item.pallets,
+    date: item.date,
+    status: item.status as StockStatus,
+    inspections: item.inspections || [],
+    operatorName: item.operatorName
+  }), []);
 
   // Helper to close all modals and sidebar
   const closeAllModals = () => {
@@ -118,7 +139,8 @@ const App: React.FC = () => {
     setEditPalletContext(null);
     setIsBulkConfirmOpen(false);
     setIsLogoutConfirmOpen(false);
-    setImportConfirmationContext(null);
+    setIsShipmentModalOpen(false);
+    setShipmentDetailContext(null);
     setIsSidebarOpen(false);
   };
 
@@ -134,7 +156,6 @@ const App: React.FC = () => {
         !!editPalletContext || 
         isBulkConfirmOpen || 
         isLogoutConfirmOpen || 
-        !!importConfirmationContext ||
         isSidebarOpen;
 
       if (anyModalOpen) {
@@ -142,7 +163,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // If no modal was open, handle tab navigation
       if (event.state && event.state.tab) {
         setActiveTab(event.state.tab);
       } else {
@@ -152,7 +172,6 @@ const App: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     
-    // Initialize history state if not present
     if (!window.history.state) {
       window.history.replaceState({ tab: activeTab }, '');
     }
@@ -166,12 +185,10 @@ const App: React.FC = () => {
     editPalletContext, 
     isBulkConfirmOpen, 
     isLogoutConfirmOpen, 
-    importConfirmationContext,
     isSidebarOpen,
     activeTab
   ]);
 
-  // Helper to change tab with history support
   const navigateToTab = (tab: typeof activeTab) => {
     if (tab !== activeTab) {
       window.history.pushState({ tab }, '');
@@ -179,7 +196,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Push state when opening a modal so back button can close it
   useEffect(() => {
     const anyModalOpen = 
       isMovementModalOpen || 
@@ -189,17 +205,13 @@ const App: React.FC = () => {
       !!editPalletContext || 
       isBulkConfirmOpen || 
       isLogoutConfirmOpen || 
-      !!importConfirmationContext ||
       isSidebarOpen;
 
     if (anyModalOpen) {
-      // Only push if the current state isn't already a modal state to avoid loops
       if (!window.history.state?.isModal) {
         window.history.pushState({ isModal: true, tab: activeTab }, '');
       }
     } else {
-      // If all modals are closed but we are still in a modal state in history,
-      // it means they were closed manually. We should go back to clear the history.
       if (window.history.state?.isModal) {
         window.history.back();
       }
@@ -212,7 +224,6 @@ const App: React.FC = () => {
     !!editPalletContext, 
     isBulkConfirmOpen, 
     isLogoutConfirmOpen, 
-    !!importConfirmationContext,
     isSidebarOpen,
     activeTab
   ]);
@@ -245,14 +256,16 @@ const App: React.FC = () => {
 
     const loadData = async () => {
       try {
-        const [invData, slotData, historyData] = await Promise.all([
+        const [invData, slotData, historyData, shipData] = await Promise.all([
           supabaseService.getInventory(),
           supabaseService.getSlots(),
-          supabaseService.getHistory()
+          supabaseService.getHistory(),
+          supabaseService.getShipments()
         ]);
 
         setData(invData);
         setHistory(historyData);
+        setShipments(shipData);
         
         // If no slots in DB, initialize them
         if (slotData.length === 0) {
@@ -289,10 +302,6 @@ const App: React.FC = () => {
 
           setSlots(sanitizedSlots);
         }
-
-        // Extract processed IDs from inventory
-        const uniqueLoadingIds = Array.from(new Set(invData.map(item => item.loadingId)));
-        setProcessedIds(uniqueLoadingIds);
       } catch (error) {
         console.error('Error loading data from Supabase:', error);
         showNotification('Erro ao carregar dados do servidor Supabase.', 'error');
@@ -304,33 +313,13 @@ const App: React.FC = () => {
     // Set up real-time subscriptions
     const inventoryChannel = supabaseService.subscribeToInventory((payload) => {
       if (payload.eventType === 'INSERT') {
-        const newItem: SheetRow = {
-          id: payload.new.id,
-          loadingId: payload.new.loading_id,
-          originOP: payload.new.origin_op,
-          description: payload.new.description,
-          lot: payload.new.lot,
-          pallets: payload.new.pallets,
-          date: payload.new.date,
-          status: payload.new.status as StockStatus,
-          inspections: payload.new.inspections || []
-        };
+        const newItem = mapInventoryItem(payload.new);
         setData(prev => {
           if (prev.find(r => r.id === newItem.id)) return prev;
           return [newItem, ...prev];
         });
       } else if (payload.eventType === 'UPDATE') {
-        const updatedItem: SheetRow = {
-          id: payload.new.id,
-          loadingId: payload.new.loading_id,
-          originOP: payload.new.origin_op,
-          description: payload.new.description,
-          lot: payload.new.lot,
-          pallets: payload.new.pallets,
-          date: payload.new.date,
-          status: payload.new.status as StockStatus,
-          inspections: payload.new.inspections || []
-        };
+        const updatedItem = mapInventoryItem(payload.new);
         setData(prev => prev.map(r => r.id === updatedItem.id ? updatedItem : r));
       } else if (payload.eventType === 'DELETE') {
         setData(prev => prev.filter(r => r.id !== payload.old.id));
@@ -357,10 +346,15 @@ const App: React.FC = () => {
       }
     });
 
+    const shipmentsChannel = supabaseService.subscribeToShipments(() => {
+      supabaseService.getShipments().then(setShipments);
+    });
+
     return () => {
       inventoryChannel.unsubscribe();
       slotsChannel.unsubscribe();
       notificationsChannel.unsubscribe();
+      shipmentsChannel.unsubscribe();
     };
   }, [user, isPublicView]);
 
@@ -424,15 +418,17 @@ const App: React.FC = () => {
 
   const handleMovementEntry = async (entryData: any) => {
     try {
+      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
       const newEntry: SheetRow = {
         id: entryData.id,
         loadingId: entryData.id,
         originOP: entryData.op || 'N/A',
-        description: entryData.name,
+        description: `${entryData.name}${operatorSuffix}`,
         lot: entryData.lot || 'N/A',
         pallets: entryData.quantity,
         date: new Date().toLocaleDateString(),
         status: StockStatus.INSPECTED,
+        operatorName: user?.name,
         inspections: [{
           bottles: entryData.supplyDetails?.bottles || 0,
           caps: entryData.supplyDetails?.caps || 0,
@@ -461,6 +457,12 @@ const App: React.FC = () => {
       await supabaseService.saveInventoryItem(newEntry);
       setData(prev => [newEntry, ...prev]);
 
+      supabaseService.broadcastNotification({
+        user: user?.id || '',
+        message: `Nova entrada registrada: ${entryData.name}`,
+        type: 'info'
+      });
+
       // Add History
       await addToHistory({
         id: Math.random().toString(36).substring(2, 9),
@@ -473,7 +475,8 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: entryData.quantity,
         slot: entryData.slotId,
-        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}`
+        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}`,
+        operatorName: user?.name
       });
 
       showNotification(`Entrada realizada com sucesso! ID: ${entryData.id}`);
@@ -506,7 +509,11 @@ const App: React.FC = () => {
           }
         }
 
-        newRows.push(row);
+        newRows.push({
+          ...row,
+          description: user?.name ? `${row.description} | Op: ${user.name}` : row.description,
+          operatorName: user?.name
+        });
         // Only add to history if it's a final entry (has slot)
         if (slotId) {
           newHistory.push({
@@ -520,7 +527,8 @@ const App: React.FC = () => {
             palletNumber: 1,
             totalPallets: 1,
             slot: slotId,
-            details: `Importação via CSV por ${user?.name || 'Sistema'}. ID: ${row.loadingId}`
+            details: `Importação via CSV por ${user?.name || 'Sistema'}. ID: ${row.loadingId}`,
+            operatorName: user?.name
           });
         }
       }
@@ -563,10 +571,13 @@ const App: React.FC = () => {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
 
+      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
       const updatedRow: SheetRow = {
         ...row,
         loadingId: finalId,
+        description: `${row.description}${operatorSuffix}`,
         status: StockStatus.INSPECTED,
+        operatorName: user?.name,
         inspections: row.inspections?.map(insp => ({ ...insp, assignedSlot: slotId }))
       };
 
@@ -590,7 +601,8 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: 1,
         slot: slotId,
-        details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}`
+        details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}`,
+        operatorName: user?.name
       };
 
       await Promise.all([
@@ -669,7 +681,8 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: transferData.toSlot,
-        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}`
+        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}`,
+        operatorName: user?.name
       });
 
       showNotification('Transferência concluída com sucesso.');
@@ -712,7 +725,8 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: occupiedSlot?.id || 'N/A',
-        details: `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`
+        details: `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`,
+        operatorName: user?.name
       });
 
       showNotification('Saída registrada com sucesso.');
@@ -775,6 +789,157 @@ const App: React.FC = () => {
     }
   };
 
+  const handleCreateShipment = async (shipmentData: { type: ShipmentType, scheduledDate: string }) => {
+    try {
+      const newShipment: Shipment = {
+        id: `SHIP-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+        type: shipmentData.type,
+        status: ShipmentStatus.OPEN,
+        createdAt: new Date().toISOString(),
+        scheduledDate: shipmentData.scheduledDate,
+        operatorName: user?.name
+      };
+
+      const selections = selectedPallets.map(id => {
+        const [rowId, palletIdx] = id.split('::');
+        return { rowId, palletIdx: parseInt(palletIdx) };
+      });
+
+      await supabaseService.saveShipment(newShipment);
+      await supabaseService.updateInventoryShipment(selections, newShipment.id);
+      
+      supabaseService.broadcastNotification({
+        user: user?.id || '',
+        message: `Novo carregamento criado: ${newShipment.id}`,
+        type: 'info'
+      });
+
+      showNotification(`Carregamento ${newShipment.id} criado com sucesso!`);
+      setSelectedPallets([]);
+    } catch (error: any) {
+      console.error('Error creating shipment:', error);
+      showNotification(`Erro ao criar carregamento: ${error.message}`, 'error');
+    }
+  };
+
+  const handleAddToShipment = async (shipmentId: string) => {
+    try {
+      const selections = selectedPallets.map(id => {
+        const [rowId, palletIdx] = id.split('::');
+        return { rowId, palletIdx: parseInt(palletIdx) };
+      });
+
+      await supabaseService.updateInventoryShipment(selections, shipmentId);
+      showNotification(`Pallets adicionados ao carregamento ${shipmentId}!`);
+      setSelectedPallets([]);
+    } catch (error: any) {
+      console.error('Error adding to shipment:', error);
+      showNotification(`Erro ao adicionar ao carregamento: ${error.message}`, 'error');
+    }
+  };
+
+  const handleRemoveFromShipment = async (palletId: string) => {
+    try {
+      const [rowId, palletIdx] = palletId.split('::');
+      await supabaseService.updateInventoryShipment([{ rowId, palletIdx: parseInt(palletIdx) }], null);
+      showNotification('Pallet removido do carregamento.');
+    } catch (error: any) {
+      console.error('Error removing from shipment:', error);
+      showNotification(`Erro ao remover pallet: ${error.message}`, 'error');
+    }
+  };
+
+  const handleFinalizeShipment = async (shipmentId: string) => {
+    try {
+      const shipment = shipments.find(s => s.id === shipmentId);
+      if (!shipment) return;
+
+      // 1. Find all pallets linked to this shipment
+      const itemsToProcess: { row: SheetRow, palletIndices: number[] }[] = [];
+      data.forEach(row => {
+        const indices = (row.inspections || [])
+          .map((insp, idx) => {
+            const sId = insp.shipmentId || (insp as any).shipment_id;
+            return sId === shipmentId ? idx : -1;
+          })
+          .filter(idx => idx !== -1);
+        
+        if (indices.length > 0) {
+          itemsToProcess.push({ row, palletIndices: indices });
+        }
+      });
+
+      if (itemsToProcess.length === 0) {
+        showNotification('Nenhum pallet encontrado para este carregamento.', 'error');
+        return;
+      }
+
+      // 2. Update shipment status
+      const updatedShipment = { ...shipment, status: ShipmentStatus.CLOSED };
+      await supabaseService.saveShipment(updatedShipment);
+
+      // 3. Process exit for each pallet
+      for (const { row, palletIndices } of itemsToProcess) {
+        // Sort indices descending to remove from array without affecting previous indices
+        const sortedIndices = [...palletIndices].sort((a, b) => b - a);
+        
+        for (const idx of sortedIndices) {
+          const inspection = row.inspections![idx];
+          
+          // Update Slot
+          if (inspection.assignedSlot) {
+            const occupiedSlot = slots.find(s => s.id === inspection.assignedSlot);
+            if (occupiedSlot) {
+              const updatedSlot: WarehouseSlot = { ...occupiedSlot, status: SlotContent.EMPTY, occupiedBy: undefined };
+              await supabaseService.updateSlot(updatedSlot);
+            }
+          }
+
+          // Add History
+          await addToHistory({
+            id: Math.random().toString(36).substring(2, 9),
+            type: HistoryType.EXIT,
+            timestamp: new Date().toLocaleString(),
+            loadingId: row.loadingId,
+            description: row.description,
+            op: row.originOP,
+            lot: row.lot,
+            palletNumber: idx + 1,
+            totalPallets: row.pallets,
+            slot: inspection.assignedSlot || 'N/A',
+            details: `Saída automática via Finalização de Carregamento ${shipmentId}`,
+            operatorName: user?.name
+          });
+        }
+
+        // Update or Delete Inventory Item
+        const remainingInspections = row.inspections!.filter((_, i) => !palletIndices.includes(i));
+        if (remainingInspections.length === 0) {
+          await supabaseService.deleteInventoryItem(row.id);
+        } else {
+          const updatedRow = { 
+            ...row, 
+            inspections: remainingInspections, 
+            pallets: remainingInspections.length 
+          };
+          await supabaseService.saveInventoryItem(updatedRow);
+        }
+      }
+
+      showNotification(`Carregamento ${shipmentId} finalizado com sucesso!`);
+    } catch (error: any) {
+      console.error('Error finalizing shipment:', error);
+      showNotification(`Erro ao finalizar carregamento: ${error.message}`, 'error');
+    }
+  };
+
+  const togglePalletSelection = (rowId: string, palletIdx: number) => {
+    const id = `${rowId}::${palletIdx}`;
+    setSelectedPallets(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   const stats = useMemo((): DashboardStats => {
     const occupied = slots.filter(s => s.status !== SlotContent.EMPTY).length;
     const total = slots.length;
@@ -831,7 +996,8 @@ const App: React.FC = () => {
     palletNumber: palletNum,
     totalPallets: row.pallets,
     slot: row.inspections?.[0]?.assignedSlot || 'N/A',
-    details: details
+    details: details,
+    operatorName: user?.name
   });
 
   const handleUpdatePallet = async (updatedData: { description: string; op: string; lot: string; quantity: number }) => {
@@ -839,12 +1005,18 @@ const App: React.FC = () => {
 
     try {
       const { row } = editPalletContext;
-      const updatedRow = { ...row };
+      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
+      // Remove old operator suffix if exists to avoid stacking
+      const baseDescription = updatedData.description.split(' | Op:')[0];
       
-      updatedRow.description = updatedData.description;
-      updatedRow.originOP = updatedData.op;
-      updatedRow.lot = updatedData.lot;
-      updatedRow.pallets = updatedData.quantity;
+      const updatedRow: SheetRow = { 
+        ...row,
+        description: `${baseDescription}${operatorSuffix}`,
+        originOP: updatedData.op,
+        lot: updatedData.lot,
+        pallets: updatedData.quantity,
+        operatorName: user?.name
+      };
 
       await supabaseService.saveInventoryItem(updatedRow);
       setData(prev => prev.map(r => r.id === updatedRow.id ? updatedRow : r));
@@ -980,31 +1152,6 @@ const App: React.FC = () => {
     setMatrixConfirmContext({ rowId, palletIdx, slotId });
   };
 
-  const togglePalletSelection = (rowId: string, idx: number) => {
-    const key = `${rowId}::${idx}`;
-    setSelectedPallets(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-  };
-
-  const pendingItems = [];
-  const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
-
-  const filteredInventory = useMemo(() => {
-    const term = inventorySearch.toLowerCase().trim();
-    const allPallets: { row: SheetRow, inspection: InspectionData, idx: number }[] = [];
-    inspectedItems.forEach(item => {
-      item.inspections?.forEach((insp, idx) => {
-        if (!term || item.description.toLowerCase().includes(term) || item.originOP.includes(term) || item.lot.toLowerCase().includes(term)) {
-          allPallets.push({ row: item, inspection: insp, idx });
-        }
-      });
-    });
-    return allPallets.sort((a, b) => {
-      const slotA = a.inspection.assignedSlot || '';
-      const slotB = b.inspection.assignedSlot || '';
-      return slotA.localeCompare(slotB, undefined, { numeric: true });
-    });
-  }, [inspectedItems, inventorySearch]);
-
   const RackView = ({ rack }: { rack: 'A' | 'B' | 'C' | 'D' }) => {
     const rackSlots = slots.filter(s => s.rack === rack);
     const freeCount = rackSlots.filter(s => s.status === SlotContent.EMPTY).length;
@@ -1078,27 +1225,63 @@ const App: React.FC = () => {
     );
   };
 
-  const BarChart = ({ data }: { data: { label: string, value: number, color: string }[] }) => {
-    const max = Math.max(...data.map(d => d.value), 1);
-    return (
-      <div className="space-y-4 w-full">
-        {data.map((item, i) => (
-          <div key={i} className="space-y-1.5">
-            <div className="flex justify-between items-end">
-              <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</span>
-              <span className="text-[10px] md:text-xs font-black text-white">{item.value}</span>
-            </div>
-            <div className="h-2 md:h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
-              <div 
-                className={`h-full ${item.color} transition-all duration-1000 ease-out rounded-full`} 
-                style={{ width: `${(item.value / max) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-        ))}
+  const StatsSection = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-blue-500/30 transition-all">
+        <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
+          <FlaskConical className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Total de Frascos</p>
+          <p className="text-2xl font-black text-white tracking-tight">{stats.totalBottles.toLocaleString()}</p>
+        </div>
       </div>
-    );
-  };
+
+      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-green-500/30 transition-all">
+        <div className="w-10 h-10 bg-green-600/10 text-green-500 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
+          <CheckCircle2 className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Livres</p>
+          <p className="text-2xl font-black text-white tracking-tight">{stats.freeSlots}</p>
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Total: {stats.totalSlots}</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
+        <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
+          <Boxes className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Ocupadas</p>
+          <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">{stats.occupancyRate}% Ocupação</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const filteredInventory = useMemo(() => {
+    const term = inventorySearch.toLowerCase().trim();
+    const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
+    const allPallets: { row: SheetRow, inspection: InspectionData, idx: number }[] = [];
+    inspectedItems.forEach(item => {
+      item.inspections?.forEach((insp, idx) => {
+        if (!term || item.description.toLowerCase().includes(term) || item.originOP.includes(term) || item.lot.toLowerCase().includes(term)) {
+          allPallets.push({ row: item, inspection: insp, idx });
+        }
+      });
+    });
+    return allPallets.sort((a, b) => {
+      const slotA = a.inspection.assignedSlot || '';
+      const slotB = b.inspection.assignedSlot || '';
+      return slotA.localeCompare(slotB, undefined, { numeric: true });
+    });
+  }, [data, inventorySearch]);
 
   const NavItem = ({ tab, icon: Icon, label, badge }: { tab: typeof activeTab, icon: React.ElementType, label: string, badge?: number }) => (
     <button 
@@ -1180,6 +1363,7 @@ const App: React.FC = () => {
             <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" />
             <NavItem tab="inventory" icon={Package} label="Estoque Geral" />
+            <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} />
             <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" />
             <NavItem tab="import" icon={FileUp} label="Importar CSV" />
             <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
@@ -1258,7 +1442,7 @@ const App: React.FC = () => {
                </button>
              )}
              <div className="flex items-center justify-center w-10 h-6 bg-slate-900/50 rounded-full border border-slate-800/50">
-               <span className={`w-1.5 h-1.5 rounded-full ${isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></span>
+               <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
              </div>
           </div>
         </header>
@@ -1287,14 +1471,14 @@ const App: React.FC = () => {
           {(activeTab === 'dashboard' || isPublicView) && (
             <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
                 {/* Dashboard Actions */}
-                <div className="flex flex-wrap justify-end gap-3">
-                    {!isPublicView && (
-                      <button 
-                          onClick={handleShareDashboard}
-                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-amber-500/30 group"
-                      >
-                          <Share2 className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" /> Compartilhar
-                      </button>
+                <div className="flex flex-wrap gap-3">
+                    {selectedPallets.length > 0 && (
+                        <button 
+                            onClick={() => setIsShipmentModalOpen(true)}
+                            className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
+                        >
+                            <Truck className="w-3.5 h-3.5" /> Enviar para Carregamento ({selectedPallets.length})
+                        </button>
                     )}
                     <button 
                         onClick={handleExportInventory}
@@ -1342,46 +1526,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Top Stats Row: Flasks, Free, Occupied */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                    {/* Flasks - Smaller as requested */}
-                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-blue-500/30 transition-all">
-                       <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
-                         <FlaskConical className="w-5 h-5" />
-                       </div>
-                       <div>
-                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Total de Frascos</p>
-                         <p className="text-2xl font-black text-white tracking-tight">{stats.totalBottles.toLocaleString()}</p>
-                       </div>
-                    </div>
-
-                    {/* Free Slots */}
-                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-green-500/30 transition-all">
-                       <div className="w-10 h-10 bg-green-600/10 text-green-500 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
-                         <CheckCircle2 className="w-5 h-5" />
-                       </div>
-                       <div>
-                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Livres</p>
-                         <p className="text-2xl font-black text-white tracking-tight">{stats.freeSlots}</p>
-                       </div>
-                       <div className="ml-auto text-right">
-                         <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Total: {stats.totalSlots}</p>
-                       </div>
-                    </div>
-
-                    {/* Occupied Slots */}
-                    <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
-                       <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
-                         <Boxes className="w-5 h-5" />
-                       </div>
-                       <div>
-                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Ocupadas</p>
-                         <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
-                       </div>
-                       <div className="ml-auto text-right">
-                         <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">{stats.occupancyRate}% Ocupação</p>
-                       </div>
-                    </div>
-                </div>
+                <StatsSection />
 
                 {/* Bottom Stats Row: Movements, Pending */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -1552,6 +1697,14 @@ const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'shipments' && (
+            <ShipmentPage 
+              shipments={shipments}
+              inventory={data}
+              onOpenDetail={setShipmentDetailContext}
+            />
+          )}
+
           {activeTab === 'history' && (
             <div className="max-w-5xl mx-auto space-y-3 animate-in fade-in duration-500">
                 {history.length === 0 ? (
@@ -1613,12 +1766,20 @@ const App: React.FC = () => {
                         />
                     </div>
                     {selectedPallets.length > 0 && (
-                        <button 
-                            onClick={() => setIsBulkConfirmOpen(true)}
-                            className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
-                        >
-                            <Send className="w-3.5 h-3.5" /> Enviar Selecionados ({selectedPallets.length})
-                        </button>
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <button 
+                                onClick={() => setIsShipmentModalOpen(true)}
+                                className="flex-1 md:flex-none px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
+                            >
+                                <Truck className="w-3.5 h-3.5" /> Carregamento ({selectedPallets.length})
+                            </button>
+                            <button 
+                                onClick={() => setIsBulkConfirmOpen(true)}
+                                className="flex-1 md:flex-none px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
+                            >
+                                <Send className="w-3.5 h-3.5" /> Enviar ({selectedPallets.length})
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -1794,10 +1955,38 @@ const App: React.FC = () => {
         <EditPalletModal 
           isOpen={!!editPalletContext}
           onClose={() => setEditPalletContext(null)}
-          onSave={handleUpdatePallet}
-          pallet={editPalletContext}
+          row={editPalletContext.row}
+          inspection={editPalletContext.inspection}
+          onUpdate={handleUpdatePallet}
         />
       )}
+
+      <ShipmentModal 
+        isOpen={isShipmentModalOpen}
+        onClose={() => setIsShipmentModalOpen(false)}
+        openShipments={shipments.filter(s => s.status === ShipmentStatus.OPEN)}
+        onCreateNew={handleCreateShipment}
+        onAddToExisting={handleAddToShipment}
+        selectedCount={selectedPallets.length}
+      />
+
+      <ShipmentDetailModal 
+        isOpen={!!shipmentDetailContext}
+        onClose={() => setShipmentDetailContext(null)}
+        shipment={shipmentDetailContext}
+        linkedPallets={shipmentDetailContext ? data.flatMap(row => 
+          (row.inspections || [])
+            .map((insp, idx) => {
+              const sId = insp.shipmentId || (insp as any).shipment_id;
+              return (sId && sId === shipmentDetailContext.id) 
+                ? { ...row, inspections: [insp], id: `${row.id}::${idx}` } 
+                : null;
+            })
+            .filter((p): p is SheetRow => p !== null)
+        ) : []}
+        onFinalize={handleFinalizeShipment}
+        onRemovePallet={handleRemoveFromShipment}
+      />
       
       <MovementModal 
         isOpen={isMovementModalOpen} 

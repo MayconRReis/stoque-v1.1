@@ -1,0 +1,159 @@
+
+import React, { useState } from 'react';
+import { Shipment, ShipmentType, ShipmentStatus, SheetRow, translateSlotContent } from '../types';
+import { 
+  X, 
+  Truck, 
+  Calendar, 
+  Package, 
+  CheckCircle2, 
+  Trash2,
+  AlertCircle,
+  Hash,
+  ArrowRight
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface ShipmentDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  shipment: Shipment | null;
+  linkedPallets: SheetRow[];
+  onFinalize: (shipmentId: string) => Promise<void>;
+  onRemovePallet: (palletId: string) => Promise<void>;
+}
+
+export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  shipment, 
+  linkedPallets,
+  onFinalize,
+  onRemovePallet
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  if (!isOpen || !shipment) return null;
+
+  const handleFinalize = async () => {
+    if (linkedPallets.length === 0) return;
+    setIsProcessing(true);
+    try {
+      await onFinalize(shipment.id);
+      onClose();
+    } catch (error) {
+      console.error('Error finalizing shipment:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-slate-900 border border-slate-800 rounded-[3rem] shadow-3xl w-full max-w-2xl overflow-hidden my-auto"
+      >
+        {/* Header */}
+        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+          <div className="flex items-center gap-4">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transform -rotate-3 ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-purple-600 shadow-purple-900/40' : 'bg-blue-600 shadow-blue-900/40'}`}>
+              <Truck className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Detalhes do Carregamento</h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">{shipment.id}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-xl bg-slate-950 text-slate-500 hover:text-white flex items-center justify-center border border-slate-800 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-8">
+          {/* Info Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
+              <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Tipo</p>
+              <p className={`text-sm font-black italic ${shipment.type === ShipmentType.THIRD_PARTY ? 'text-purple-500' : 'text-blue-500'}`}>
+                {shipment.type === ShipmentType.THIRD_PARTY ? 'Terceirista' : 'Próprio'}
+              </p>
+            </div>
+            <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
+              <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Data de Envio</p>
+              <p className="text-sm font-black text-white italic">{new Date(shipment.scheduledDate).toLocaleDateString('pt-BR')}</p>
+            </div>
+            <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
+              <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Total Pallets</p>
+              <p className="text-sm font-black text-white italic">{linkedPallets.length} Unidades</p>
+            </div>
+          </div>
+
+          {/* Pallet List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] italic">Pallets Vinculados</h4>
+              <span className="text-[10px] font-bold text-slate-600 uppercase">{linkedPallets.length} itens</span>
+            </div>
+            
+            <div className="max-h-[35vh] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+              {linkedPallets.length === 0 ? (
+                <div className="py-12 text-center border-2 border-dashed border-slate-800/50 rounded-[2rem] bg-slate-950/20">
+                  <Package className="w-10 h-10 text-slate-800 mx-auto mb-3" />
+                  <p className="text-slate-600 font-bold uppercase text-[9px] tracking-widest">Nenhum pallet vinculado</p>
+                </div>
+              ) : (
+                linkedPallets.map(pallet => (
+                  <div key={pallet.id} className="bg-slate-950/50 border border-slate-800/60 p-4 rounded-2xl flex items-center justify-between group hover:border-slate-700 transition-all">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-slate-500 border border-slate-800 shrink-0">
+                        <Package className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black text-blue-500 font-mono uppercase mb-0.5 pr-4 truncate">{pallet.originOP}</p>
+                        <h5 className="text-[11px] font-bold text-white uppercase truncate pr-4">{pallet.description}</h5>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-[8px] font-black text-slate-600 uppercase">Lote: {pallet.lot}</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase">Vaga: {pallet.inspections?.[0]?.assignedSlot || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => onRemovePallet(pallet.id)}
+                      className="w-10 h-10 bg-slate-900 hover:bg-red-500/10 text-slate-700 hover:text-red-500 border border-slate-800 hover:border-red-500/30 rounded-xl transition-all flex items-center justify-center shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <button 
+              onClick={onClose}
+              className="flex-1 py-5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all"
+            >
+              Fechar
+            </button>
+            <button 
+              onClick={handleFinalize}
+              disabled={isProcessing || linkedPallets.length === 0}
+              className="flex-[2] py-5 bg-green-600 hover:bg-green-500 disabled:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-green-900/40 transition-all flex items-center justify-center gap-3 active:scale-95"
+            >
+              {isProcessing ? (
+                <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processando</>
+              ) : (
+                <><CheckCircle2 className="w-5 h-5" /> Finalizar Carregamento</>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus } from '../types';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -50,11 +50,23 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
  * 
+ * CREATE TABLE shipments (
+ *   id TEXT PRIMARY KEY,
+ *   type TEXT NOT NULL,
+ *   status TEXT DEFAULT 'OPEN',
+ *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+ *   scheduled_date TEXT,
+ *   operator_name TEXT
+ * );
+ * 
+ * ALTER TABLE inventory ADD COLUMN shipment_id TEXT REFERENCES shipments(id);
+ * 
  * -- 2. Disable RLS (or add policies)
  * ALTER TABLE inventory DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE warehouse_slots DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE history DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ * ALTER TABLE shipments DISABLE ROW LEVEL SECURITY;
  */
 
 export const supabaseService = {
@@ -75,7 +87,8 @@ export const supabaseService = {
       pallets: item.pallets,
       date: item.date,
       status: item.status as StockStatus,
-      inspections: item.inspections || []
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
     }));
   },
 
@@ -91,7 +104,8 @@ export const supabaseService = {
         pallets: item.pallets,
         date: item.date,
         status: item.status,
-        inspections: item.inspections || []
+        inspections: item.inspections || [],
+        operator_name: item.operatorName
       });
     
     if (error) {
@@ -182,7 +196,8 @@ export const supabaseService = {
       palletNumber: entry.pallet_number,
       totalPallets: entry.total_pallets,
       slot: entry.slot,
-      details: entry.details
+      details: entry.details,
+      operatorName: entry.operator_name
     }));
   },
 
@@ -200,7 +215,8 @@ export const supabaseService = {
         pallet_number: entry.palletNumber,
         total_pallets: entry.totalPallets,
         slot: entry.slot,
-        details: entry.details
+        details: entry.details,
+        operator_name: entry.operatorName
       });
     
     if (error) {
@@ -281,5 +297,81 @@ export const supabaseService = {
       event: 'new-import',
       payload
     });
+  },
+
+  // Shipments
+  async getShipments(): Promise<Shipment[]> {
+    const { data, error } = await supabase
+      .from('shipments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(s => ({
+      id: s.id,
+      type: s.type as ShipmentType,
+      status: s.status as ShipmentStatus,
+      createdAt: s.created_at,
+      scheduledDate: s.scheduled_date,
+      operatorName: s.operator_name
+    }));
+  },
+
+  async saveShipment(shipment: Shipment) {
+    const { error } = await supabase
+      .from('shipments')
+      .upsert({
+        id: shipment.id,
+        type: shipment.type,
+        status: shipment.status,
+        created_at: shipment.createdAt,
+        scheduled_date: shipment.scheduledDate,
+        operator_name: shipment.operatorName
+      });
+    
+    if (error) throw error;
+  },
+
+  async updateInventoryShipment(selections: { rowId: string, palletIdx: number }[], shipmentId: string | null) {
+    // Group by rowId to minimize database calls
+    const grouped = selections.reduce((acc, sel) => {
+      if (!acc[sel.rowId]) acc[sel.rowId] = [];
+      acc[sel.rowId].push(sel.palletIdx);
+      return acc;
+    }, {} as Record<string, number[]>);
+
+    for (const rowId in grouped) {
+      // 1. Get current item
+      const { data: item, error: getError } = await supabase
+        .from('inventory')
+        .select('inspections')
+        .eq('id', rowId)
+        .single();
+      
+      if (getError) throw getError;
+
+      // 2. Update inspections array
+      const inspections = [...(item.inspections || [])];
+      grouped[rowId].forEach(idx => {
+        if (inspections[idx]) {
+          inspections[idx] = { ...inspections[idx], shipmentId: shipmentId || undefined };
+        }
+      });
+
+      // 3. Save back
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ inspections })
+        .eq('id', rowId);
+      
+      if (updateError) throw updateError;
+    }
+  },
+
+  subscribeToShipments(callback: (payload: any) => void) {
+    return supabase
+      .channel('shipment-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
+      .subscribe();
   }
 };

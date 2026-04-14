@@ -7,10 +7,7 @@ export interface User {
 
 export enum StockStatus {
   PENDING = 'PENDING',
-  INSPECTED = 'INSPECTED',
-  IN_PRODUCTION = 'IN_PRODUCTION',
-  FINISHED = 'FINISHED',
-  REJECTED = 'REJECTED'
+  INSPECTED = 'INSPECTED'
 }
 
 export enum SlotContent {
@@ -22,7 +19,6 @@ export enum SlotContent {
   CONTAINER_SJ = 'CONTAINER_SJ',
   CONTAINER_LP = 'CONTAINER_LP',
   CONTAINER_CP = 'CONTAINER_CP',
-  CRADLE = 'CRADLE',
   USE_CONSUMPTION = 'USE_CONSUMPTION'
 }
 
@@ -31,6 +27,25 @@ export enum HistoryType {
   EXIT = 'EXIT',
   REMOVAL = 'REMOVAL',
   TRANSFER = 'TRANSFER'
+}
+
+export enum ShipmentType {
+  THIRD_PARTY = 'THIRD_PARTY',
+  OWN = 'OWN'
+}
+
+export enum ShipmentStatus {
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED'
+}
+
+export interface Shipment {
+  id: string;
+  type: ShipmentType;
+  status: ShipmentStatus;
+  createdAt: string;
+  scheduledDate: string;
+  operatorName?: string;
 }
 
 export interface HistoryEntry {
@@ -45,6 +60,7 @@ export interface HistoryEntry {
   totalPallets: number;
   slot: string;
   details: string;
+  operatorName?: string;
 }
 
 export interface WarehouseSlot {
@@ -65,6 +81,7 @@ export interface InspectionData {
   contentType: SlotContent;
   palletNumber?: number;
   supplyDescription?: string; // Descrição do insumo
+  shipmentId?: string;
 }
 
 export interface SheetRow {
@@ -77,6 +94,7 @@ export interface SheetRow {
   status: StockStatus;
   inspections?: InspectionData[];
   loadingId: string; // ID extraído da célula B1
+  operatorName?: string;
 }
 
 export interface DashboardStats {
@@ -99,7 +117,6 @@ export const translateSlotContent = (content: SlotContent): string => {
     [SlotContent.CONTAINER_SJ]: 'Container SJ',
     [SlotContent.CONTAINER_LP]: 'Container LP',
     [SlotContent.CONTAINER_CP]: 'Container CP',
-    [SlotContent.CRADLE]: 'Berço',
     [SlotContent.USE_CONSUMPTION]: 'Uso e Consumo'
   };
   return translations[content] || content;
