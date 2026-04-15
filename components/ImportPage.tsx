@@ -44,6 +44,8 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
           if (tipo.includes('FRASCO')) contentType = SlotContent.BOTTLES;
           else if (tipo.includes('ACABADO')) contentType = SlotContent.FINISHED_PRODUCT;
           else if (tipo.includes('INSUMO')) contentType = SlotContent.SUPPLIES;
+          else if (tipo.includes('RETRABALHO')) contentType = SlotContent.REWORK;
+          else if (tipo.includes('REPROCESSO')) contentType = SlotContent.REPROCESS;
 
           let suggestedSlot: string | undefined;
           const usedSlotsInThisImport = parsedData.slice(0, index).map(p => p.suggestedSlot).filter(Boolean);

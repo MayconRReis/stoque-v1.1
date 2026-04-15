@@ -1197,13 +1197,18 @@ const App: React.FC = () => {
         
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
           {rackSlots.map(slot => {
-            const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : slot.status === SlotContent.BOTTLES ? FlaskConical : slot.status === SlotContent.FINISHED_PRODUCT ? Truck : Package;
+            const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : 
+                               slot.status === SlotContent.BOTTLES ? FlaskConical : 
+                               slot.status === SlotContent.FINISHED_PRODUCT ? Truck : 
+                               (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? RefreshCw :
+                               Package;
             
             return (
               <div key={slot.id} className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative ${
                 slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
                 slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
                 slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
+                (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'bg-purple-600/10 border-purple-600/30' :
                 'bg-green-600/10 border-green-600/30'
               }`}>
                 <span className="text-[7px] font-bold text-slate-600 mb-1">{slot.id.split('.').slice(1).join('.')}</span>
@@ -1211,6 +1216,7 @@ const App: React.FC = () => {
                   <ContentIcon className={`w-3.5 h-3.5 ${
                     slot.status === SlotContent.BOTTLES ? 'text-blue-500' : 
                     slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
+                    (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'text-purple-500' :
                     'text-green-500'
                   }`} />
                 ) : (
@@ -1669,10 +1675,12 @@ const App: React.FC = () => {
                         { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600' },
                         { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
                         { type: SlotContent.RETURN, label: 'Retorno', color: 'bg-red-600' },
+                        { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600' },
+                        { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-purple-600' },
                         { type: 'OTHER', label: 'Outros', color: 'bg-slate-600' }
                       ].map(item => {
                         const count = item.type === 'OTHER' 
-                          ? slots.filter(s => s.status !== SlotContent.EMPTY && ![SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT, SlotContent.RETURN].includes(s.status)).length
+                          ? slots.filter(s => s.status !== SlotContent.EMPTY && ![SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT, SlotContent.RETURN, SlotContent.REWORK, SlotContent.REPROCESS].includes(s.status)).length
                           : slots.filter(s => s.status === item.type).length;
                         
                         const totalOccupied = stats.occupiedSlots || 1;
@@ -1813,7 +1821,12 @@ const App: React.FC = () => {
                         filteredInventory.map(({ row: item, inspection: insp, idx }) => {
                             const isSelected = selectedPallets.includes(`${item.id}::${idx}`);
                             const isUseConsumption = insp.contentType === SlotContent.USE_CONSUMPTION;
-                            const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : Package;
+                            const isRework = insp.contentType === SlotContent.REWORK;
+                            const isReprocess = insp.contentType === SlotContent.REPROCESS;
+                            const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : 
+                                               insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
+                                               (isRework || isReprocess) ? RefreshCw :
+                                               Package;
                             
                             return (
                                 <motion.div 
@@ -1829,7 +1842,12 @@ const App: React.FC = () => {
 
                                   <div className="mt-4">
                                     <div className="flex justify-between items-start mb-4">
-                                      <div className={`w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800 shadow-inner ${insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 'text-green-500'}`}>
+                                      <div className={`w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800 shadow-inner ${
+                                        insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : 
+                                        insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 
+                                        (isRework || isReprocess) ? 'text-purple-400' :
+                                        'text-green-500'
+                                      }`}>
                                         <ContentIcon className="w-5 h-5" />
                                       </div>
                                       <div className="flex flex-col items-end gap-1">

@@ -7,7 +7,8 @@ import {
   Package, 
   X, 
   Info, 
-  Box 
+  Box,
+  RefreshCw
 } from 'lucide-react';
 
 interface InventoryDetailModalProps {
@@ -25,8 +26,10 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
   const isFinished = inspection.contentType === SlotContent.FINISHED_PRODUCT;
   const isSupplies = inspection.contentType === SlotContent.SUPPLIES;
   const isUseConsumption = inspection.contentType === SlotContent.USE_CONSUMPTION;
+  const isRework = inspection.contentType === SlotContent.REWORK;
+  const isReprocess = inspection.contentType === SlotContent.REPROCESS;
 
-  const Icon = isBottles ? FlaskConical : isFinished ? Truck : Package;
+  const Icon = isBottles ? FlaskConical : isFinished ? Truck : (isRework || isReprocess) ? RefreshCw : Package;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
@@ -39,6 +42,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                 isFinished ? 'bg-green-600 shadow-green-900/40' :
                 isSupplies ? 'bg-indigo-600 shadow-indigo-900/40' :
                 isUseConsumption ? 'bg-purple-600 shadow-purple-900/40' :
+                (isRework || isReprocess) ? 'bg-purple-600 shadow-purple-900/40' :
                 'bg-amber-600 shadow-amber-900/40'
              }`}>
                 <Icon className="text-white w-6 h-6" />

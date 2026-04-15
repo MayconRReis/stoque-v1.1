@@ -191,6 +191,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     { value: SlotContent.CONTAINER_SJ, label: 'Container SJ' },
     { value: SlotContent.CONTAINER_LP, label: 'Container LP' },
     { value: SlotContent.CONTAINER_CP, label: 'Container CP' },
+    { value: SlotContent.REWORK, label: 'Retrabalho' },
+    { value: SlotContent.REPROCESS, label: 'Reprocesso' },
   ];
 
   return (
