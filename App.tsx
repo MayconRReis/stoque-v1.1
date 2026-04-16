@@ -28,7 +28,9 @@ import {
   Plus,
   Pencil,
   RefreshCw,
-  Container
+  Container,
+  Filter,
+  ChevronDown
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -110,6 +112,8 @@ const App: React.FC = () => {
   
   // Selection and Search State
   const [inventorySearch, setInventorySearch] = useState('');
+  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL'>('ALL');
+  const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
   const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
 
@@ -1356,9 +1360,19 @@ const App: React.FC = () => {
     const term = inventorySearch.toLowerCase().trim();
     const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
     const allPallets: { row: SheetRow, inspection: InspectionData, idx: number }[] = [];
+    
     inspectedItems.forEach(item => {
       item.inspections?.forEach((insp, idx) => {
-        if (!term || item.description.toLowerCase().includes(term) || item.originOP.includes(term) || item.lot.toLowerCase().includes(term)) {
+        // Search term check
+        const matchesSearch = !term || 
+          item.description.toLowerCase().includes(term) || 
+          item.originOP.includes(term) || 
+          item.lot.toLowerCase().includes(term);
+        
+        // Type filter check
+        const matchesType = inventoryTypeFilter === 'ALL' || insp.contentType === inventoryTypeFilter;
+
+        if (matchesSearch && matchesType) {
           allPallets.push({ row: item, inspection: insp, idx });
         }
       });
@@ -1368,7 +1382,7 @@ const App: React.FC = () => {
       const slotB = b.inspection.assignedSlot || '';
       return slotA.localeCompare(slotB, undefined, { numeric: true });
     });
-  }, [data, inventorySearch]);
+  }, [data, inventorySearch, inventoryTypeFilter]);
 
   const NavItem = ({ tab, icon: Icon, label, badge }: { tab: typeof activeTab, icon: React.ElementType, label: string, badge?: number }) => (
     <button 
@@ -1676,7 +1690,7 @@ const App: React.FC = () => {
                        </div>
                        <div className="flex items-baseline gap-3">
                          <p className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.pendingEntries}</p>
-                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cargas</p>
+                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Pallets</p>
                        </div>
                        <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between">
                          <div className="flex items-center gap-2">
@@ -1886,6 +1900,62 @@ const App: React.FC = () => {
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
+                    
+                    {/* Type Filter Dropdown */}
+                    <div className="relative w-full md:w-64">
+                      <button
+                        onClick={() => setIsInventoryFilterOpen(!isInventoryFilterOpen)}
+                        className={`w-full flex items-center justify-between px-5 py-3 bg-slate-900 border ${isInventoryFilterOpen ? 'border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'border-slate-800'} rounded-xl transition-all group`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Filter className={`w-4 h-4 ${inventoryTypeFilter !== 'ALL' ? 'text-blue-500' : 'text-slate-500'}`} />
+                          <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-white' : 'text-slate-500'}`}>
+                            {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : translateSlotContent(inventoryTypeFilter as SlotContent)}
+                          </span>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-300 ${isInventoryFilterOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {isInventoryFilterOpen && (
+                        <>
+                          <div className="fixed inset-0 z-[60]" onClick={() => setIsInventoryFilterOpen(false)} />
+                          <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[70] animate-in fade-in zoom-in-95 duration-200">
+                            <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1">
+                              {[
+                                { value: 'ALL', label: 'Todos os Tipos' },
+                                { value: SlotContent.BOTTLES, label: 'Frasco' },
+                                { value: SlotContent.SUPPLIES, label: 'Insumo' },
+                                { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
+                                { value: SlotContent.CONTAINER_SJ, label: 'Container SJ' },
+                                { value: SlotContent.CONTAINER_LP, label: 'Container LP' },
+                                { value: SlotContent.CONTAINER_CP, label: 'Container CP' },
+                                { value: SlotContent.REWORK, label: 'Retrabalho' },
+                                { value: SlotContent.REPROCESS, label: 'Reprocesso' },
+                                { value: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' },
+                                { value: SlotContent.RETURN, label: 'Retorno' }
+                              ].map((type) => (
+                                <button
+                                  key={type.value}
+                                  onClick={() => {
+                                    setInventoryTypeFilter(type.value as any);
+                                    setIsInventoryFilterOpen(false);
+                                  }}
+                                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                    inventoryTypeFilter === type.value 
+                                      ? 'bg-blue-600 text-white' 
+                                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                  }`}
+                                >
+                                  {type.label}
+                                  {inventoryTypeFilter === type.value && <CheckCircle2 className="w-3 h-3" />}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
                     {selectedPallets.length > 0 && (
                         <div className="flex gap-3 w-full md:w-auto">
                             <button 
