@@ -27,7 +27,8 @@ import {
   Send,
   Plus,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  Container
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -58,10 +59,19 @@ import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
   const slots: WarehouseSlot[] = [];
-  const racks: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
+  const racks: ('A' | 'B' | 'C' | 'D' | 'E' | 'F')[] = ['A', 'B', 'C', 'D', 'E', 'F'];
   racks.forEach(rack => {
-    const positions = rack === 'D' ? 18 : 16;
-    for (let l = 1; l <= 3; l++) {
+    let levels = 3;
+    let positions = 16;
+    
+    if (rack === 'D') {
+      positions = 18;
+    } else if (rack === 'E' || rack === 'F') {
+      levels = 5;
+      positions = 9;
+    }
+    
+    for (let l = 1; l <= levels; l++) {
       for (let p = 1; p <= positions; p++) {
         slots.push({ id: `${rack}.${l}.${p}`, rack, level: l, position: p, status: SlotContent.EMPTY });
       }
@@ -268,11 +278,48 @@ const App: React.FC = () => {
         setHistory(historyData);
         setShipments(shipData);
         
-        // If no slots in DB, initialize them
+        // If no slots in DB, initialize them. If fewer slots than expected, add missing ones.
+        const expectedSlots = generateSlots();
         if (slotData.length === 0) {
-          const initialSlots = generateSlots();
-          await supabaseService.bulkUpdateSlots(initialSlots);
-          setSlots(initialSlots);
+          await supabaseService.bulkUpdateSlots(expectedSlots);
+          setSlots(expectedSlots);
+        } else if (slotData.length < expectedSlots.length) {
+          // Sync missing slots to Supabase
+          const existingIds = new Set(slotData.map(s => s.id));
+          const missingSlots = expectedSlots.filter(s => !existingIds.has(s.id));
+          await supabaseService.bulkUpdateSlots(missingSlots);
+          
+          // Combine existing and new slots
+          const allSlots = [...slotData, ...missingSlots];
+          
+          // Auto-sanitize slots based on inventory to prevent ghost data
+          const occupiedSlotsMap = new Map();
+          invData.forEach(item => {
+            if (item.inspections && item.inspections[0]?.assignedSlot) {
+              occupiedSlotsMap.set(item.inspections[0].assignedSlot, {
+                status: item.inspections[0].contentType,
+                occupiedBy: item.originOP || item.description
+              });
+            }
+          });
+
+          const sanitizedSlots = allSlots.map(slot => {
+            const inventoryInfo = occupiedSlotsMap.get(slot.id);
+            if (inventoryInfo) {
+              return {
+                ...slot,
+                status: inventoryInfo.status,
+                occupiedBy: inventoryInfo.occupiedBy
+              };
+            }
+            return {
+              ...slot,
+              status: SlotContent.EMPTY,
+              occupiedBy: undefined
+            };
+          });
+
+          setSlots(sanitizedSlots);
         } else {
           // Auto-sanitize slots based on inventory to prevent ghost data
           const occupiedSlotsMap = new Map();
@@ -423,12 +470,11 @@ const App: React.FC = () => {
 
   const handleMovementEntry = async (entryData: any) => {
     try {
-      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
       const newEntry: SheetRow = {
         id: entryData.id,
         loadingId: entryData.id,
         originOP: entryData.op || 'N/A',
-        description: `${entryData.name}${operatorSuffix}`,
+        description: entryData.name,
         lot: entryData.lot || 'N/A',
         pallets: entryData.quantity,
         date: new Date().toLocaleDateString(),
@@ -516,7 +562,6 @@ const App: React.FC = () => {
 
         newRows.push({
           ...row,
-          description: user?.name ? `${row.description} | Op: ${user.name}` : row.description,
           operatorName: user?.name
         });
         // Only add to history if it's a final entry (has slot)
@@ -576,11 +621,9 @@ const App: React.FC = () => {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
 
-      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
       const updatedRow: SheetRow = {
         ...row,
         loadingId: finalId,
-        description: `${row.description}${operatorSuffix}`,
         status: StockStatus.INSPECTED,
         operatorName: user?.name,
         inspections: row.inspections?.map(insp => ({ ...insp, assignedSlot: slotId }))
@@ -1005,21 +1048,41 @@ const App: React.FC = () => {
     operatorName: user?.name
   });
 
-  const handleUpdatePallet = async (updatedData: { description: string; op: string; lot: string; quantity: number }) => {
+  const handleUpdatePallet = async (updatedData: { 
+    description: string; 
+    op: string; 
+    lot: string; 
+    quantity: number;
+    contentType: SlotContent;
+    supplyDetails?: {
+      bottles: number;
+      caps: number;
+      boxes: number;
+      cradles: number;
+      others: { name: string; quantity: number }[];
+    }
+  }) => {
     if (!editPalletContext) return;
 
     try {
-      const { row } = editPalletContext;
-      const operatorSuffix = user?.name ? ` | Op: ${user.name}` : '';
-      // Remove old operator suffix if exists to avoid stacking
-      const baseDescription = updatedData.description.split(' | Op:')[0];
+      const { row, idx } = editPalletContext;
       
+      const updatedInspections = [...(row.inspections || [])];
+      if (updatedInspections[idx]) {
+        updatedInspections[idx] = {
+          ...updatedInspections[idx],
+          contentType: updatedData.contentType,
+          ...(updatedData.supplyDetails || {})
+        };
+      }
+
       const updatedRow: SheetRow = { 
         ...row,
-        description: `${baseDescription}${operatorSuffix}`,
+        description: updatedData.description,
         originOP: updatedData.op,
         lot: updatedData.lot,
         pallets: updatedData.quantity,
+        inspections: updatedInspections,
         operatorName: user?.name
       };
 
@@ -1157,7 +1220,7 @@ const App: React.FC = () => {
     setMatrixConfirmContext({ rowId, palletIdx, slotId });
   };
 
-  const RackView = ({ rack }: { rack: 'A' | 'B' | 'C' | 'D' }) => {
+  const RackView = ({ rack }: { rack: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' }) => {
     const rackSlots = slots.filter(s => s.rack === rack);
     const freeCount = rackSlots.filter(s => s.status === SlotContent.EMPTY).length;
     const totalCount = rackSlots.length;
@@ -1166,14 +1229,21 @@ const App: React.FC = () => {
       'A': 'Frascos (G0)',
       'B': 'Insumos / Acabados',
       'C': 'Insumos / Acabados',
-      'D': 'Outros / Acabados'
+      'D': 'Outros / Acabados',
+      'E': 'Containers',
+      'F': 'Containers'
     };
 
     return (
       <div className="bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-800/50 shadow-2xl overflow-hidden mb-6">
         <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
-             <div className={`w-1.5 h-8 rounded-full ${rack === 'D' ? 'bg-green-600' : rack === 'A' ? 'bg-blue-600' : 'bg-amber-600'}`}></div>
+             <div className={`w-1.5 h-8 rounded-full ${
+               rack === 'D' ? 'bg-green-600' : 
+               rack === 'A' ? 'bg-blue-600' : 
+               (rack === 'E' || rack === 'F') ? 'bg-purple-600' :
+               'bg-amber-600'
+             }`}></div>
              <div className="flex flex-col">
                 <h4 className="text-lg font-black text-white uppercase tracking-tighter flex items-center gap-2">
                   Porta Pallet {rack} <span className="text-slate-500 font-medium text-sm">/ {rackTitles[rack]}</span>
@@ -1197,10 +1267,14 @@ const App: React.FC = () => {
         
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
           {rackSlots.map(slot => {
+            const isContainer = slot.status === SlotContent.CONTAINER_SJ || 
+                              slot.status === SlotContent.CONTAINER_LP || 
+                              slot.status === SlotContent.CONTAINER_CP;
             const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : 
                                slot.status === SlotContent.BOTTLES ? FlaskConical : 
                                slot.status === SlotContent.FINISHED_PRODUCT ? Truck : 
                                (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? RefreshCw :
+                               isContainer ? Container :
                                Package;
             
             return (
@@ -1208,6 +1282,7 @@ const App: React.FC = () => {
                 slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
                 slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
                 slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
+                isContainer ? 'bg-slate-300/10 border-slate-100/30' :
                 (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'bg-purple-600/10 border-purple-600/30' :
                 'bg-green-600/10 border-green-600/30'
               }`}>
@@ -1216,6 +1291,7 @@ const App: React.FC = () => {
                   <ContentIcon className={`w-3.5 h-3.5 ${
                     slot.status === SlotContent.BOTTLES ? 'text-blue-500' : 
                     slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
+                    isContainer ? 'text-slate-100' :
                     (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'text-purple-500' :
                     'text-green-500'
                   }`} />
@@ -1632,12 +1708,17 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <div className="space-y-6">
-                      {['A', 'B', 'C', 'D'].map(rack => {
+                      {['A', 'B', 'C', 'D', 'E', 'F'].map(rack => {
                         const rackSlots = slots.filter(s => s.rack === rack);
                         const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
                         const total = rackSlots.length;
                         const rate = Math.round((occupied / total) * 100);
-                        const color = rack === 'A' ? 'bg-blue-600' : rack === 'B' ? 'bg-amber-600' : rack === 'C' ? 'bg-indigo-600' : 'bg-green-600';
+                        const color = 
+                          rack === 'A' ? 'bg-blue-600' : 
+                          rack === 'B' ? 'bg-amber-600' : 
+                          rack === 'C' ? 'bg-indigo-600' : 
+                          rack === 'D' ? 'bg-green-600' :
+                          'bg-purple-600';
                         
                         return (
                           <div key={rack} className="space-y-2">
@@ -1708,11 +1789,19 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'map' && <div className="animate-in fade-in duration-500 max-w-7xl mx-auto"><RackView rack="A" /><RackView rack="B" /><RackView rack="C" /><RackView rack="D" /></div>}
+          {activeTab === 'map' && (
+            <div className="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
+              <RackView rack="A" />
+              <RackView rack="B" />
+              <RackView rack="C" />
+              <RackView rack="D" />
+              <RackView rack="E" />
+              <RackView rack="F" />
+            </div>
+          )}
 
           {activeTab === 'import' && (
             <ImportPage 
-              availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)} 
               onProcess={handleImportProcess} 
             />
           )}
@@ -1723,6 +1812,7 @@ const App: React.FC = () => {
               availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
               onConfirm={handleConfirmAnalysis}
               onReject={handleRejectAnalysis}
+              onEdit={(item) => setEditPalletContext({ row: item, inspection: item.inspections?.[0] || { contentType: SlotContent.SUPPLIES, bottles: 0, caps: 0, boxes: 0, cradles: 0 }, idx: 0 })}
             />
           )}
 
@@ -1768,7 +1858,9 @@ const App: React.FC = () => {
                                 <div className="flex flex-wrap gap-3 mt-1">
                                   <span className="text-[9px] font-bold text-blue-500/80">OP {entry.op}</span>
                                   <span className="text-[9px] font-bold text-amber-500/80">Lote {entry.lot}</span>
-                                  <span className="text-[9px] font-bold text-slate-500">P{entry.palletNumber}/{entry.totalPallets}</span>
+                                  {entry.operatorName && (
+                                    <span className="text-[9px] font-bold text-purple-500/80">Op: {entry.operatorName}</span>
+                                  )}
                                 </div>
                             </div>
                             <div className="bg-slate-950/50 px-4 py-2.5 rounded-xl border border-slate-800/50 min-w-[140px] text-center">
@@ -1823,9 +1915,13 @@ const App: React.FC = () => {
                             const isUseConsumption = insp.contentType === SlotContent.USE_CONSUMPTION;
                             const isRework = insp.contentType === SlotContent.REWORK;
                             const isReprocess = insp.contentType === SlotContent.REPROCESS;
+                            const isContainer = insp.contentType === SlotContent.CONTAINER_SJ || 
+                                              insp.contentType === SlotContent.CONTAINER_LP || 
+                                              insp.contentType === SlotContent.CONTAINER_CP;
                             const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : 
                                                insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
                                                (isRework || isReprocess) ? RefreshCw :
+                                               isContainer ? Container :
                                                Package;
                             
                             return (
@@ -1846,13 +1942,18 @@ const App: React.FC = () => {
                                         insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : 
                                         insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 
                                         (isRework || isReprocess) ? 'text-purple-400' :
+                                        isContainer ? 'text-slate-100' :
                                         'text-green-500'
                                       }`}>
                                         <ContentIcon className="w-5 h-5" />
                                       </div>
                                       <div className="flex flex-col items-end gap-1">
-                                        <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 'text-slate-300'}`}>VAGA {insp.assignedSlot}</span>
-                                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Pallet {idx + 1}/{item.pallets}</span>
+                                        <div className="flex items-center gap-2">
+                                          {item.operatorName && (
+                                            <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider">Op: {item.operatorName}</span>
+                                          )}
+                                          <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 'text-slate-300'}`}>VAGA {insp.assignedSlot}</span>
+                                        </div>
                                       </div>
                                     </div>
 
@@ -1871,9 +1972,15 @@ const App: React.FC = () => {
                                             <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
                                          </div>
                                        )}
+                                       {item.pallets > 0 && (
+                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Qtd</p>
+                                            <p className="text-xs font-black text-green-400 font-mono italic">{item.pallets}</p>
+                                         </div>
+                                       )}
                                        <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Qtd</p>
-                                          <p className="text-xs font-black text-green-400 font-mono italic">{item.pallets}</p>
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">ID</p>
+                                          <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId}</p>
                                        </div>
                                        {isUseConsumption && (
                                          <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
@@ -1994,9 +2101,8 @@ const App: React.FC = () => {
         <EditPalletModal 
           isOpen={!!editPalletContext}
           onClose={() => setEditPalletContext(null)}
-          row={editPalletContext.row}
-          inspection={editPalletContext.inspection}
-          onUpdate={handleUpdatePallet}
+          pallet={editPalletContext}
+          onSave={handleUpdatePallet}
         />
       )}
 

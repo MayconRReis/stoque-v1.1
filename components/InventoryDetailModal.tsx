@@ -8,7 +8,8 @@ import {
   X, 
   Info, 
   Box,
-  RefreshCw
+  RefreshCw,
+  Container
 } from 'lucide-react';
 
 interface InventoryDetailModalProps {
@@ -28,8 +29,11 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
   const isUseConsumption = inspection.contentType === SlotContent.USE_CONSUMPTION;
   const isRework = inspection.contentType === SlotContent.REWORK;
   const isReprocess = inspection.contentType === SlotContent.REPROCESS;
+  const isContainer = inspection.contentType === SlotContent.CONTAINER_SJ || 
+                    inspection.contentType === SlotContent.CONTAINER_LP || 
+                    inspection.contentType === SlotContent.CONTAINER_CP;
 
-  const Icon = isBottles ? FlaskConical : isFinished ? Truck : (isRework || isReprocess) ? RefreshCw : Package;
+  const Icon = isBottles ? FlaskConical : isFinished ? Truck : (isRework || isReprocess) ? RefreshCw : isContainer ? Container : Package;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
@@ -40,6 +44,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-3 ${
                 isBottles ? 'bg-blue-600 shadow-blue-900/40' : 
                 isFinished ? 'bg-green-600 shadow-green-900/40' :
+                isContainer ? 'bg-slate-300 shadow-slate-900/40' :
                 isSupplies ? 'bg-indigo-600 shadow-indigo-900/40' :
                 isUseConsumption ? 'bg-purple-600 shadow-purple-900/40' :
                 (isRework || isReprocess) ? 'bg-purple-600 shadow-purple-900/40' :
@@ -49,7 +54,6 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
              </div>
              <div>
                 <h3 className="font-black text-xl italic uppercase tracking-tighter text-white">Detalhes do Item</h3>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Pallet {palletIdx + 1} de {row.pallets}</p>
              </div>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-950/50 rounded-xl text-slate-500 hover:text-white transition-all">
@@ -88,8 +92,8 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
           </div>
 
           {isSupplies && (
-            <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 space-y-6">
+              <div className="flex justify-between items-center mb-0">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Conferência Técnica</p>
                   <span className="bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-400 border border-slate-800 uppercase italic">Vaga {inspection.assignedSlot}</span>
               </div>
@@ -99,6 +103,21 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                 <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Berços</p><p className={`text-lg font-black ${inspection.cradles > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.cradles}</p></div>
                 <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Tampas</p><p className={`text-lg font-black ${inspection.caps > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.caps}</p></div>
               </div>
+
+              {inspection.others && inspection.others.length > 0 && (
+                <div className="pt-6 border-t border-slate-800/50 space-y-3">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest text-center">Outros Itens</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {inspection.others.map((other, idx) => (
+                      <div key={idx} className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex items-center gap-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">{other.name}</span>
+                        <div className="w-px h-3 bg-slate-800"></div>
+                        <span className="text-[10px] font-black text-indigo-400 italic">{other.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -67,7 +67,7 @@ export interface HistoryEntry {
 
 export interface WarehouseSlot {
   id: string; // e.g., A.1.1
-  rack: 'A' | 'B' | 'C' | 'D';
+  rack: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
   level: number;
   position: number;
   status: SlotContent;
@@ -83,6 +83,7 @@ export interface InspectionData {
   contentType: SlotContent;
   palletNumber?: number;
   supplyDescription?: string; // Descrição do insumo
+  others?: { name: string; quantity: number }[];
   shipmentId?: string;
 }
 

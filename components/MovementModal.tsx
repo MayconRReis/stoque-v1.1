@@ -43,11 +43,23 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const [slotId, setSlotId] = useState('');
 
   // Supply Specific Fields
-  const [supplyDescription, setSupplyDescription] = useState('');
+  const [others, setOthers] = useState<{ id: string, name: string, quantity: number }[]>([]);
   const [bottlesCount, setBottlesCount] = useState<number>(0);
   const [capsCount, setCapsCount] = useState<number>(0);
   const [boxesCount, setBoxesCount] = useState<number>(0);
   const [cradlesCount, setCradlesCount] = useState<number>(0);
+
+  const addOther = () => {
+    setOthers(prev => [...prev, { id: Math.random().toString(36).substring(2, 9), name: '', quantity: 0 }]);
+  };
+
+  const updateOther = (id: string, field: 'name' | 'quantity', value: any) => {
+    setOthers(prev => prev.map(o => o.id === id ? { ...o, [field]: value } : o));
+  };
+
+  const removeOther = (id: string) => {
+    setOthers(prev => prev.filter(o => o.id !== id));
+  };
 
   // Transfer Fields
   const [transferId, setTransferId] = useState('');
@@ -101,12 +113,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
         }
       } else if (contentType === SlotContent.FINISHED_PRODUCT) {
         suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14);
+      } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
+        suggestedSlot = availableSlots.find(s => s.rack === 'E' || s.rack === 'F');
       } else {
         suggestedSlot = availableSlots.find(s => {
           const isBottleRange = s.rack === 'A' && s.position <= 16;
           const isSupplyRange = (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16;
           const isFinishedRange = (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14;
-          return !isBottleRange && !isSupplyRange && !isFinishedRange;
+          const isContainerRange = s.rack === 'E' || s.rack === 'F';
+          return !isBottleRange && !isSupplyRange && !isFinishedRange && !isContainerRange;
         });
       }
 
@@ -134,7 +149,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
       setToSlot('');
       setExitId('');
       setExitReason('');
-      setSupplyDescription('');
+      setOthers([]);
       setBottlesCount(0);
       setCapsCount(0);
       setBoxesCount(0);
@@ -145,8 +160,12 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   if (!isOpen) return null;
 
   const handleEntrySubmit = () => {
-    if (!name || !quantity || !slotId) return;
-    if (isNaN(quantity) || quantity <= 0) return;
+    const isSupplies = contentType === SlotContent.SUPPLIES;
+    if (!name || !slotId) return;
+    
+    const finalQuantity = isSupplies ? 1 : quantity;
+
+    if (isNaN(finalQuantity) || finalQuantity < 0) return;
     
     const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     onEntry({
@@ -154,15 +173,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
       op,
       name,
       lot,
-      quantity,
+      quantity: finalQuantity,
       contentType,
       slotId,
-      supplyDetails: contentType === SlotContent.SUPPLIES ? {
-        description: supplyDescription,
+      supplyDetails: isSupplies ? {
         bottles: bottlesCount,
         caps: capsCount,
         boxes: boxesCount,
-        cradles: cradlesCount
+        cradles: cradlesCount,
+        others: others.filter(o => o.name && o.quantity > 0)
       } : null
     });
   };
@@ -352,19 +371,21 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                      <FlaskConical className="w-3 h-3 text-blue-500" />
-                      Quantidade
-                    </label>
-                    <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">informar quantidade total de unidades</p>
-                    <input 
-                      type="number" 
-                      value={quantity}
-                      onChange={e => setQuantity(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
-                    />
-                  </div>
+                  {contentType !== SlotContent.SUPPLIES && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                        <FlaskConical className="w-3 h-3 text-blue-500" />
+                        Quantidade
+                      </label>
+                      <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">informar quantidade total (unidades ou kg)</p>
+                      <input 
+                        type="number" 
+                        value={quantity}
+                        onChange={e => setQuantity(Number(e.target.value))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                       <Warehouse className="w-3 h-3 text-blue-500" />
@@ -393,42 +414,75 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    className="p-5 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-4"
+                    className="p-5 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-6"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-7 h-7 bg-indigo-600/10 text-indigo-500 rounded-lg flex items-center justify-center border border-indigo-500/20">
                         <Package className="w-4 h-4" />
                       </div>
-                      <h4 className="text-[10px] font-bold text-white uppercase tracking-widest">Detalhes do Insumo</h4>
+                      <h4 className="text-[10px] font-bold text-white uppercase tracking-widest">Detalhamento de Insumos</h4>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest ml-1">Descrição</label>
-                      <input 
-                        type="text" 
-                        value={supplyDescription}
-                        onChange={e => setSupplyDescription(e.target.value)}
-                        placeholder="Ex: Caixas de papelão..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-indigo-600 outline-none transition-all"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Caixas</label>
-                        <input type="number" value={boxesCount} onChange={e => setBoxesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center" />
+                        <input type="number" value={boxesCount} onChange={e => setBoxesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Frascos</label>
-                        <input type="number" value={bottlesCount} onChange={e => setBottlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center" />
+                        <input type="number" value={bottlesCount} onChange={e => setBottlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Berços</label>
-                        <input type="number" value={cradlesCount} onChange={e => setCradlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center" />
+                        <input type="number" value={cradlesCount} onChange={e => setCradlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Tampas</label>
-                        <input type="number" value={capsCount} onChange={e => setCapsCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center" />
+                        <input type="number" value={capsCount} onChange={e => setCapsCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Outros Itens</label>
+                        <button 
+                          onClick={addOther}
+                          className="text-[8px] font-bold text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-all"
+                        >
+                          + Adicionar Outro
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {others.map((other) => (
+                          <div key={other.id} className="flex gap-3 items-end">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-[7px] font-bold text-slate-700 uppercase tracking-widest">Item</label>
+                              <input 
+                                type="text" 
+                                value={other.name}
+                                onChange={e => updateOther(other.id, 'name', e.target.value)}
+                                placeholder="Nome do item..."
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-[10px] focus:border-indigo-600 outline-none"
+                              />
+                            </div>
+                            <div className="w-24 space-y-1.5">
+                              <label className="text-[7px] font-bold text-slate-700 uppercase tracking-widest">Qtd</label>
+                              <input 
+                                type="number" 
+                                value={other.quantity}
+                                onChange={e => updateOther(other.id, 'quantity', Number(e.target.value))}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
+                              />
+                            </div>
+                            <button 
+                              onClick={() => removeOther(other.id)}
+                              className="p-2.5 bg-red-600/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-600/20 transition-all"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </motion.div>
@@ -436,7 +490,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
                 <button 
                   onClick={handleEntrySubmit}
-                  disabled={!name || !quantity || !slotId}
+                  disabled={!name || !slotId}
                   className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-blue-900/40 active:scale-[0.98] group"
                 >
                   Confirmar Entrada 

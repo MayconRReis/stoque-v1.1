@@ -18,8 +18,8 @@ interface CSVRow {
   tipo: string;
 }
 
-export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProcess }) => {
-  const [items, setItems] = useState<(CSVRow & { selected: boolean, suggestedSlot?: string, contentType: SlotContent })[]>([]);
+export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
+  const [items, setItems] = useState<(CSVRow & { selected: boolean, contentType: SlotContent })[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,24 +46,10 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
           else if (tipo.includes('INSUMO')) contentType = SlotContent.SUPPLIES;
           else if (tipo.includes('RETRABALHO')) contentType = SlotContent.REWORK;
           else if (tipo.includes('REPROCESSO')) contentType = SlotContent.REPROCESS;
-
-          let suggestedSlot: string | undefined;
-          const usedSlotsInThisImport = parsedData.slice(0, index).map(p => p.suggestedSlot).filter(Boolean);
-          const trulyAvailable = availableSlots.filter(s => !usedSlotsInThisImport.includes(s.id));
-
-          if (contentType === SlotContent.BOTTLES) {
-            suggestedSlot = trulyAvailable.find(s => s.rack === 'A' && s.position <= 16)?.id;
-          } else if (contentType === SlotContent.SUPPLIES) {
-            suggestedSlot = trulyAvailable.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16)?.id;
-          } else if (contentType === SlotContent.FINISHED_PRODUCT) {
-            suggestedSlot = trulyAvailable.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
-          } else {
-            suggestedSlot = trulyAvailable.find(s => {
-              const isBottleRange = s.rack === 'A' && s.position <= 16;
-              const isSupplyRange = (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16;
-              const isFinishedRange = (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14;
-              return !isBottleRange && !isSupplyRange && !isFinishedRange;
-            })?.id;
+          else if (tipo.includes('CONTAINER')) {
+            if (tipo.includes('SJ')) contentType = SlotContent.CONTAINER_SJ;
+            else if (tipo.includes('LP')) contentType = SlotContent.CONTAINER_LP;
+            else contentType = SlotContent.CONTAINER_CP;
           }
 
           return {
@@ -73,7 +59,6 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
             quantidade,
             tipo,
             selected: true,
-            suggestedSlot: suggestedSlot || trulyAvailable[0]?.id,
             contentType
           };
         });
@@ -101,7 +86,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
           originOP: item.op,
           description: item.nome,
           lot: item.lote,
-          pallets: 1,
+          pallets: parseInt(item.quantidade) || 0,
           date: new Date().toLocaleDateString('pt-BR'),
           status: StockStatus.PENDING,
           inspections: [{
@@ -188,7 +173,6 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
                     <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">OP / Nome</th>
                     <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Lote</th>
                     <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Qtd / Tipo</th>
-                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Vaga Sugerida</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">
@@ -224,22 +208,6 @@ export const ImportPage: React.FC<ImportPageProps> = ({ availableSlots, onProces
                             {translateSlotContent(item.contentType)}
                           </span>
                         </div>
-                      </td>
-                      <td className="p-5">
-                        <select 
-                          value={item.suggestedSlot}
-                          onChange={(e) => {
-                            const newItems = [...items];
-                            newItems[idx].suggestedSlot = e.target.value;
-                            setItems(newItems);
-                          }}
-                          className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-[9px] font-bold text-white uppercase outline-none focus:border-blue-600 transition-all"
-                        >
-                          <option value="">Vaga</option>
-                          {availableSlots.map(slot => (
-                            <option key={slot.id} value={slot.id}>{slot.id}</option>
-                          ))}
-                        </select>
                       </td>
                     </tr>
                   ))}

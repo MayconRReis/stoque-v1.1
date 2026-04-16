@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../types';
-import { ClipboardCheck, Box, Check, X, AlertCircle, Info } from 'lucide-react';
+import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AnalysisPageProps {
@@ -9,9 +9,10 @@ interface AnalysisPageProps {
   availableSlots: WarehouseSlot[];
   onConfirm: (rowId: string, slotId: string, finalId: string) => Promise<void>;
   onReject: (rowId: string) => Promise<void>;
+  onEdit: (item: SheetRow) => void;
 }
 
-export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, onConfirm, onReject }) => {
+export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, onConfirm, onReject, onEdit }) => {
   const [selectedItem, setSelectedItem] = useState<SheetRow | null>(null);
   const [slotId, setSlotId] = useState('');
   const [finalId, setFinalId] = useState('');
@@ -30,6 +31,8 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
       suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16)?.id;
     } else if (contentType === SlotContent.FINISHED_PRODUCT) {
       suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
+    } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
+      suggestedSlot = availableSlots.find(s => s.rack === 'E' || s.rack === 'F')?.id;
     }
     setSlotId(suggestedSlot || (availableSlots.length > 0 ? availableSlots[0].id : ''));
   };
@@ -60,18 +63,36 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {pendingItems.map(item => (
-            <motion.div 
-              layout
-              key={item.id} 
-              className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-[2rem] p-6 space-y-5 hover:border-blue-600/30 transition-all group relative overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20">
-                  <Box className="w-5 h-5" />
+          {pendingItems.map(item => {
+            const insp = item.inspections?.[0];
+            const isRework = insp?.contentType === SlotContent.REWORK;
+            const isReprocess = insp?.contentType === SlotContent.REPROCESS;
+            const isContainer = insp?.contentType === SlotContent.CONTAINER_SJ || 
+                              insp?.contentType === SlotContent.CONTAINER_LP || 
+                              insp?.contentType === SlotContent.CONTAINER_CP;
+            const ContentIcon = insp?.contentType === SlotContent.BOTTLES ? FlaskConical : 
+                               insp?.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
+                               (isRework || isReprocess) ? RefreshCw :
+                               isContainer ? Container :
+                               Box;
+            
+            return (
+              <motion.div 
+                layout
+                key={item.id} 
+                className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-[2rem] p-6 space-y-5 hover:border-blue-600/30 transition-all group relative overflow-hidden"
+              >
+                <div className="flex justify-between items-start">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                    insp?.contentType === SlotContent.BOTTLES ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' : 
+                    insp?.contentType === SlotContent.FINISHED_PRODUCT ? 'bg-green-600/10 text-green-500 border-green-500/20' : 
+                    isContainer ? 'bg-slate-300/10 text-slate-100 border-slate-100/20' :
+                    'bg-amber-600/10 text-amber-500 border-amber-500/20'
+                  }`}>
+                    <ContentIcon className="w-5 h-5" />
+                  </div>
+                  <span className="bg-amber-500/10 text-amber-500 text-[8px] font-black px-2.5 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Pendente</span>
                 </div>
-                <span className="bg-amber-500/10 text-amber-500 text-[8px] font-black px-2.5 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Pendente</span>
-              </div>
               
               <div>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">OP {item.originOP}</p>
@@ -83,20 +104,30 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Lote</p>
                   <p className="text-[10px] font-black text-white font-mono">{item.lot}</p>
                 </div>
-                <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50">
-                  <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Qtd</p>
-                  <p className="text-[10px] font-black text-white">{item.inspections?.[0]?.bottles || 0} un</p>
-                </div>
+                {item.pallets > 0 && (
+                  <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50">
+                    <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Qtd</p>
+                    <p className="text-[10px] font-black text-white">{item.pallets}</p>
+                  </div>
+                )}
               </div>
 
-              <button 
-                onClick={() => handleStartAnalysis(item)}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
-              >
-                <ClipboardCheck className="w-3.5 h-3.5" /> Analisar e Alocar
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => onEdit(item)}
+                  className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 text-slate-400 font-bold text-[10px] uppercase tracking-widest border border-slate-800 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Info className="w-3.5 h-3.5" /> Editar
+                </button>
+                <button 
+                  onClick={() => handleStartAnalysis(item)}
+                  className="flex-[2] py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" /> Analisar
+                </button>
+              </div>
             </motion.div>
-          ))}
+          )})}
         </div>
       )}
 

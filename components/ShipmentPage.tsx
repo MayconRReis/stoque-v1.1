@@ -112,7 +112,7 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
                 <div className="flex items-center justify-between pt-6 border-t border-slate-800/50">
                   <div className="flex items-center gap-2">
                     <Package className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-xs font-black text-white italic">{palletCount} Pallets</span>
+                    <span className="text-xs font-black text-white italic">{palletCount} Itens</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-700 group-hover:text-white group-hover:translate-x-1 transition-all" />
                 </div>

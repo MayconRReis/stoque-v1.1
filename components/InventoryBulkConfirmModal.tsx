@@ -9,7 +9,9 @@ import {
   Trash2, 
   Layers, 
   Boxes,
-  Send
+  Send,
+  Container,
+  RefreshCw
 } from 'lucide-react';
 
 interface InventoryBulkConfirmModalProps {
@@ -36,20 +38,36 @@ export const InventoryBulkConfirmModal: React.FC<InventoryBulkConfirmModalProps>
   };
 
   const getTypeIcon = (type: SlotContent) => {
+    const isContainer = type === SlotContent.CONTAINER_SJ || 
+                      type === SlotContent.CONTAINER_LP || 
+                      type === SlotContent.CONTAINER_CP;
+    const isRework = type === SlotContent.REWORK || type === SlotContent.REPROCESS;
+    
     switch (type) {
       case SlotContent.BOTTLES: return FlaskConical;
       case SlotContent.SUPPLIES: return Package;
       case SlotContent.FINISHED_PRODUCT: return Truck;
-      default: return Package;
+      default: 
+        if (isContainer) return Container;
+        if (isRework) return RefreshCw;
+        return Package;
     }
   };
 
   const getTypeColor = (type: SlotContent) => {
+    const isContainer = type === SlotContent.CONTAINER_SJ || 
+                      type === SlotContent.CONTAINER_LP || 
+                      type === SlotContent.CONTAINER_CP;
+    const isRework = type === SlotContent.REWORK || type === SlotContent.REPROCESS;
+
     switch (type) {
       case SlotContent.BOTTLES: return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
       case SlotContent.SUPPLIES: return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
       case SlotContent.FINISHED_PRODUCT: return 'text-green-500 bg-green-500/10 border-green-500/20';
-      default: return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
+      default: 
+        if (isContainer) return 'text-slate-100 bg-slate-300/10 border-slate-100/20';
+        if (isRework) return 'text-purple-500 bg-purple-600/10 border-purple-500/20';
+        return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
     }
   };
 
@@ -131,11 +149,11 @@ export const InventoryBulkConfirmModal: React.FC<InventoryBulkConfirmModalProps>
               <Boxes className="w-16 h-16 text-white" />
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Total Pallets</p>
+              <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Itens Pendentes</p>
               <p className="text-3xl font-black text-white italic">{totalItems}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Volume Total</p>
+              <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Quantidade Total</p>
               <p className="text-3xl font-black text-purple-500 italic">{totalUnits.toLocaleString('pt-BR')}</p>
             </div>
           </div>
