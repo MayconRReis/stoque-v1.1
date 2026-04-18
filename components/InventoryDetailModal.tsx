@@ -95,7 +95,9 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
             <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 space-y-6">
               <div className="flex justify-between items-center mb-0">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Conferência Técnica</p>
-                  <span className="bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-400 border border-slate-800 uppercase italic">Vaga {inspection.assignedSlot}</span>
+                  <span className={`bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black border border-slate-800 uppercase italic ${inspection.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' : 'text-blue-400'}`}>
+                    {inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${inspection.assignedSlot}`}
+                  </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div><p className="text-[8px] font-black text-slate-600 uppercase mb-2">Caixas</p><p className={`text-lg font-black ${inspection.boxes > 0 ? 'text-white' : 'text-slate-800'}`}>{inspection.boxes}</p></div>
@@ -125,7 +127,9 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
             <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 space-y-4">
                <div className="flex justify-between items-center">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Localização</p>
-                  <span className="bg-slate-950 px-6 py-2.5 rounded-full text-xs font-black text-blue-400 border border-slate-800 uppercase italic tracking-widest">Vaga {inspection.assignedSlot}</span>
+                  <span className={`bg-slate-950 px-6 py-2.5 rounded-full text-xs font-black border border-slate-800 uppercase italic tracking-widest ${inspection.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' : 'text-blue-400'}`}>
+                    {inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${inspection.assignedSlot}`}
+                  </span>
                </div>
                <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Quantidade Total</p>

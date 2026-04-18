@@ -30,7 +30,8 @@ import {
   RefreshCw,
   Container,
   Filter,
-  ChevronDown
+  ChevronDown,
+  Clock
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -633,14 +634,19 @@ const App: React.FC = () => {
         inspections: row.inspections?.map(insp => ({ ...insp, assignedSlot: slotId }))
       };
 
-      const targetSlot = slots.find(s => s.id === slotId);
-      if (!targetSlot) throw new Error('Vaga não encontrada');
+      const isWaiting = slotId === 'AGUARDANDO';
+      let updatedSlot: WarehouseSlot | null = null;
 
-      const updatedSlot: WarehouseSlot = {
-        ...targetSlot,
-        status: row.inspections![0].contentType,
-        occupiedBy: row.originOP || row.description
-      };
+      if (!isWaiting) {
+        const targetSlot = slots.find(s => s.id === slotId);
+        if (!targetSlot) throw new Error('Vaga não encontrada');
+
+        updatedSlot = {
+          ...targetSlot,
+          status: row.inspections![0].contentType,
+          occupiedBy: row.originOP || row.description
+        };
+      }
 
       const historyEntry: HistoryEntry = {
         id: Math.random().toString(36).substring(2, 9),
@@ -652,19 +658,26 @@ const App: React.FC = () => {
         lot: row.lot,
         palletNumber: 1,
         totalPallets: 1,
-        slot: slotId,
-        details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}`,
+        slot: isWaiting ? 'AGUARDANDO' : slotId,
+        details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}${isWaiting ? ' (Aguardando Vaga)' : ''}`,
         operatorName: user?.name
       };
 
-      await Promise.all([
+      const promises: Promise<any>[] = [
         supabaseService.saveInventoryItem(updatedRow),
-        supabaseService.updateSlot(updatedSlot),
         supabaseService.addHistoryEntry(historyEntry)
-      ]);
+      ];
+
+      if (updatedSlot) {
+        promises.push(supabaseService.updateSlot(updatedSlot));
+      }
+
+      await Promise.all(promises);
 
       setData(prev => prev.map(r => r.id === rowId ? updatedRow : r));
-      setSlots(prev => prev.map(s => s.id === slotId ? updatedSlot : s));
+      if (updatedSlot) {
+        setSlots(prev => prev.map(s => s.id === slotId ? updatedSlot : s));
+      }
       setHistory(prev => [historyEntry, ...prev]);
 
       showNotification(`Entrada confirmada! ID: ${finalId}`);
@@ -997,6 +1010,12 @@ const App: React.FC = () => {
     const total = slots.length;
     const pendingCount = data.filter(r => r.status === StockStatus.PENDING).length;
     
+    // Count pallets in "Aguardando Vaga" (Inspected but assigned to virtual slot 'AGUARDANDO')
+    const waitingPalletsCount = data.reduce((acc, row) => {
+      const rowWaiting = row.inspections?.filter(insp => insp.assignedSlot === 'AGUARDANDO').length || 0;
+      return acc + rowWaiting;
+    }, 0);
+    
     // Calculate total bottles from inventory data
     const totalBottles = data.reduce((acc, row) => {
       const rowBottles = row.inspections?.reduce((sum, insp) => {
@@ -1009,13 +1028,14 @@ const App: React.FC = () => {
     }, 0);
 
     return {
-      freeSlots: total - occupied,
+      freeSlots: Math.max(0, total - occupied),
       pendingEntries: pendingCount,
-      occupancyRate: Math.round((occupied / total) * 100),
+      occupancyRate: Math.round(((occupied + waitingPalletsCount) / total) * 100),
       dailyMovements: history.length,
       totalSlots: total,
       occupiedSlots: occupied,
-      totalBottles
+      totalBottles,
+      waitingPallets: waitingPalletsCount
     };
   }, [slots, history, data]);
 
@@ -1317,7 +1337,7 @@ const App: React.FC = () => {
   };
 
   const StatsSection = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
       <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-blue-500/30 transition-all">
         <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
           <FlaskConical className="w-5 h-5" />
@@ -1346,11 +1366,21 @@ const App: React.FC = () => {
           <Boxes className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Ocupadas</p>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Alocados</p>
           <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
         </div>
         <div className="ml-auto text-right">
           <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">{stats.occupancyRate}% Ocupação</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all">
+        <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
+          <RefreshCw className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Vaga</p>
+          <p className="text-2xl font-black text-white tracking-tight">{stats.waitingPallets}</p>
         </div>
       </div>
     </div>
@@ -1367,7 +1397,9 @@ const App: React.FC = () => {
         const matchesSearch = !term || 
           item.description.toLowerCase().includes(term) || 
           item.originOP.includes(term) || 
-          item.lot.toLowerCase().includes(term);
+          item.lot.toLowerCase().includes(term) ||
+          item.loadingId.toLowerCase().includes(term) ||
+          item.id.toLowerCase().includes(term);
         
         // Type filter check
         const matchesType = inventoryTypeFilter === 'ALL' || insp.contentType === inventoryTypeFilter;
@@ -1523,7 +1555,7 @@ const App: React.FC = () => {
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
                   {activeTab === 'movement' && 'Movimentação'}
-                  {activeTab === 'inventory' && 'Inventário G0'}
+                  {activeTab === 'inventory' && 'Estoque Geral'}
                   {activeTab === 'map' && 'Mapa de vagas'}
                   {activeTab === 'import' && 'Importar CSV'}
                   {activeTab === 'analysis' && 'Análise de Recebimento'}
@@ -1805,6 +1837,23 @@ const App: React.FC = () => {
 
           {activeTab === 'map' && (
             <div className="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
+              {stats.waitingPallets > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-500/30">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white uppercase italic tracking-tight">Pallets Aguardando Vaga</h3>
+                      <p className="text-[10px] text-amber-500/70 font-bold uppercase tracking-widest">Estes itens estão analisados mas sem vaga física atribuída</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-950/50 px-8 py-3 rounded-2xl border border-slate-800 flex items-center gap-4">
+                    <span className="text-3xl font-black text-white">{stats.waitingPallets}</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pallets</span>
+                  </div>
+                </div>
+              )}
               <RackView rack="A" />
               <RackView rack="B" />
               <RackView rack="C" />
@@ -1896,7 +1945,7 @@ const App: React.FC = () => {
                             type="text" 
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
-                            placeholder="Buscar por OP, Produto ou Lote..." 
+                            placeholder="Buscar por ID, OP, Produto ou Lote..." 
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
@@ -2022,7 +2071,13 @@ const App: React.FC = () => {
                                           {item.operatorName && (
                                             <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider">Op: {item.operatorName}</span>
                                           )}
-                                          <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 'text-slate-300'}`}>VAGA {insp.assignedSlot}</span>
+                                          <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${
+                                            insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500 border-amber-500/30' :
+                                            insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 
+                                            'text-slate-300'
+                                          }`}>
+                                            {insp.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${insp.assignedSlot}`}
+                                          </span>
                                         </div>
                                       </div>
                                     </div>

@@ -52,6 +52,21 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     }
   };
 
+  const handleReject = async () => {
+    if (!selectedItem) return;
+    setIsProcessing(true);
+    try {
+      await onReject(selectedItem.id);
+      setSelectedItem(null);
+      setSlotId('');
+      setFinalId('');
+    } catch (error) {
+      console.error('Analysis rejection error:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
       {pendingItems.length === 0 ? (
@@ -193,6 +208,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
                     >
                       <option value="">Selecionar</option>
+                      <option value="AGUARDANDO" className="text-amber-500 font-bold">Aguardando Vaga</option>
                       {availableSlots.map(s => (
                         <option key={s.id} value={s.id}>{s.id} ({s.rack})</option>
                       ))}
@@ -202,10 +218,16 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
 
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => onReject(selectedItem.id)}
+                    onClick={handleReject}
+                    disabled={isProcessing}
                     className="flex-1 py-3 bg-slate-950 hover:bg-red-500/10 text-slate-500 hover:text-red-500 border border-slate-800 hover:border-red-500/30 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                   >
-                    <X className="w-3.5 h-3.5" /> Rejeitar
+                    {isProcessing ? (
+                      <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <X className="w-3.5 h-3.5" />
+                    )} 
+                    Rejeitar
                   </button>
                   <button 
                     onClick={handleConfirm}

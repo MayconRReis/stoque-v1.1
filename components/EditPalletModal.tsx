@@ -112,7 +112,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             <div>
               <h3 className="font-black text-lg italic uppercase tracking-tighter text-white">Editar Pallet</h3>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                {pallet.inspection.assignedSlot ? `Vaga ${pallet.inspection.assignedSlot}` : 'Pendente de Análise'}
+                {pallet.inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : (pallet.inspection.assignedSlot ? `Vaga ${pallet.inspection.assignedSlot}` : 'Pendente de Análise')}
               </p>
             </div>
           </div>
