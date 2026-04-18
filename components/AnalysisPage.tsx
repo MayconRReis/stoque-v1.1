@@ -119,7 +119,9 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Lote</p>
                   <p className="text-[10px] font-black text-white font-mono">{item.lot}</p>
                 </div>
-                {item.pallets > 0 && (
+                {item.pallets > 0 && 
+                 insp?.contentType !== SlotContent.CONTAINER_SJ && 
+                 insp?.contentType !== SlotContent.CONTAINER_LP && (
                   <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50">
                     <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Qtd</p>
                     <p className="text-[10px] font-black text-white">{item.pallets}</p>

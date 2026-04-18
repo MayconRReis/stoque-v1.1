@@ -371,7 +371,9 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {contentType !== SlotContent.SUPPLIES && (
+                  {contentType !== SlotContent.SUPPLIES && 
+                   contentType !== SlotContent.CONTAINER_SJ && 
+                   contentType !== SlotContent.CONTAINER_LP && (
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                         <FlaskConical className="w-3 h-3 text-blue-500" />
@@ -399,6 +401,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                       >
                         <option value="">Selecione uma vaga</option>
+                        <option value="AGUARDANDO">⚠️ AGUARDANDO VAGA (Virtual)</option>
                         {sortedAvailableSlots.map(slot => (
                           <option key={slot.id} value={slot.id}>{slot.id}</option>
                         ))}
@@ -562,6 +565,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                       >
                         <option value="">Selecione o destino</option>
+                        <option value="AGUARDANDO">⚠️ AGUARDANDO VAGA (Virtual)</option>
                         {sortedAvailableSlots.map(slot => (
                           <option key={slot.id} value={slot.id}>{slot.id}</option>
                         ))}

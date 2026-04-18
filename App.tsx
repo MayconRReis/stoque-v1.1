@@ -462,6 +462,109 @@ const App: React.FC = () => {
     });
   };
 
+  const performStackReorganization = async (currentData: SheetRow[], currentSlots: WarehouseSlot[]) => {
+    const racksToProcess: ('E' | 'F')[] = ['E', 'F'];
+    let newData = [...currentData];
+    let newSlots = [...currentSlots];
+    
+    let hasChanges = false;
+    const itemsToUpdateMap = new Map<string, SheetRow>();
+    const slotsToUpdateMap = new Map<string, WarehouseSlot>();
+
+    racksToProcess.forEach(rack => {
+      // Find all positions (columns) for this rack
+      const rackSlots = currentSlots.filter(s => s.rack === rack);
+      const positions = Array.from(new Set(rackSlots.map(s => s.position))).sort((a,b) => a-b);
+      
+      positions.forEach(pos => {
+        const stackPallets: { rowId: string, idx: number, level: number, insp: InspectionData }[] = [];
+        
+        newData.forEach(row => {
+          row.inspections?.forEach((insp, idx) => {
+            if (insp.assignedSlot?.startsWith(`${rack}.`)) {
+              const parts = insp.assignedSlot.split('.');
+              // Parts: Rack (0), Level (1), Position (2)
+              if (parseInt(parts[2]) === pos && parts[0] === rack) {
+                stackPallets.push({ rowId: row.id, idx, level: parseInt(parts[1]), insp: { ...insp } });
+              }
+            }
+          });
+        });
+
+        if (stackPallets.length === 0) return;
+
+        // Sort by CURRENT level (bottom to top)
+        stackPallets.sort((a, b) => a.level - b.level);
+
+        // Check if there is a gap or shift needed
+        let stackNeedsShift = false;
+        stackPallets.forEach((p, i) => {
+          if (p.level !== i + 1) stackNeedsShift = true;
+        });
+
+        if (stackNeedsShift) {
+          hasChanges = true;
+          
+          // Re-assign in data
+          stackPallets.forEach((p, i) => {
+            const targetLevel = i + 1;
+            const targetSlotId = `${rack}.${targetLevel}.${pos}`;
+            
+            const rIdx = newData.findIndex(r => r.id === p.rowId);
+            const insps = [...newData[rIdx].inspections!];
+            insps[p.idx] = { ...insps[p.idx], assignedSlot: targetSlotId };
+            newData[rIdx] = { ...newData[rIdx], inspections: insps };
+            itemsToUpdateMap.set(p.rowId, newData[rIdx]);
+          });
+
+          // Re-assign in slots
+          // 1. Clear ONLY THIS stack
+          const stackSlots = newSlots.filter(s => s.rack === rack && s.position === pos);
+          stackSlots.forEach(s => {
+            const sIdx = newSlots.findIndex(sc => sc.id === s.id);
+            newSlots[sIdx] = { ...newSlots[sIdx], status: SlotContent.EMPTY, occupiedBy: undefined };
+            slotsToUpdateMap.set(s.id, newSlots[sIdx]);
+          });
+
+          // 2. Fill stack from bottom up
+          stackPallets.forEach((p, i) => {
+            const targetLevel = i + 1;
+            const targetSlotId = `${rack}.${targetLevel}.${pos}`;
+            const sIdx = newSlots.findIndex(s => s.id === targetSlotId);
+            
+            if (sIdx !== -1) {
+              const row = newData.find(r => r.id === p.rowId);
+              newSlots[sIdx] = { 
+                ...newSlots[sIdx], 
+                status: p.insp.contentType, 
+                occupiedBy: row?.originOP || row?.description 
+              };
+              slotsToUpdateMap.set(targetSlotId, newSlots[sIdx]);
+            }
+          });
+        }
+      });
+    });
+
+    if (hasChanges) {
+      const invUpdates = Array.from(itemsToUpdateMap.values());
+      const slotUpdates = Array.from(slotsToUpdateMap.values());
+      
+      try {
+        await Promise.all([
+          ...invUpdates.map(item => supabaseService.saveInventoryItem(item)),
+          supabaseService.bulkUpdateSlots(slotUpdates)
+        ]);
+        
+        setData(newData);
+        setSlots(newSlots);
+        console.log(`Ponte: Reorganização de pilhas E/F concluída. ${invUpdates.length} itens movidos.`);
+      } catch (error) {
+        console.error('Stack reorganization failed:', error);
+      }
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabaseService.signOut();
@@ -498,15 +601,18 @@ const App: React.FC = () => {
       };
 
       // Update Slot
-      const targetSlot = slots.find(s => s.id === entryData.slotId);
-      if (targetSlot) {
-        const updatedSlot: WarehouseSlot = {
-          ...targetSlot,
-          status: entryData.contentType,
-          occupiedBy: entryData.op || entryData.name
-        };
-        await supabaseService.updateSlot(updatedSlot);
-        setSlots(prev => prev.map(s => s.id === entryData.slotId ? updatedSlot : s));
+      const isWaiting = entryData.slotId === 'AGUARDANDO';
+      if (!isWaiting) {
+        const targetSlot = slots.find(s => s.id === entryData.slotId);
+        if (targetSlot) {
+          const updatedSlot: WarehouseSlot = {
+            ...targetSlot,
+            status: entryData.contentType,
+            occupiedBy: entryData.op || entryData.name
+          };
+          await supabaseService.updateSlot(updatedSlot);
+          setSlots(prev => prev.map(s => s.id === entryData.slotId ? updatedSlot : s));
+        }
       }
 
       // Save Inventory
@@ -531,12 +637,15 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: entryData.quantity,
         slot: entryData.slotId,
-        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}`,
+        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}${isWaiting ? ' (Aguardando Vaga)' : ''}`,
         operatorName: user?.name
       });
 
       showNotification(`Entrada realizada com sucesso! ID: ${entryData.id}`);
       setIsMovementModalOpen(false);
+      
+      // Auto-reorganize E/F stacks
+      performStackReorganization([newEntry, ...data], slots.map(s => s.id === entryData.slotId ? { ...s, status: entryData.contentType, occupiedBy: entryData.op || entryData.name } : s));
     } catch (error: any) {
       console.error('Entry error:', error);
       const errorMessage = error?.message || error?.details || 'Erro desconhecido';
@@ -681,6 +790,12 @@ const App: React.FC = () => {
       setHistory(prev => [historyEntry, ...prev]);
 
       showNotification(`Entrada confirmada! ID: ${finalId}`);
+      
+      // Auto-reorganize E/F stacks
+      performStackReorganization(
+        data.map(r => r.id === rowId ? updatedRow : r),
+        updatedSlot ? slots.map(s => s.id === slotId ? updatedSlot : s) : slots
+      );
     } catch (error: any) {
       console.error('Analysis confirmation error:', error);
       showNotification(`Erro ao confirmar análise: ${error.message}`, 'error');
@@ -715,15 +830,18 @@ const App: React.FC = () => {
       }
 
       // Update To Slot
-      const toSlotObj = slots.find(s => s.id === transferData.toSlot);
-      if (toSlotObj) {
-        const updatedTo: WarehouseSlot = { 
-          ...toSlotObj, 
-          status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, 
-          occupiedBy: item.originOP || item.description 
-        };
-        await supabaseService.updateSlot(updatedTo);
-        setSlots(prev => prev.map(s => s.id === transferData.toSlot ? updatedTo : s));
+      const isWaitingDestination = transferData.toSlot === 'AGUARDANDO';
+      if (!isWaitingDestination) {
+        const toSlotObj = slots.find(s => s.id === transferData.toSlot);
+        if (toSlotObj) {
+          const updatedTo: WarehouseSlot = { 
+            ...toSlotObj, 
+            status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, 
+            occupiedBy: item.originOP || item.description 
+          };
+          await supabaseService.updateSlot(updatedTo);
+          setSlots(prev => prev.map(s => s.id === transferData.toSlot ? updatedTo : s));
+        }
       }
 
       // Update Inventory Item Slot
@@ -746,12 +864,23 @@ const App: React.FC = () => {
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: transferData.toSlot,
-        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}`,
+        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}${isWaitingDestination ? ' (Aguardando Vaga)' : ''}`,
         operatorName: user?.name
       });
 
       showNotification('Transferência concluída com sucesso.');
       setIsMovementModalOpen(false);
+      
+      // Auto-reorganize E/F stacks after transfer
+      const finalData = data.map(d => d.id === item.id ? updatedItem : d);
+      const finalSlots = slots.map(s => {
+        if (s.id === transferData.fromSlot) return { ...s, status: SlotContent.EMPTY, occupiedBy: undefined };
+        if (s.id === transferData.toSlot && !isWaitingDestination) {
+           return { ...s, status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, occupiedBy: item.originOP || item.description };
+        }
+        return s;
+      });
+      performStackReorganization(finalData, finalSlots);
     } catch (error) {
       console.error('Transfer error:', error);
       showNotification('Erro ao realizar transferência.', 'error');
@@ -796,6 +925,11 @@ const App: React.FC = () => {
 
       showNotification('Saída registrada com sucesso.');
       setIsMovementModalOpen(false);
+
+      // Auto-reorganize E/F stacks
+      const finalData = data.filter(d => d.id !== item.id);
+      const finalSlots = occupiedSlot ? slots.map(s => s.id === occupiedSlot.id ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
+      performStackReorganization(finalData, finalSlots);
     } catch (error) {
       console.error('Exit error:', error);
       showNotification('Erro ao registrar saída.', 'error');
@@ -940,7 +1074,11 @@ const App: React.FC = () => {
       }
 
       // 2. Update shipment status
-      const updatedShipment = { ...shipment, status: ShipmentStatus.CLOSED };
+      const updatedShipment = { 
+        ...shipment, 
+        status: ShipmentStatus.CLOSED,
+        closedAt: new Date().toISOString()
+      };
       await supabaseService.saveShipment(updatedShipment);
 
       // 3. Process exit for each pallet
@@ -992,9 +1130,34 @@ const App: React.FC = () => {
       }
 
       showNotification(`Carregamento ${shipmentId} finalizado com sucesso!`);
+      
+      // Auto-reorganize E/F stacks as many pallets might have left
+      // We need to fetch latest state or at least calculate what happened.
+      // Since individual updateSlot calls happened in the loop, let's use a fresh get logic or just trust state after dispatch.
+      supabaseService.getInventory().then(inv => {
+        supabaseService.getSlots().then(slt => {
+           performStackReorganization(inv, slt);
+        });
+      });
     } catch (error: any) {
       console.error('Error finalizing shipment:', error);
       showNotification(`Erro ao finalizar carregamento: ${error.message}`, 'error');
+    }
+  };
+
+  const handleDeleteShipment = async (shipmentId: string) => {
+    try {
+      await supabaseService.deleteShipment(shipmentId);
+      setShipments(prev => prev.filter(s => s.id !== shipmentId));
+      
+      // We also need to refresh inventory data to reflect unlinked shipmentIds
+      const updatedInv = await supabaseService.getInventory();
+      setData(updatedInv);
+      
+      showNotification('Carregamento excluído com sucesso.');
+    } catch (error: any) {
+      console.error('Error deleting shipment:', error);
+      showNotification(`Erro ao excluir carregamento: ${error.message}`, 'error');
     }
   };
 
@@ -1027,6 +1190,14 @@ const App: React.FC = () => {
       return acc + rowBottles;
     }, 0);
 
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const finishedShipmentsCount = shipments.filter(s => 
+      s.status === ShipmentStatus.CLOSED && 
+      s.closedAt && 
+      new Date(s.closedAt) > oneDayAgo
+    ).length;
+
     return {
       freeSlots: Math.max(0, total - occupied),
       pendingEntries: pendingCount,
@@ -1035,9 +1206,10 @@ const App: React.FC = () => {
       totalSlots: total,
       occupiedSlots: occupied,
       totalBottles,
-      waitingPallets: waitingPalletsCount
+      waitingPallets: waitingPalletsCount,
+      finishedShipments24h: finishedShipmentsCount
     };
-  }, [slots, history, data]);
+  }, [slots, history, data, shipments]);
 
   const showNotification = (message: string, type: 'info' | 'error' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -1115,6 +1287,9 @@ const App: React.FC = () => {
       
       showNotification('Dados do pallet atualizados com sucesso!');
       setEditPalletContext(null);
+
+      // Auto-reorganize E/F stacks in case OP/Description changed
+      performStackReorganization(data.map(r => r.id === updatedRow.id ? updatedRow : r), slots);
     } catch (error: any) {
       console.error('Update error:', error);
       showNotification('Erro ao atualizar pallet', 'error');
@@ -1147,6 +1322,11 @@ const App: React.FC = () => {
           await supabaseService.saveInventoryItem(updatedRow);
           
           setData(prev => prev.map(r => r.id === deleteContext.rowId ? updatedRow : r));
+          
+          // Auto-reorganize E/F stacks
+          const finalData = data.map(r => r.id === deleteContext.rowId ? updatedRow : r);
+          const finalSlots = inspection.assignedSlot ? slots.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
+          performStackReorganization(finalData, finalSlots);
         }
       }
       setDeleteContext(null);
@@ -1183,6 +1363,11 @@ const App: React.FC = () => {
 
       showNotification(`A OP ${row.originOP} foi enviada para matriz com sucesso`);
       setMatrixConfirmContext(null);
+
+      // Auto-reorganize E/F stacks
+      const finalData = data.map(r => r.id === rowId ? updatedRow : r);
+      const finalSlots = slotId ? slots.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
+      performStackReorganization(finalData, finalSlots);
     } catch (error) {
       console.error('Error sending to matrix:', error);
       showNotification('Erro ao processar envio no servidor.', 'error');
@@ -1234,6 +1419,9 @@ const App: React.FC = () => {
       showNotification(`${selectedPallets.length} pallets enviados para matriz`);
       setSelectedPallets([]);
       setIsBulkConfirmOpen(false);
+      
+      // Auto-reorganize E/F stacks
+      performStackReorganization(data.map(row => rowsToUpdate.get(row.id) || row), updatedSlots);
     } catch (error) {
       console.error('Error in bulk send:', error);
       showNotification('Erro ao processar envio em massa no servidor.', 'error');
@@ -1337,50 +1525,106 @@ const App: React.FC = () => {
   };
 
   const StatsSection = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-blue-500/30 transition-all">
-        <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
-          <FlaskConical className="w-5 h-5" />
+    <div className="space-y-6">
+      {/* Large Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-900/60 p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-blue-500/30 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
+            <FlaskConical className="w-40 h-40" />
+          </div>
+          <div className="flex justify-between items-start mb-6">
+            <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-3xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-900/40">
+              <FlaskConical className="w-8 h-8" />
+            </div>
+            <div className="text-right">
+              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Total de Frascos</h4>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Estoque Consolidado</p>
+            </div>
+          </div>
+          <div className="flex items-baseline gap-4">
+            <p className="text-6xl md:text-8xl font-black text-white tracking-tighter">{stats.totalBottles.toLocaleString()}</p>
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Unidades</p>
+          </div>
         </div>
-        <div>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Total de Frascos</p>
-          <p className="text-2xl font-black text-white tracking-tight">{stats.totalBottles.toLocaleString()}</p>
+
+        <div className="bg-slate-900/60 p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-green-500/30 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
+            <CheckCircle2 className="w-40 h-40" />
+          </div>
+          <div className="flex justify-between items-start mb-6">
+            <div className="w-16 h-16 bg-green-600/10 text-green-500 rounded-3xl flex items-center justify-center border border-green-500/20 shadow-lg shadow-green-900/40">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <div className="text-right">
+              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Vagas Livres</h4>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Capacidade Disponível</p>
+            </div>
+          </div>
+          <div className="flex items-baseline gap-4">
+            <p className="text-6xl md:text-8xl font-black text-white tracking-tighter">{stats.freeSlots}</p>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Espaços</p>
+              <p className="text-[10px] text-slate-600 font-bold uppercase">De {stats.totalSlots} Total</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-green-500/30 transition-all">
-        <div className="w-10 h-10 bg-green-600/10 text-green-500 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
-          <CheckCircle2 className="w-5 h-5" />
+      {/* Small Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Registros */}
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-indigo-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('history')}>
+          <div className="w-10 h-10 bg-indigo-600/10 text-indigo-500 rounded-xl flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
+            <History className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Registros (24h)</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stats.dailyMovements}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Vagas Livres</p>
-          <p className="text-2xl font-black text-white tracking-tight">{stats.freeSlots}</p>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Total: {stats.totalSlots}</p>
-        </div>
-      </div>
 
-      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
-        <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
-          <Boxes className="w-5 h-5" />
+        {/* Entradas Pendentes */}
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-red-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('analysis')}>
+          <div className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Pendentes</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stats.pendingEntries}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Alocados</p>
-          <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">{stats.occupancyRate}% Ocupação</p>
-        </div>
-      </div>
 
-      <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all">
-        <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
-          <RefreshCw className="w-5 h-5" />
+        {/* Alocados */}
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
+          <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
+            <Boxes className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Alocados</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Vaga</p>
-          <p className="text-2xl font-black text-white tracking-tight">{stats.waitingPallets}</p>
+
+        {/* Aguardando Vaga */}
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all">
+          <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
+            <RefreshCw className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stats.waitingPallets}</p>
+          </div>
+        </div>
+
+        {/* Expedidos */}
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-fuchsia-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('shipments')}>
+          <div className="w-10 h-10 bg-fuchsia-600/10 text-fuchsia-500 rounded-xl flex items-center justify-center border border-fuchsia-500/20 group-hover:scale-110 transition-transform">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Expedidos (24h)</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stats.finishedShipments24h}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1670,75 +1914,8 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Top Stats Row: Flasks, Free, Occupied */}
+                {/* Stats Section */}
                 <StatsSection />
-
-                {/* Bottom Stats Row: Movements, Pending */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    {/* Movements */}
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-indigo-500/30 transition-all relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                         <History className="w-32 h-32" />
-                       </div>
-                       <div className="flex justify-between items-start mb-6">
-                         <div className="w-12 h-12 bg-indigo-600/10 text-indigo-500 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-lg shadow-indigo-900/20">
-                           <History className="w-6 h-6" />
-                         </div>
-                         <div className="text-right">
-                           <h4 className="text-sm font-black text-white uppercase italic tracking-tight">Movimentações</h4>
-                           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Últimas 24 Horas</p>
-                         </div>
-                       </div>
-                       <div className="flex items-baseline gap-3">
-                         <p className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.dailyMovements}</p>
-                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Registros</p>
-                       </div>
-                       <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between">
-                         <div className="flex gap-2">
-                           <div className="px-2 py-1 rounded-lg bg-green-500/10 text-green-500 text-[8px] font-bold uppercase border border-green-500/20">Entradas: {history.filter(h => h.type === HistoryType.ENTRY).length}</div>
-                           <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-[8px] font-bold uppercase border border-blue-500/20">Saídas: {history.filter(h => h.type === HistoryType.EXIT).length}</div>
-                         </div>
-                         {!isPublicView && (
-                           <button onClick={() => navigateToTab('history')} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
-                             Ver tudo <ArrowRight className="w-3 h-3" />
-                           </button>
-                         )}
-                       </div>
-                    </div>
-
-                    {/* Pending Entries */}
-                    <div className="bg-slate-900/60 p-6 md:p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-red-500/30 transition-all relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                         <Truck className="w-32 h-32" />
-                       </div>
-                       <div className="flex justify-between items-start mb-6">
-                         <div className="w-12 h-12 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center border border-red-500/20 shadow-lg shadow-red-900/20">
-                           <Truck className="w-6 h-6" />
-                         </div>
-                         <div className="text-right">
-                           <h4 className="text-sm font-black text-white uppercase italic tracking-tight">Entradas Pendentes</h4>
-                           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Aguardando Análise</p>
-                         </div>
-                       </div>
-                       <div className="flex items-baseline gap-3">
-                         <p className="text-5xl md:text-7xl font-black text-white tracking-tighter">{stats.pendingEntries}</p>
-                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Pallets</p>
-                       </div>
-                       <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                           <div className={`w-2 h-2 rounded-full ${stats.pendingEntries > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-700'}`}></div>
-                           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                             {stats.pendingEntries > 0 ? 'Ação Necessária' : 'Tudo em dia'}
-                           </p>
-                         </div>
-                         {!isPublicView && (
-                           <button onClick={() => navigateToTab('analysis')} className="text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest flex items-center gap-1.5 transition-colors">
-                             Ir para Análise <ArrowRight className="w-3 h-3" />
-                           </button>
-                         )}
-                       </div>
-                    </div>
-                </div>
 
                 {/* Charts Area - Keeping some but making them more modern */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
@@ -1749,40 +1926,65 @@ const App: React.FC = () => {
                         <h4 className="text-lg font-black text-white uppercase italic tracking-tighter">Distribuição por Rack</h4>
                         <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Ocupação Setorial G0</p>
                       </div>
-                      <div className="flex gap-3">
-                        <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span></div>
-                      </div>
+                      <div className="flex gap-4">
+                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Aguardando</span></div>
                     </div>
-                    <div className="space-y-6">
-                      {['A', 'B', 'C', 'D', 'E', 'F'].map(rack => {
-                        const rackSlots = slots.filter(s => s.rack === rack);
-                        const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
-                        const total = rackSlots.length;
-                        const rate = Math.round((occupied / total) * 100);
-                        const color = 
-                          rack === 'A' ? 'bg-blue-600' : 
-                          rack === 'B' ? 'bg-amber-600' : 
-                          rack === 'C' ? 'bg-indigo-600' : 
-                          rack === 'D' ? 'bg-green-600' :
-                          'bg-purple-600';
-                        
-                        return (
-                          <div key={rack} className="space-y-2">
-                            <div className="flex justify-between items-end">
-                              <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Porta Pallet {rack}</span>
-                              <span className="text-[10px] font-black text-slate-400">{rate}% ({occupied}/{total})</span>
-                            </div>
-                            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                  </div>
+                  <div className="space-y-6">
+                    {['A', 'B', 'C', 'D', 'E', 'F'].map(rack => {
+                      const rackSlots = slots.filter(s => s.rack === rack);
+                      const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
+                      const total = 32; // Fixed limit as requested
+                      const rate = Math.round((occupied / total) * 100);
+                      const color = 
+                        rack === 'A' ? 'bg-blue-600' : 
+                        rack === 'B' ? 'bg-amber-600' : 
+                        rack === 'C' ? 'bg-indigo-600' : 
+                        rack === 'D' ? 'bg-green-600' :
+                        'bg-purple-600';
+                      
+                      return (
+                        <div key={rack} className="space-y-2">
+                          <div className="flex justify-between items-end">
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Porta Pallet {rack}</span>
+                            <span className="text-[10px] font-black text-slate-400">{rate}% ({occupied}/{total})</span>
+                          </div>
+                          <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min(rate, 100)}%` }}
+                              className={`h-full ${color} rounded-full`}
+                            />
+                            {rate > 100 && (
                               <motion.div 
                                 initial={{ width: 0 }}
-                                animate={{ width: `${rate}%` }}
-                                className={`h-full ${color} rounded-full`}
+                                animate={{ width: `${rate - 100}%` }}
+                                className="h-full bg-red-500 rounded-full opacity-50 absolute top-0 left-0"
                               />
-                            </div>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Aguardando Vagas row */}
+                    {stats.waitingPallets > 0 && (
+                      <div className="pt-4 mt-4 border-t border-slate-800/50 space-y-2">
+                        <div className="flex justify-between items-end">
+                          <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest italic">Aguardando Vaga Geral</span>
+                          <span className="text-[10px] font-black text-slate-400">{stats.waitingPallets} Pallets</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                           <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min((stats.waitingPallets / 32) * 100, 100)}%` }}
+                              className="h-full bg-purple-600 rounded-full animate-pulse"
+                           />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   </div>
 
                   {/* Product Distribution Card */}
@@ -1884,6 +2086,7 @@ const App: React.FC = () => {
               shipments={shipments}
               inventory={data}
               onOpenDetail={setShipmentDetailContext}
+              onDelete={handleDeleteShipment}
             />
           )}
 
@@ -2009,7 +2212,7 @@ const App: React.FC = () => {
                         <div className="flex gap-3 w-full md:w-auto">
                             <button 
                                 onClick={() => setIsShipmentModalOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
+                                className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20 animate-in zoom-in duration-200"
                             >
                                 <Truck className="w-3.5 h-3.5" /> Carregamento ({selectedPallets.length})
                             </button>
@@ -2097,7 +2300,7 @@ const App: React.FC = () => {
                                             <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
                                          </div>
                                        )}
-                                       {item.pallets > 0 && (
+                                       {item.pallets > 0 && insp.contentType !== SlotContent.CONTAINER_SJ && insp.contentType !== SlotContent.CONTAINER_LP && (
                                          <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
                                             <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Qtd</p>
                                             <p className="text-xs font-black text-green-400 font-mono italic">{item.pallets}</p>
@@ -2256,6 +2459,7 @@ const App: React.FC = () => {
         ) : []}
         onFinalize={handleFinalizeShipment}
         onRemovePallet={handleRemoveFromShipment}
+        onDelete={handleDeleteShipment}
       />
       
       <MovementModal 

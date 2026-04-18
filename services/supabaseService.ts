@@ -56,7 +56,8 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   status TEXT DEFAULT 'OPEN',
  *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
  *   scheduled_date TEXT,
- *   operator_name TEXT
+ *   operator_name TEXT,
+ *   closed_at TIMESTAMP WITH TIME ZONE
  * );
  * 
  * ALTER TABLE inventory ADD COLUMN shipment_id TEXT REFERENCES shipments(id);
@@ -313,7 +314,8 @@ export const supabaseService = {
       status: s.status as ShipmentStatus,
       createdAt: s.created_at,
       scheduledDate: s.scheduled_date,
-      operatorName: s.operator_name
+      operatorName: s.operator_name,
+      closedAt: s.closed_at
     }));
   },
 
@@ -326,10 +328,53 @@ export const supabaseService = {
         status: shipment.status,
         created_at: shipment.createdAt,
         scheduled_date: shipment.scheduledDate,
-        operator_name: shipment.operatorName
+        operator_name: shipment.operatorName,
+        closed_at: shipment.closedAt
       });
     
     if (error) throw error;
+  },
+
+  async deleteShipment(shipmentId: string) {
+    // 1. Unlink all inventory items from this shipment
+    const { data: items, error: fetchError } = await supabase
+      .from('inventory')
+      .select('*');
+    
+    if (fetchError) throw fetchError;
+
+    const updates = (items || []).filter(item => {
+      return (item.inspections || []).some((insp: any) => 
+        insp.shipmentId === shipmentId || insp.shipment_id === shipmentId
+      );
+    });
+
+    for (const item of updates) {
+      const updatedInspections = item.inspections.map((insp: any) => {
+        if (insp.shipmentId === shipmentId || insp.shipment_id === shipmentId) {
+          const newInsp = { ...insp };
+          delete newInsp.shipmentId;
+          delete newInsp.shipment_id;
+          return newInsp;
+        }
+        return insp;
+      });
+
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ inspections: updatedInspections })
+        .eq('id', item.id);
+      
+      if (updateError) throw updateError;
+    }
+
+    // 2. Delete the shipment record
+    const { error: deleteError } = await supabase
+      .from('shipments')
+      .delete()
+      .eq('id', shipmentId);
+    
+    if (deleteError) throw deleteError;
   },
 
   async updateInventoryShipment(selections: { rowId: string, palletIdx: number }[], shipmentId: string | null) {

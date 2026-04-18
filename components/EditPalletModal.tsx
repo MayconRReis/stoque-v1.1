@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { SheetRow, InspectionData, SlotContent } from '../types';
+import { SheetRow, InspectionData, SlotContent, WarehouseSlot } from '../types';
 import { 
   Pencil, 
   X, 
@@ -12,7 +12,8 @@ import {
   Package,
   Truck,
   Box,
-  Container
+  Container,
+  Warehouse
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -189,17 +190,19 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-              <Hash className="w-3 h-3" /> Quantidade Total (Unidades ou Kg)
-            </label>
-            <input 
-              type="number" 
-              value={quantity}
-              onChange={e => setQuantity(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
-            />
-          </div>
+          {contentType !== SlotContent.CONTAINER_SJ && contentType !== SlotContent.CONTAINER_LP && (
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                <Hash className="w-3 h-3" /> Quantidade Total (Unidades ou Kg)
+              </label>
+              <input 
+                type="number" 
+                value={quantity}
+                onChange={e => setQuantity(Number(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+              />
+            </div>
+          )}
 
           {contentType === SlotContent.SUPPLIES && (
             <motion.div 
@@ -260,7 +263,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             </motion.div>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-4">
             <button 
               onClick={onClose}
               className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"

@@ -48,6 +48,7 @@ export interface Shipment {
   createdAt: string;
   scheduledDate: string;
   operatorName?: string;
+  closedAt?: string;
 }
 
 export interface HistoryEntry {
@@ -109,6 +110,7 @@ export interface DashboardStats {
   occupiedSlots: number;
   totalBottles: number;
   waitingPallets: number;
+  finishedShipments24h: number;
 }
 
 export const translateSlotContent = (content: SlotContent): string => {

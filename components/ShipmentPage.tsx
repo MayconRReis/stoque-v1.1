@@ -16,9 +16,10 @@ interface ShipmentPageProps {
   shipments: Shipment[];
   inventory: SheetRow[];
   onOpenDetail: (shipment: Shipment) => void;
+  onDelete?: (shipmentId: string) => void;
 }
 
-export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory, onOpenDetail }) => {
+export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory, onOpenDetail, onDelete }) => {
   const getPalletCount = (shipmentId: string) => {
     return inventory.reduce((acc, item) => {
       const count = (item.inspections || []).filter(insp => {
@@ -66,57 +67,70 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {openShipments.map(shipment => {
             const palletCount = getPalletCount(shipment.id);
+            const isThirdParty = shipment.type === ShipmentType.THIRD_PARTY;
+            
             return (
-              <motion.button 
+              <motion.div 
                 layout
                 key={shipment.id}
-                onClick={() => onOpenDetail(shipment)}
-                className="group bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-[2.5rem] p-6 text-left hover:border-purple-500/40 transition-all hover:bg-slate-800/20 relative overflow-hidden shadow-2xl"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="group h-full"
               >
-                {/* Accent line */}
-                <div className={`absolute top-0 left-0 w-full h-1.5 ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-purple-600' : 'bg-blue-600'}`}></div>
-                
-                <div className="flex justify-between items-start mb-6">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg group-hover:scale-110 transition-transform ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-purple-600/10 text-purple-500 border-purple-500/20' : 'bg-blue-600/10 text-blue-500 border-blue-500/20'}`}>
-                    <Truck className="w-6 h-6" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-white font-mono uppercase mb-1">{shipment.id}</p>
-                    <span className={`text-[8px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest border ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : 'bg-blue-600/10 text-blue-500 border-blue-500/20'}`}>
-                      {shipment.type === ShipmentType.THIRD_PARTY ? 'Terceirista' : 'Próprio'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-slate-500 border border-slate-800">
-                      <Calendar className="w-4 h-4" />
+                <div 
+                  onClick={() => onOpenDetail(shipment)}
+                  className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-[2.5rem] p-7 text-left hover:border-fuchsia-500/40 transition-all hover:bg-slate-800/30 relative overflow-hidden shadow-2xl cursor-pointer group/card h-full flex flex-col"
+                >
+                  {/* Background Ornament */}
+                  <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-[60px] opacity-20 transition-all group-hover/card:opacity-40 ${isThirdParty ? 'bg-fuchsia-600' : 'bg-pink-500'}`} />
+                  
+                  {/* Type Badge Floating */}
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center border shadow-2xl transition-transform group-hover/card:scale-110 duration-500 ${isThirdParty ? 'bg-fuchsia-600/20 text-fuchsia-400 border-fuchsia-500/30' : 'bg-pink-600/20 text-pink-400 border-pink-500/30'}`}>
+                      <Truck className="w-7 h-7" />
                     </div>
                     <div>
-                      <p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Data de Envio</p>
-                      <p className="text-xs font-black text-white italic">{new Date(shipment.scheduledDate).toLocaleDateString('pt-BR')}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Hash className="w-3 h-3 text-slate-600" />
+                        <span className="text-[10px] font-black text-white font-mono tracking-tighter uppercase">{shipment.id}</span>
+                      </div>
+                      <span className={`text-[8px] font-black px-2.5 py-1 rounded-lg uppercase tracking-[0.2em] border shadow-sm ${isThirdParty ? 'bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20' : 'bg-pink-500/10 text-pink-500 border-pink-500/20'}`}>
+                        {isThirdParty ? 'Terceirista' : 'Próprio'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-slate-500 border border-slate-800">
-                      <Clock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Criado em</p>
-                      <p className="text-xs font-black text-slate-400 italic">{new Date(shipment.createdAt).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-6 border-t border-slate-800/50">
-                  <div className="flex items-center gap-2">
-                    <Package className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-xs font-black text-white italic">{palletCount} Itens</span>
+                  <div className="space-y-4 mb-8 flex-1">
+                    <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-800/50 group-hover/card:border-slate-700/50 transition-colors">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Calendar className="w-3.5 h-3.5 text-fuchsia-500/70" />
+                        <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Data de Envio</p>
+                      </div>
+                      <p className="text-sm font-black text-white italic ml-6.5">{new Date(shipment.scheduledDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    </div>
+
+                    <div className="px-4">
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-3.5 h-3.5 text-slate-600" />
+                        <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Criado em {new Date(shipment.createdAt).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-700 group-hover:text-white group-hover:translate-x-1 transition-all" />
+
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-800/50">
+                    <div className="flex items-center gap-3 bg-slate-950/60 px-4 py-2 rounded-xl border border-slate-800/80">
+                      <Package className="w-4 h-4 text-fuchsia-500" />
+                      <span className="text-xs font-black text-white italic">{palletCount} Pallets</span>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 group-hover/card:bg-fuchsia-600 group-hover/card:border-fuchsia-500 transition-all">
+                      <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white transition-all transform group-hover/card:translate-x-0.5" />
+                    </div>
+                  </div>
+
+                  {/* Top Highlight line */}
+                  <div className={`absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r ${isThirdParty ? 'from-fuchsia-600 to-fuchsia-400' : 'from-pink-600 to-pink-400'}`} />
                 </div>
-              </motion.button>
+              </motion.div>
             );
           })}
         </div>
@@ -126,15 +140,25 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
       {closedShipments.length > 0 && (
         <div className="pt-10 border-t border-slate-900">
           <h3 className="text-lg font-black text-slate-600 uppercase italic tracking-widest mb-6 px-4">Histórico Recente</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 opacity-60">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {closedShipments.slice(0, 4).map(shipment => (
-              <div key={shipment.id} className="bg-slate-900/20 border border-slate-800/50 rounded-[2rem] p-5 flex justify-between items-center">
+              <div key={shipment.id} className="bg-slate-900/20 border border-slate-800/50 rounded-[2rem] p-5 flex justify-between items-center group/item hover:border-fuchsia-500/30 transition-all opacity-60 hover:opacity-100">
                 <div>
-                  <p className="text-[9px] font-black text-slate-500 font-mono mb-1">{shipment.id}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-[9px] font-black text-fuchsia-500/70 font-mono tracking-tighter uppercase">{shipment.id}</p>
+                    <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md uppercase border ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20' : 'bg-pink-500/10 text-pink-500 border-pink-500/20'}`}>
+                      {shipment.type === ShipmentType.THIRD_PARTY ? 'T' : 'P'}
+                    </span>
+                  </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase italic">Enviado em {new Date(shipment.scheduledDate).toLocaleDateString('pt-BR')}</p>
                 </div>
-                <div className="w-8 h-8 rounded-lg bg-green-500/10 text-green-500 flex items-center justify-center border border-green-500/20">
-                  <ChevronRight className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                  <div 
+                    onClick={() => onOpenDetail(shipment)}
+                    className="w-8 h-8 rounded-lg bg-slate-950 text-slate-500 flex items-center justify-center border border-slate-800 cursor-pointer hover:bg-fuchsia-600 hover:text-white hover:border-fuchsia-500 transition-all"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
                 </div>
               </div>
             ))}

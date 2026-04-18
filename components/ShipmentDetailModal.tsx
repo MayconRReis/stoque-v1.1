@@ -21,6 +21,7 @@ interface ShipmentDetailModalProps {
   linkedPallets: SheetRow[];
   onFinalize: (shipmentId: string) => Promise<void>;
   onRemovePallet: (palletId: string) => Promise<void>;
+  onDelete?: (shipmentId: string) => Promise<void>;
 }
 
 export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({ 
@@ -29,9 +30,11 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
   shipment, 
   linkedPallets,
   onFinalize,
-  onRemovePallet
+  onRemovePallet,
+  onDelete
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!isOpen || !shipment) return null;
 
@@ -48,8 +51,60 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsProcessing(true);
+    try {
+      await onDelete(shipment.id);
+      onClose();
+    } catch (error) {
+      console.error('Error deleting shipment:', error);
+    } finally {
+      setIsProcessing(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4"
+          >
+            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-3xl text-center space-y-6">
+              <div className="w-16 h-16 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-red-900/20">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-white font-black uppercase text-xl italic tracking-tight">Excluir Carregamento?</h3>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                  Os pallets vinculados serão liberados e o registro será removido permanentemente.
+                </p>
+              </div>
+              <div className="flex gap-4 pt-2">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDelete}
+                  disabled={isProcessing}
+                  className="flex-2 py-4 bg-red-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-lg shadow-red-900/40 transition-all hover:bg-red-500 active:scale-95 disabled:opacity-50"
+                >
+                  {isProcessing ? 'Excluindo...' : 'Sim, Excluir'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -59,7 +114,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
         {/* Header */}
         <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
           <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transform -rotate-3 ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-purple-600 shadow-purple-900/40' : 'bg-blue-600 shadow-blue-900/40'}`}>
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transform -rotate-3 ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-fuchsia-600 shadow-fuchsia-900/40' : 'bg-pink-600 shadow-pink-900/40'}`}>
               <Truck className="w-7 h-7" />
             </div>
             <div>
@@ -77,7 +132,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Tipo</p>
-              <p className={`text-sm font-black italic ${shipment.type === ShipmentType.THIRD_PARTY ? 'text-purple-500' : 'text-blue-500'}`}>
+              <p className={`text-sm font-black italic ${shipment.type === ShipmentType.THIRD_PARTY ? 'text-fuchsia-500' : 'text-pink-500'}`}>
                 {shipment.type === ShipmentType.THIRD_PARTY ? 'Terceirista' : 'Próprio'}
               </p>
             </div>
@@ -112,7 +167,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
                         <Package className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black text-blue-500 font-mono uppercase mb-0.5 pr-4 truncate">{pallet.originOP}</p>
+                        <p className="text-[10px] font-black text-fuchsia-500 font-mono uppercase mb-0.5 pr-4 truncate">{pallet.originOP}</p>
                         <h5 className="text-[11px] font-bold text-white uppercase truncate pr-4">{pallet.description}</h5>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[8px] font-black text-slate-600 uppercase">Lote: {pallet.lot}</span>
@@ -134,6 +189,14 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <button 
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isProcessing}
+              className="px-6 py-5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-2xl transition-all shadow-xl shadow-red-900/10"
+              title="Excluir Carregamento"
+            >
+              <Trash2 className="w-5 h-5 mx-auto" />
+            </button>
             <button 
               onClick={onClose}
               className="flex-1 py-5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all"

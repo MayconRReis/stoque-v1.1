@@ -131,10 +131,12 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                     {inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${inspection.assignedSlot}`}
                   </span>
                </div>
-               <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Quantidade Total</p>
-                  <span className="text-lg font-black text-green-400 font-mono">{row.pallets}</span>
-               </div>
+               {inspection.contentType !== SlotContent.CONTAINER_SJ && inspection.contentType !== SlotContent.CONTAINER_LP && (
+                 <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Quantidade Total</p>
+                    <span className="text-lg font-black text-green-400 font-mono">{row.pallets}</span>
+                 </div>
+               )}
             </div>
           )}
 
