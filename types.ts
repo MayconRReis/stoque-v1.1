@@ -21,7 +21,8 @@ export enum SlotContent {
   CONTAINER_CP = 'CONTAINER_CP',
   USE_CONSUMPTION = 'USE_CONSUMPTION',
   REWORK = 'REWORK',
-  REPROCESS = 'REPROCESS'
+  REPROCESS = 'REPROCESS',
+  ROTATIVE = 'ROTATIVE'
 }
 
 export enum HistoryType {
@@ -75,6 +76,15 @@ export interface WarehouseSlot {
   occupiedBy?: string; // OP or Lot number
 }
 
+export interface RotativeStockItem {
+  id: string;
+  productName: string;
+  quantity: number;
+  slotId: string;
+  type: string; // 'Frasco' | 'Caixa' | 'Tampa' | 'Sleev'
+  updatedAt: string;
+}
+
 export interface InspectionData {
   bottles: number;
   caps: number;
@@ -125,7 +135,8 @@ export const translateSlotContent = (content: SlotContent): string => {
     [SlotContent.CONTAINER_CP]: 'Container CP',
     [SlotContent.USE_CONSUMPTION]: 'Uso e Consumo',
     [SlotContent.REWORK]: 'Retrabalho',
-    [SlotContent.REPROCESS]: 'Reprocesso'
+    [SlotContent.REPROCESS]: 'Reprocesso',
+    [SlotContent.ROTATIVE]: 'Estoque Rotativo'
   };
   return translations[content] || content;
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
   Package, 
@@ -31,7 +31,8 @@ import {
   Container,
   Filter,
   ChevronDown,
-  Clock
+  Clock,
+  TrendingUp
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -58,6 +59,7 @@ import { Login } from './components/Login';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
+import { RotativeStockManager } from './components/RotativeStockManager';
 import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
@@ -106,7 +108,7 @@ const App: React.FC = () => {
   const [isPublicView, setIsPublicView] = useState(false);
   const [data, setData] = useState<SheetRow[]>([]);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
@@ -562,6 +564,49 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Stack reorganization failed:', error);
       }
+    }
+  };
+
+  const [selectedMappingSlot, setSelectedMappingSlot] = useState<WarehouseSlot | null>(null);
+
+  const handleDedicateSlot = async (slot: WarehouseSlot) => {
+    try {
+      await supabaseService.updateSlot({
+        ...slot,
+        status: SlotContent.ROTATIVE,
+        occupiedBy: 'ESTOQUE ROTATIVO'
+      });
+      setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: SlotContent.ROTATIVE, occupiedBy: 'ESTOQUE ROTATIVO' } : s));
+      showNotification(`Vaga ${slot.id} dedicada ao Estoque Rotativo`);
+      setSelectedMappingSlot(null);
+    } catch (error) {
+      console.error('Error dedicating slot:', error);
+      showNotification('Erro ao dedicar vaga', 'error');
+    }
+  };
+
+  const handleReleaseSlot = async (slot: WarehouseSlot) => {
+    // Check if there are items in this slot first
+    try {
+      const rotativeItems = await supabaseService.getRotativeStock();
+      const itemsInSlot = rotativeItems.filter(i => i.slotId === slot.id);
+      
+      if (itemsInSlot.length > 0) {
+        showNotification('Não é possível liberar uma vaga que contém itens no estoque rotativo', 'error');
+        return;
+      }
+
+      await supabaseService.updateSlot({
+        ...slot,
+        status: SlotContent.EMPTY,
+        occupiedBy: undefined
+      });
+      setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+      showNotification(`Vaga ${slot.id} liberada do Estoque Rotativo`);
+      setSelectedMappingSlot(null);
+    } catch (error) {
+      console.error('Error releasing slot:', error);
+      showNotification('Erro ao liberar vaga', 'error');
     }
   };
 
@@ -1318,13 +1363,24 @@ const App: React.FC = () => {
           }
 
           const updatedInsps = row.inspections?.filter((_, i) => i !== deleteContext.palletIdx);
-          const updatedRow = { ...row, inspections: updatedInsps, status: (updatedInsps?.length === 0) ? StockStatus.PENDING : row.status };
-          await supabaseService.saveInventoryItem(updatedRow);
-          
-          setData(prev => prev.map(r => r.id === deleteContext.rowId ? updatedRow : r));
+          if (updatedInsps?.length === 0) {
+            await supabaseService.deleteInventoryItem(row.id);
+            setData(prev => prev.filter(r => r.id !== row.id));
+          } else {
+            const updatedRow = { 
+              ...row, 
+              inspections: updatedInsps, 
+              pallets: updatedInsps?.length || 0,
+              status: row.status 
+            };
+            await supabaseService.saveInventoryItem(updatedRow);
+            setData(prev => prev.map(r => r.id === deleteContext.rowId ? updatedRow : r));
+          }
           
           // Auto-reorganize E/F stacks
-          const finalData = data.map(r => r.id === deleteContext.rowId ? updatedRow : r);
+          const finalData = (updatedInsps?.length === 0) 
+            ? data.filter(r => r.id !== row.id)
+            : data.map(r => r.id === deleteContext.rowId ? { ...row, inspections: updatedInsps, pallets: updatedInsps?.length || 0 } : r);
           const finalSlots = inspection.assignedSlot ? slots.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
           performStackReorganization(finalData, finalSlots);
         }
@@ -1356,16 +1412,27 @@ const App: React.FC = () => {
       }
       
       const newInsps = row.inspections?.filter((_, i) => i !== palletIdx);
-      const updatedRow = { ...row, inspections: newInsps, status: (newInsps?.length === 0) ? StockStatus.PENDING : row.status };
-      await supabaseService.saveInventoryItem(updatedRow);
-
-      setData(prev => prev.map(r => r.id === rowId ? updatedRow : r));
+      if (newInsps?.length === 0) {
+        await supabaseService.deleteInventoryItem(rowId);
+        setData(prev => prev.filter(r => r.id !== rowId));
+      } else {
+        const updatedRow = { 
+          ...row, 
+          inspections: newInsps, 
+          pallets: newInsps?.length || 0,
+          status: row.status 
+        };
+        await supabaseService.saveInventoryItem(updatedRow);
+        setData(prev => prev.map(r => r.id === rowId ? updatedRow : r));
+      }
 
       showNotification(`A OP ${row.originOP} foi enviada para matriz com sucesso`);
       setMatrixConfirmContext(null);
 
       // Auto-reorganize E/F stacks
-      const finalData = data.map(r => r.id === rowId ? updatedRow : r);
+      const finalData = (newInsps?.length === 0) 
+        ? data.filter(r => r.id !== rowId)
+        : data.map(r => r.id === rowId ? { ...row, inspections: newInsps, pallets: newInsps?.length || 0 } : r);
       const finalSlots = slotId ? slots.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
       performStackReorganization(finalData, finalSlots);
     } catch (error) {
@@ -1402,26 +1469,43 @@ const App: React.FC = () => {
           
           const newInsps = row.inspections?.filter((_, i) => !rowSelectedIndices.includes(i));
           currentRow.inspections = newInsps;
-          currentRow.status = (newInsps?.length === 0) ? StockStatus.PENDING : row.status;
+          currentRow.pallets = newInsps?.length || 0;
           rowsToUpdate.set(rowId, currentRow);
         }
       }
 
       // Bulk update slots and rows in Supabase
-      await Promise.all([
-        supabaseService.bulkUpdateSlots(updatedSlots),
-        ...Array.from(rowsToUpdate.values()).map(row => supabaseService.saveInventoryItem(row))
-      ]);
+      const slotUpdatePromise = supabaseService.bulkUpdateSlots(updatedSlots);
+      
+      const inventoryUpdatePromises = Array.from(rowsToUpdate.values()).map(row => {
+        if (row.inspections && row.inspections.length === 0) {
+          return supabaseService.deleteInventoryItem(row.id);
+        } else {
+          return supabaseService.saveInventoryItem(row);
+        }
+      });
+
+      await Promise.all([slotUpdatePromise, ...inventoryUpdatePromises]);
 
       setSlots(updatedSlots);
-      setData(prev => prev.map(row => rowsToUpdate.get(row.id) || row));
+      
+      // Update local state: remove rows with 0 inspections
+      setData(prev => {
+        const nextData = prev
+          .map(row => rowsToUpdate.has(row.id) ? rowsToUpdate.get(row.id)! : row)
+          .filter(row => (row.inspections?.length || 0) > 0);
+        return nextData;
+      });
 
-      showNotification(`${selectedPallets.length} pallets enviados para matriz`);
+      showNotification(`${selectedPallets.length} pallets enviados com sucesso`);
       setSelectedPallets([]);
       setIsBulkConfirmOpen(false);
       
       // Auto-reorganize E/F stacks
-      performStackReorganization(data.map(row => rowsToUpdate.get(row.id) || row), updatedSlots);
+      const finalData = data
+        .map(row => rowsToUpdate.has(row.id) ? rowsToUpdate.get(row.id)! : row)
+        .filter(row => (row.inspections?.length || 0) > 0);
+      performStackReorganization(finalData, updatedSlots);
     } catch (error) {
       console.error('Error in bulk send:', error);
       showNotification('Erro ao processar envio em massa no servidor.', 'error');
@@ -1482,20 +1566,28 @@ const App: React.FC = () => {
             const isContainer = slot.status === SlotContent.CONTAINER_SJ || 
                               slot.status === SlotContent.CONTAINER_LP || 
                               slot.status === SlotContent.CONTAINER_CP;
+            const isRotative = slot.status === SlotContent.ROTATIVE;
             const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : 
                                slot.status === SlotContent.BOTTLES ? FlaskConical : 
                                slot.status === SlotContent.FINISHED_PRODUCT ? Truck : 
                                (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? RefreshCw :
                                isContainer ? Container :
+                               isRotative ? TrendingUp :
                                Package;
             
             return (
-              <div key={slot.id} className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative ${
+              <div 
+                key={slot.id} 
+                onClick={() => {
+                  setSelectedMappingSlot(slot);
+                }}
+                className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative cursor-pointer ${
                 slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
                 slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
                 slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
                 isContainer ? 'bg-slate-300/10 border-slate-100/30' :
                 (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'bg-purple-600/10 border-purple-600/30' :
+                isRotative ? 'bg-indigo-600/10 border-indigo-600/30 shadow-[inset_0_0_10px_rgba(79,70,229,0.1)]' :
                 'bg-green-600/10 border-green-600/30'
               }`}>
                 <span className="text-[7px] font-bold text-slate-600 mb-1">{slot.id.split('.').slice(1).join('.')}</span>
@@ -1505,12 +1597,16 @@ const App: React.FC = () => {
                     slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
                     isContainer ? 'text-slate-100' :
                     (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'text-purple-500' :
+                    isRotative ? 'text-indigo-500' :
                     'text-green-500'
                   }`} />
                 ) : (
                   <div className="w-1 h-1 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
                 )}
                 
+                {isRotative && (
+                   <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-slate-950 z-20 shadow-lg"></div>
+                )}
                 {slot.occupiedBy && (
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 transition-opacity border border-slate-700 p-1">
                     <span className="text-[7px] font-bold text-white text-center leading-tight line-clamp-3">{slot.occupiedBy}</span>
@@ -1706,6 +1802,82 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col lg:flex-row font-sans selection:bg-blue-600/30 overflow-x-hidden">
       
+      {/* Slot Actions Modal */}
+      <AnimatePresence>
+        {selectedMappingSlot && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedMappingSlot(null)}
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Ações da Vaga</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Vaga {selectedMappingSlot.id}</p>
+                </div>
+                <button onClick={() => setSelectedMappingSlot(null)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
+                  <X className="w-5 h-5 text-slate-600" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {selectedMappingSlot.status === SlotContent.EMPTY && (
+                  <button 
+                    onClick={() => handleDedicateSlot(selectedMappingSlot)}
+                    className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                  >
+                    <TrendingUp className="w-4 h-4" /> Dedicar ao Rotativo
+                  </button>
+                )}
+
+                {selectedMappingSlot.status === SlotContent.ROTATIVE && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        navigateToTab('rotative');
+                        setSelectedMappingSlot(null);
+                      }}
+                      className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                    >
+                      <Search className="w-4 h-4" /> Ver Estoque Rotativo
+                    </button>
+                    <button 
+                      onClick={() => handleReleaseSlot(selectedMappingSlot)}
+                      className="w-full px-6 py-4 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-500 border border-slate-800 hover:border-red-500/30 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" /> Remover Dedicação
+                    </button>
+                  </>
+                )}
+
+                {![SlotContent.EMPTY, SlotContent.ROTATIVE].includes(selectedMappingSlot.status as any) && (
+                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+                    <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-2 text-center">Ocupado por</p>
+                    <p className="text-white font-black uppercase text-center text-sm">{selectedMappingSlot.occupiedBy || 'N/A'}</p>
+                  </div>
+                )}
+              </div>
+
+              <button 
+                onClick={() => setSelectedMappingSlot(null)}
+                className="w-full px-6 py-4 bg-slate-800 hover:bg-slate-750 text-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
+              >
+                Voltar ao Mapa
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-[90%] md:max-w-sm">
         {notifications.map(n => (
@@ -1740,6 +1912,7 @@ const App: React.FC = () => {
             <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" />
             <NavItem tab="inventory" icon={Package} label="Estoque Geral" />
+            <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" />
             <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} />
             <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" />
             <NavItem tab="import" icon={FileUp} label="Importar CSV" />
@@ -1804,6 +1977,8 @@ const App: React.FC = () => {
                   {activeTab === 'import' && 'Importar CSV'}
                   {activeTab === 'analysis' && 'Análise de Recebimento'}
                   {activeTab === 'history' && 'Histórico'}
+                  {activeTab === 'shipments' && 'Gestão de Carregamentos'}
+                  {activeTab === 'rotative' && 'Estoque Rotativo'}
                 </>
               )}
             </h2>
@@ -2135,6 +2310,24 @@ const App: React.FC = () => {
                         </div>
                     ))
                 )}
+            </div>
+          )}
+
+          {activeTab === 'rotative' && (
+            <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+              <RotativeStockManager 
+                slots={slots}
+                onUpdateSlot={async (slot) => {
+                  try {
+                    await supabaseService.updateSlot(slot);
+                    setSlots(prev => prev.map(s => s.id === slot.id ? slot : s));
+                  } catch (error) {
+                    showNotification('Erro ao atualizar vaga', 'error');
+                  }
+                }}
+                onShowNotification={showNotification}
+                operatorName={user?.name}
+              />
             </div>
           )}
 

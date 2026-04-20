@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem } from '../types';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -60,6 +60,15 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   closed_at TIMESTAMP WITH TIME ZONE
  * );
  * 
+ * CREATE TABLE rotative_stock (
+ *   id TEXT PRIMARY KEY,
+ *   product_name TEXT NOT NULL,
+ *   quantity INTEGER NOT NULL DEFAULT 0,
+ *   slot_id TEXT NOT NULL REFERENCES warehouse_slots(id),
+ *   type TEXT,
+ *   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+ * );
+ * 
  * ALTER TABLE inventory ADD COLUMN shipment_id TEXT REFERENCES shipments(id);
  * 
  * -- 2. Disable RLS (or add policies)
@@ -68,6 +77,7 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  * ALTER TABLE history DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE shipments DISABLE ROW LEVEL SECURITY;
+ * ALTER TABLE rotative_stock DISABLE ROW LEVEL SECURITY;
  */
 
 export const supabaseService = {
@@ -411,6 +421,54 @@ export const supabaseService = {
       
       if (updateError) throw updateError;
     }
+  },
+
+  // Rotative Stock
+  async getRotativeStock(): Promise<RotativeStockItem[]> {
+    const { data, error } = await supabase
+      .from('rotative_stock')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      productName: item.product_name,
+      quantity: item.quantity,
+      slotId: item.slot_id,
+      type: item.type || 'Frasco',
+      updatedAt: item.updated_at
+    }));
+  },
+
+  async saveRotativeStockItem(item: RotativeStockItem) {
+    const { error } = await supabase
+      .from('rotative_stock')
+      .upsert({
+        id: item.id,
+        product_name: item.productName,
+        quantity: item.quantity,
+        slot_id: item.slotId,
+        type: item.type,
+        updated_at: new Date().toISOString()
+      });
+    
+    if (error) throw error;
+  },
+
+  async deleteRotativeStockItem(id: string) {
+    const { error } = await supabase
+      .from('rotative_stock')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  subscribeToRotativeStock(callback: (payload: any) => void) {
+    return supabase
+      .channel('rotative-stock-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rotative_stock' }, callback)
+      .subscribe();
   },
 
   subscribeToShipments(callback: (payload: any) => void) {
