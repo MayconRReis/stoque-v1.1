@@ -719,7 +719,7 @@ const App: React.FC = () => {
           if (slotIdx !== -1) {
             updatedSlots[slotIdx] = {
               ...updatedSlots[slotIdx],
-              status: row.inspections![0].contentType,
+              status: row.inspections?.[0]?.contentType || SlotContent.SUPPLIES,
               occupiedBy: row.originOP || row.description
             };
           }
@@ -803,7 +803,7 @@ const App: React.FC = () => {
 
         updatedSlot = {
           ...targetSlot,
-          status: row.inspections![0].contentType,
+          status: row.inspections?.[0]?.contentType || SlotContent.SUPPLIES,
           occupiedBy: row.originOP || row.description
         };
       }
