@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Boxes
 } from 'lucide-react';
-import { RotativeStockItem, WarehouseSlot, SlotContent } from '../types';
+import { RotativeStockItem, WarehouseSlot, SlotContent, HistoryEntry, HistoryType } from '../types';
 import { supabaseService } from '../services/supabaseService';
 
 interface RotativeStockManagerProps {
@@ -21,18 +21,43 @@ interface RotativeStockManagerProps {
   onUpdateSlot: (slot: WarehouseSlot) => Promise<void>;
   onShowNotification: (message: string, type?: 'info' | 'error') => void;
   operatorName?: string;
+  onAddHistory: (entry: HistoryEntry) => Promise<void>;
 }
+
+const PRODUCT_LIMITS: Record<string, number> = {
+  "FASHION GOLD - ESCOVA PROGRESSIVA - SELANTE 1KG": 500,
+  "FASHION GOLD - ESCOVA PROGRESSIVA - SELANTE 500G": 1000,
+  "FASHION GOLD - ESCOVA PROGRESSIVA - SELANTE 300G": 1500,
+  "FASHION GOLD - ESCOVA PROGRESSIVA - SELANTE 150G": 3000,
+  "TAMPA DISKTOP C/ SELO": 5000,
+  "TAMPA DISKTOP S/ SELO": 5000,
+  "TAMPA DISKTOP P C/ SELO": 5000,
+  "TAMPA DISKTOP P S/SELO": 5000
+};
 
 export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
   slots,
   onUpdateSlot,
   onShowNotification,
-  operatorName
+  operatorName,
+  onAddHistory
 }) => {
+  const getProductLimit = (name: string) => {
+    // Exact match
+    if (PRODUCT_LIMITS[name]) return PRODUCT_LIMITS[name];
+    
+    // Case insensitive match
+    const upperName = name.toUpperCase();
+    const entry = Object.entries(PRODUCT_LIMITS).find(([key]) => key.toUpperCase() === upperName);
+    return entry ? entry[1] : null;
+  };
+
   const [items, setItems] = useState<RotativeStockItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedItemForAction, setSelectedItemForAction] = useState<{item: RotativeStockItem, action: 'add' | 'remove'} | null>(null);
+  const [actionQuantity, setActionQuantity] = useState<number>(0);
   
   // Entry Form State
   const [isEntryMode, setIsEntryMode] = useState(false);
@@ -76,6 +101,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
     }
 
     try {
+      const limit = getProductLimit(productName);
       // Check if product already exists in this slot with SAME TYPE
       const existingItem = items.find(
         i => i.productName.toLowerCase() === productName.toLowerCase() && 
@@ -83,24 +109,79 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
              i.type === productType
       );
 
+      const totalExisting = items
+        .filter(i => i.productName.toLowerCase() === productName.toLowerCase())
+        .reduce((sum, i) => sum + i.quantity, 0);
+
+      if (limit && (totalExisting + quantity) > limit) {
+        onShowNotification(`Limite excedido! O estoque máximo para este produto é ${limit} Un.`, 'error');
+        return;
+      }
+
       const targetSlot = slots.find(s => s.id === selectedSlotId);
 
       if (existingItem) {
         // Update existing
+        const newTotal = existingItem.quantity + quantity;
         await supabaseService.saveRotativeStockItem({
           ...existingItem,
-          quantity: existingItem.quantity + quantity
+          quantity: newTotal
         });
+
+        // Add to history
+        await onAddHistory({
+          id: Math.random().toString(36).substring(2, 9),
+          type: HistoryType.ENTRY,
+          timestamp: new Date().toLocaleString('pt-BR'),
+          loadingId: 'ROTATIVO',
+          description: `Entrada: ${productName} (${productType})`,
+          op: 'ESTOQUE ROTATIVO',
+          lot: productType,
+          palletNumber: 0,
+          totalPallets: 0,
+          slot: selectedSlotId,
+          details: `Adicionado ${quantity} unidades por ${operatorName || 'Sistema'}. Saldo atual: ${newTotal}`,
+          operatorName: operatorName
+        });
+
+        if (limit && newTotal <= (limit / 2)) {
+          onShowNotification(`ALERTA: Estoque de ${productName} atingiu nível crítico (${newTotal}/${limit})`, 'error');
+        } else {
+          onShowNotification(`Entrada de ${quantity}x ${productName} realizada`);
+        }
       } else {
         // Create new
+        const newItemId = Math.random().toString(36).substring(2, 9);
         await supabaseService.saveRotativeStockItem({
-          id: Math.random().toString(36).substring(2, 9),
+          id: newItemId,
           productName,
           quantity,
           slotId: selectedSlotId,
           type: productType,
           updatedAt: new Date().toISOString()
         });
+
+        // Add to history
+        await onAddHistory({
+          id: Math.random().toString(36).substring(2, 9),
+          type: HistoryType.ENTRY,
+          timestamp: new Date().toLocaleString('pt-BR'),
+          loadingId: 'ROTATIVO',
+          description: `Novo Item: ${productName} (${productType})`,
+          op: 'ESTOQUE ROTATIVO',
+          lot: productType,
+          palletNumber: 0,
+          totalPallets: 0,
+          slot: selectedSlotId,
+          details: `Iniciado estoque com ${quantity} unidades por ${operatorName || 'Sistema'}`,
+          operatorName: operatorName
+        });
+
+        if (limit && quantity <= (limit / 2)) {
+          onShowNotification(`ALERTA: Estoque de ${productName} atingiu nível crítico (${quantity}/${limit})`, 'error');
+        } else {
+          onShowNotification(`Entrada de ${quantity}x ${productName} realizada`);
+        }
       }
 
       // Update slot status to ROTATIVE if it was EMPTY
@@ -112,7 +193,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
         });
       }
 
-      onShowNotification(`Entrada de ${quantity}x ${productName} realizada`);
+      if (!existingItem) {
+        if (limit && quantity <= (limit / 2)) {
+          onShowNotification(`ALERTA: Estoque de ${productName} atingiu nível crítico (${quantity}/${limit})`, 'error');
+        } else {
+          onShowNotification(`Entrada de ${quantity}x ${productName} realizada`);
+        }
+      }
       setIsEntryMode(false);
       setProductName('');
       setQuantity(0);
@@ -145,24 +232,28 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
           ...item,
           quantity: newQuantity
         });
-      }
-
-      // Check if slot becomes empty
-      // Need to check updated items list AFTER this operation
-      // Actually, let's refresh and check
-      const updatedData = await supabaseService.getRotativeStock();
-      const remainingInSlot = updatedData.filter(i => i.slotId === slotId).length;
-
-      if (remainingInSlot === 0) {
-        const targetSlot = slots.find(s => s.id === slotId);
-        if (targetSlot) {
-          await onUpdateSlot({
-            ...targetSlot,
-            status: SlotContent.EMPTY,
-            occupiedBy: undefined
-          });
+        
+        const limit = getProductLimit(item.productName);
+        if (limit && newQuantity <= (limit / 2)) {
+          onShowNotification(`ALERTA: Estoque de ${item.productName} está abaixo de 50%! (${newQuantity}/${limit})`, 'error');
         }
       }
+
+      // Add to history
+      await onAddHistory({
+        id: Math.random().toString(36).substring(2, 9),
+        type: HistoryType.EXIT,
+        timestamp: new Date().toLocaleString('pt-BR'),
+        loadingId: 'ROTATIVO',
+        description: `Saída: ${item.productName} (${item.type})`,
+        op: 'ESTOQUE ROTATIVO',
+        lot: item.type,
+        palletNumber: 0,
+        totalPallets: 0,
+        slot: item.slotId,
+        details: `Retirado ${exitQty} unidades por ${operatorName || 'Sistema'}. Saldo atual: ${newQuantity}`,
+        operatorName: operatorName
+      });
 
       onShowNotification(`Saída de ${exitQty}x ${item.productName} realizada`);
       loadItems();
@@ -256,44 +347,49 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
 
               <div className="space-y-2 pt-2">
                 {slotItems.map(item => (
-                  <div key={item.id} className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 group/item hover:border-slate-700 transition-all">
+                  <div 
+                    key={item.id} 
+                    onClick={() => {
+                      setSelectedItemForAction({ item, action: 'add' });
+                      setActionQuantity(0);
+                    }}
+                    className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 group/item hover:border-blue-500/50 transition-all cursor-pointer relative"
+                  >
                     <div className="flex justify-between items-start mb-2">
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[8px] px-2 py-0.5 bg-blue-600/10 text-blue-500 border border-blue-500/20 rounded font-black uppercase tracking-widest">{item.type}</span>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Produto</p>
+                          {getProductLimit(item.productName) && (
+                            <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest border ${
+                              item.quantity <= (getProductLimit(item.productName)! / 2) 
+                                ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' 
+                                : 'bg-slate-800 text-slate-500 border-slate-700'
+                            }`}>
+                              Limite: {getProductLimit(item.productName)}
+                            </span>
+                          )}
                         </div>
                         <h4 className="text-white font-black uppercase text-xs sm:text-sm leading-tight">{item.productName}</h4>
+                        {getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <AlertCircle className="w-3 h-3 text-red-500" />
+                            <span className="text-[9px] text-red-500 font-bold uppercase tracking-tight">Estoque Crítico (Abaixo de 50%)</span>
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Saldo</p>
-                        <p className="text-lg font-black text-white italic">{item.quantity} <span className="text-[10px] text-slate-600 px-1 font-normal tracking-normal not-italic">Un</span></p>
+                        <p className={`text-lg font-black italic transition-colors ${
+                          getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) ? 'text-red-500' : 'text-white'
+                        }`}>
+                          {item.quantity} <span className="text-[10px] text-slate-600 px-1 font-normal tracking-normal not-italic">Un</span>
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/30">
-                      <button 
-                        onClick={() => {
-                          const qty = prompt(`Quantas unidades de ${item.productName} deseja retirar?`, '1');
-                          if (qty) handleExit(item.id, parseInt(qty));
-                        }}
-                        className="p-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-500/20"
-                        title="Retirar do estoque"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const qty = prompt(`Quantas unidades de ${item.productName} deseja adicionar?`, '1');
-                          if (qty) {
-                            // Update item logic shortcut
-                            handleEntryShortcut(item.slotId, item.productName, parseInt(qty));
-                          }
-                        }}
-                        className="p-2 bg-green-600/10 text-green-500 rounded-lg hover:bg-green-600 hover:text-white transition-all border border-green-500/20"
-                        title="Adicionar mais"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="text-[9px] text-slate-600 font-bold uppercase tracking-tight opacity-0 group-hover/item:opacity-100 transition-opacity">
+                        Clique para ajustar saldo
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -413,6 +509,106 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
             </motion.div>
           </div>
         )}
+
+        {selectedItemForAction && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedItemForAction(null)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
+                  selectedItemForAction.action === 'add' ? 'bg-green-600/10 text-green-500 border-green-500/20' : 'bg-red-600/10 text-red-500 border-red-500/20'
+                }`}>
+                  {selectedItemForAction.action === 'add' ? <Plus className="w-7 h-7" /> : <Minus className="w-7 h-7" />}
+                </div>
+                <h3 className="text-white font-black uppercase text-lg italic tracking-tight leading-tight">
+                  {selectedItemForAction.action === 'add' ? 'Adicionar Saldo' : 'Retirar Saldo'}
+                </h3>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{selectedItemForAction.item.productName}</p>
+                <div className="flex justify-center gap-1 mt-1">
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-black tracking-widest">Saldo: {selectedItemForAction.item.quantity}</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-center items-center gap-4">
+                  <button 
+                    onClick={() => setActionQuantity(q => Math.max(0, q - 1))}
+                    className="w-12 h-12 bg-slate-800 text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
+                  >
+                    <Minus className="w-5 h-5" />
+                  </button>
+                  <input 
+                    type="number"
+                    value={actionQuantity || ''}
+                    onChange={(e) => setActionQuantity(parseInt(e.target.value) || 0)}
+                    className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-2 py-3 text-white font-black text-center text-xl focus:border-blue-500 outline-none transition-all"
+                  />
+                  <button 
+                    onClick={() => setActionQuantity(q => q + 1)}
+                    className="w-12 h-12 bg-slate-800 text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setSelectedItemForAction(prev => prev ? { ...prev, action: 'remove' } : null)}
+                    className={`py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                      selectedItemForAction.action === 'remove' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'bg-slate-800 text-slate-500 hover:text-white'
+                    }`}
+                  >
+                    Saída
+                  </button>
+                  <button 
+                    onClick={() => setSelectedItemForAction(prev => prev ? { ...prev, action: 'add' } : null)}
+                    className={`py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                      selectedItemForAction.action === 'add' ? 'bg-green-600 text-white shadow-lg shadow-green-900/40' : 'bg-slate-800 text-slate-500 hover:text-white'
+                    }`}
+                  >
+                    Entrada
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button 
+                  onClick={() => setSelectedItemForAction(null)}
+                  className="flex-1 py-4 bg-slate-800 text-slate-500 font-black text-[10px] uppercase rounded-2xl hover:text-white transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (actionQuantity <= 0) return;
+                    if (selectedItemForAction.action === 'add') {
+                      await handleEntryShortcut(selectedItemForAction.item.slotId, selectedItemForAction.item.productName, actionQuantity, selectedItemForAction.item.type);
+                    } else {
+                      await handleExit(selectedItemForAction.item.id, actionQuantity);
+                    }
+                    setSelectedItemForAction(null);
+                  }}
+                  className={`flex-1 py-4 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95 ${
+                    selectedItemForAction.action === 'add' ? 'bg-green-600 shadow-green-900/40' : 'bg-red-600 shadow-red-900/40'
+                  }`}
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -428,16 +624,48 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
 
   const handleEntryWithParams = async (pName: string, qty: number, sId: string, pType: string) => {
     try {
+      const limit = getProductLimit(pName);
+      const totalExisting = items
+        .filter(i => i.productName.toLowerCase() === pName.toLowerCase())
+        .reduce((sum, i) => sum + i.quantity, 0);
+
+      if (limit && (totalExisting + qty) > limit) {
+        onShowNotification(`Limite excedido para ${pName}! Máximo permitido: ${limit} Un.`, 'error');
+        return;
+      }
+
       const existingItem = items.find(
         i => i.productName.toLowerCase() === pName.toLowerCase() && i.slotId === sId && i.type === pType
       );
 
       if (existingItem) {
+        const newTotal = existingItem.quantity + qty;
         await supabaseService.saveRotativeStockItem({
           ...existingItem,
-          quantity: existingItem.quantity + qty
+          quantity: newTotal
         });
-        onShowNotification(`Adicionado ${qty}x ${pName} à vaga ${sId}`);
+
+        // Add to history
+        await onAddHistory({
+          id: Math.random().toString(36).substring(2, 9),
+          type: HistoryType.ENTRY,
+          timestamp: new Date().toLocaleString('pt-BR'),
+          loadingId: 'ROTATIVO',
+          description: `Entrada: ${pName} (${pType})`,
+          op: 'ESTOQUE ROTATIVO',
+          lot: pType,
+          palletNumber: 0,
+          totalPallets: 0,
+          slot: sId,
+          details: `Adicionado ${qty} unidades por ${operatorName || 'Sistema'}. Saldo atual: ${newTotal}`,
+          operatorName: operatorName
+        });
+
+        if (limit && newTotal <= (limit / 2)) {
+          onShowNotification(`ALERTA: Estoque de ${pName} está em nível crítico!`, 'error');
+        } else {
+          onShowNotification(`Adicionado ${qty}x ${pName} à vaga ${sId}`);
+        }
         loadItems();
       }
     } catch (error) {

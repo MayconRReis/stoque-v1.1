@@ -311,6 +311,9 @@ const App: React.FC = () => {
           });
 
           const sanitizedSlots = allSlots.map(slot => {
+            // Keep dedicated rotative slots as they are
+            if (slot.status === SlotContent.ROTATIVE) return slot;
+
             const inventoryInfo = occupiedSlotsMap.get(slot.id);
             if (inventoryInfo) {
               return {
@@ -340,6 +343,9 @@ const App: React.FC = () => {
           });
 
           const sanitizedSlots = slotData.map(slot => {
+            // Keep dedicated rotative slots as they are
+            if (slot.status === SlotContent.ROTATIVE) return slot;
+
             const inventoryInfo = occupiedSlotsMap.get(slot.id);
             if (inventoryInfo) {
               return {
@@ -2327,6 +2333,7 @@ const App: React.FC = () => {
                 }}
                 onShowNotification={showNotification}
                 operatorName={user?.name}
+                onAddHistory={addToHistory}
               />
             </div>
           )}

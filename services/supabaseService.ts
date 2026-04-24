@@ -40,6 +40,7 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   total_pallets INTEGER,
  *   slot TEXT,
  *   details TEXT,
+ *   operator_name TEXT,
  *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
  * 
