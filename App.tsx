@@ -1685,13 +1685,13 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Entradas Pendentes */}
+        {/* Aguardando Análise */}
         <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-red-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('analysis')}>
           <div className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
-            <Truck className="w-5 h-5" />
+            <ClipboardCheck className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Pendentes</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Análise</p>
             <p className="text-2xl font-black text-white tracking-tight">{stats.pendingEntries}</p>
           </div>
         </div>
