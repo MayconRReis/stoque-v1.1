@@ -1713,18 +1713,18 @@ const App: React.FC = () => {
             <RefreshCw className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Vaga</p>
             <p className="text-2xl font-black text-white tracking-tight">{stats.waitingPallets}</p>
           </div>
         </div>
 
-        {/* Expedidos */}
+        {/* Carregamentos */}
         <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-fuchsia-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('shipments')}>
           <div className="w-10 h-10 bg-fuchsia-600/10 text-fuchsia-500 rounded-xl flex items-center justify-center border border-fuchsia-500/20 group-hover:scale-110 transition-transform">
             <Truck className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Expedidos (24h)</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Carregamentos (24h)</p>
             <p className="text-2xl font-black text-white tracking-tight">{stats.finishedShipments24h}</p>
           </div>
         </div>
@@ -2109,7 +2109,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex gap-4">
                       <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span></div>
-                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Aguardando</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Aguardando Vaga</span></div>
                     </div>
                   </div>
                   <div className="space-y-6">
