@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { WarehouseSlot, SlotContent, SheetRow, StockStatus, translateSlotContent } from '../types';
 import { FileUp, Upload, Check, CheckCircle2, FileText, AlertCircle, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ImportPageProps {
   availableSlots: WarehouseSlot[];

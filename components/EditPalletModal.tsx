@@ -15,7 +15,7 @@ import {
   Container,
   Warehouse
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface EditPalletModalProps {
   isOpen: boolean;

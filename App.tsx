@@ -470,7 +470,17 @@ const App: React.FC = () => {
     });
   };
 
+  const getContainerColor = (contentType?: SlotContent) => {
+    switch (contentType) {
+      case SlotContent.CONTAINER_LP: return 'text-slate-100';
+      case SlotContent.CONTAINER_SJ: return 'text-orange-900';
+      case SlotContent.CONTAINER_CP: return 'text-fuchsia-500';
+      default: return 'text-slate-100';
+    }
+  };
+
   const performStackReorganization = async (currentData: SheetRow[], currentSlots: WarehouseSlot[]) => {
+    // Re-enabled but will be carefully applied
     const racksToProcess: ('E' | 'F')[] = ['E', 'F'];
     let newData = [...currentData];
     let newSlots = [...currentSlots];
@@ -500,6 +510,14 @@ const App: React.FC = () => {
         });
 
         if (stackPallets.length === 0) return;
+
+        // Skip reorganization for container stacks as per user request
+        const hasContainer = stackPallets.some(p => 
+          p.insp.contentType === SlotContent.CONTAINER_SJ || 
+          p.insp.contentType === SlotContent.CONTAINER_LP || 
+          p.insp.contentType === SlotContent.CONTAINER_CP
+        );
+        if (hasContainer) return;
 
         // Sort by CURRENT level (bottom to top)
         stackPallets.sort((a, b) => a.level - b.level);
@@ -1595,6 +1613,9 @@ const App: React.FC = () => {
             const isContainer = slot.status === SlotContent.CONTAINER_SJ || 
                               slot.status === SlotContent.CONTAINER_LP || 
                               slot.status === SlotContent.CONTAINER_CP;
+            
+            const containerColor = getContainerColor(slot.status);
+
             const isRotative = slot.status === SlotContent.ROTATIVE;
             const ContentIcon = slot.status === SlotContent.EMPTY ? undefined : 
                                slot.status === SlotContent.BOTTLES ? FlaskConical : 
@@ -1624,7 +1645,7 @@ const App: React.FC = () => {
                   <ContentIcon className={`w-3.5 h-3.5 ${
                     slot.status === SlotContent.BOTTLES ? 'text-blue-500' : 
                     slot.status === SlotContent.SUPPLIES ? 'text-amber-500' :
-                    isContainer ? 'text-slate-100' :
+                    isContainer ? containerColor :
                     (slot.status === SlotContent.REWORK || slot.status === SlotContent.REPROCESS) ? 'text-purple-500' :
                     isRotative ? 'text-indigo-500' :
                     'text-green-500'
@@ -2474,6 +2495,9 @@ const App: React.FC = () => {
                             const isContainer = insp.contentType === SlotContent.CONTAINER_SJ || 
                                               insp.contentType === SlotContent.CONTAINER_LP || 
                                               insp.contentType === SlotContent.CONTAINER_CP;
+                            
+                            const containerColor = getContainerColor(insp.contentType);
+
                             const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : 
                                                insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
                                                (isRework || isReprocess) ? RefreshCw :
@@ -2498,7 +2522,7 @@ const App: React.FC = () => {
                                         insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : 
                                         insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 
                                         (isRework || isReprocess) ? 'text-purple-400' :
-                                        isContainer ? 'text-slate-100' :
+                                        isContainer ? containerColor :
                                         'text-green-500'
                                       }`}>
                                         <ContentIcon className="w-5 h-5" />

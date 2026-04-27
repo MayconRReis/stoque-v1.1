@@ -12,7 +12,7 @@ import {
   Hash,
   ArrowRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ShipmentDetailModalProps {
   isOpen: boolean;

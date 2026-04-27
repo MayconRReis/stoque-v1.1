@@ -10,7 +10,7 @@ import {
   Package,
   AlertCircle
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 interface ShipmentPageProps {
   shipments: Shipment[];

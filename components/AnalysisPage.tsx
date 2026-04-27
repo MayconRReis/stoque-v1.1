@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../types';
 import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface AnalysisPageProps {
   pendingItems: SheetRow[];
@@ -32,7 +32,8 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     } else if (contentType === SlotContent.FINISHED_PRODUCT) {
       suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
     } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
-      suggestedSlot = availableSlots.find(s => s.rack === 'E' || s.rack === 'F')?.id;
+      // Disabled by user request: "remover função de substituição de vaga automática dos containers"
+      suggestedSlot = undefined;
     }
     setSlotId(suggestedSlot || (availableSlots.length > 0 ? availableSlots[0].id : ''));
   };
@@ -91,6 +92,12 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                                isContainer ? Container :
                                Box;
             
+            const containerColor = 
+              insp?.contentType === SlotContent.CONTAINER_LP ? 'text-slate-100' :
+              insp?.contentType === SlotContent.CONTAINER_SJ ? 'text-orange-900' : // Brown
+              insp?.contentType === SlotContent.CONTAINER_CP ? 'text-fuchsia-500' : 
+              'text-slate-100';
+
             return (
               <motion.div 
                 layout
@@ -101,10 +108,10 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
                     insp?.contentType === SlotContent.BOTTLES ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' : 
                     insp?.contentType === SlotContent.FINISHED_PRODUCT ? 'bg-green-600/10 text-green-500 border-green-500/20' : 
-                    isContainer ? 'bg-slate-300/10 text-slate-100 border-slate-100/20' :
+                    isContainer ? 'bg-slate-300/10 border-slate-100/20' :
                     'bg-amber-600/10 text-amber-500 border-amber-500/20'
                   }`}>
-                    <ContentIcon className="w-5 h-5" />
+                    <ContentIcon className={`w-5 h-5 ${isContainer ? containerColor : ''}`} />
                   </div>
                   <span className="bg-amber-500/10 text-amber-500 text-[8px] font-black px-2.5 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Pendente</span>
                 </div>

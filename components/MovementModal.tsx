@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
 import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check, ClipboardCheck, Warehouse, Search } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface MovementModalProps {
   isOpen: boolean;
@@ -114,7 +114,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
       } else if (contentType === SlotContent.FINISHED_PRODUCT) {
         suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14);
       } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
-        suggestedSlot = availableSlots.find(s => s.rack === 'E' || s.rack === 'F');
+        // Disabled by user request: "remover função de substituição de vaga automática dos containers"
+        suggestedSlot = undefined;
       } else {
         suggestedSlot = availableSlots.find(s => {
           const isBottleRange = s.rack === 'A' && s.position <= 16;

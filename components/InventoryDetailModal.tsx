@@ -44,7 +44,9 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-3 ${
                 isBottles ? 'bg-blue-600 shadow-blue-900/40' : 
                 isFinished ? 'bg-green-600 shadow-green-900/40' :
-                isContainer ? 'bg-slate-300 shadow-slate-900/40' :
+                inspection.contentType === SlotContent.CONTAINER_LP ? 'bg-slate-300 shadow-slate-900/40' :
+                inspection.contentType === SlotContent.CONTAINER_SJ ? 'bg-orange-900 shadow-orange-900/40' :
+                inspection.contentType === SlotContent.CONTAINER_CP ? 'bg-fuchsia-600 shadow-fuchsia-900/40' :
                 isSupplies ? 'bg-indigo-600 shadow-indigo-900/40' :
                 isUseConsumption ? 'bg-purple-600 shadow-purple-900/40' :
                 (isRework || isReprocess) ? 'bg-purple-600 shadow-purple-900/40' :

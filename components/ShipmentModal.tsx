@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   ArrowRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ShipmentModalProps {
   isOpen: boolean;
