@@ -121,6 +121,7 @@ export interface DashboardStats {
   totalBottles: number;
   waitingPallets: number;
   finishedShipments24h: number;
+  openShipmentsCount: number;
 }
 
 export const translateSlotContent = (content: SlotContent): string => {

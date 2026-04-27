@@ -115,7 +115,7 @@ const App: React.FC = () => {
   
   // Selection and Search State
   const [inventorySearch, setInventorySearch] = useState('');
-  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL'>('ALL');
+  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL' | 'CONTAINER'>('ALL');
   const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
   const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
@@ -1058,6 +1058,22 @@ const App: React.FC = () => {
       await supabaseService.saveShipment(newShipment);
       await supabaseService.updateInventoryShipment(selections, newShipment.id);
       
+      // Update local state immediately
+      setShipments(prev => {
+        const exists = prev.find(s => s.id === newShipment.id);
+        if (exists) return prev;
+        return [newShipment, ...prev];
+      });
+      
+      // Force refresh of the whole state to ensure consistency across tabs
+      const [invData, shipmentsData] = await Promise.all([
+        supabaseService.getInventory(),
+        supabaseService.getShipments()
+      ]);
+      
+      setData(invData);
+      setShipments(shipmentsData);
+      
       supabaseService.broadcastNotification({
         user: user?.id || '',
         message: `Novo carregamento criado: ${newShipment.id}`,
@@ -1080,6 +1096,11 @@ const App: React.FC = () => {
       });
 
       await supabaseService.updateInventoryShipment(selections, shipmentId);
+      
+      // Update local inventory state
+      const updatedInv = await supabaseService.getInventory();
+      setData(updatedInv);
+      
       showNotification(`Pallets adicionados ao carregamento ${shipmentId}!`);
       setSelectedPallets([]);
     } catch (error: any) {
@@ -1241,6 +1262,7 @@ const App: React.FC = () => {
       return acc + rowBottles;
     }, 0);
 
+    const openShipmentsCount = shipments.filter(s => s.status === ShipmentStatus.OPEN).length;
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const finishedShipmentsCount = shipments.filter(s => 
@@ -1258,7 +1280,8 @@ const App: React.FC = () => {
       occupiedSlots: occupied,
       totalBottles,
       waitingPallets: waitingPalletsCount,
-      finishedShipments24h: finishedShipmentsCount
+      finishedShipments24h: finishedShipmentsCount,
+      openShipmentsCount
     };
   }, [slots, history, data, shipments]);
 
@@ -1724,8 +1747,11 @@ const App: React.FC = () => {
             <Truck className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Carregamentos (24h)</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stats.finishedShipments24h}</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Carregamentos</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-2xl font-black text-white tracking-tight">{stats.openShipmentsCount}</p>
+              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Em Aberto</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1748,7 +1774,9 @@ const App: React.FC = () => {
           item.id.toLowerCase().includes(term);
         
         // Type filter check
-        const matchesType = inventoryTypeFilter === 'ALL' || insp.contentType === inventoryTypeFilter;
+        const matchesType = inventoryTypeFilter === 'ALL' || 
+          insp.contentType === inventoryTypeFilter ||
+          (inventoryTypeFilter === 'CONTAINER' && [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType));
 
         if (matchesSearch && matchesType) {
           allPallets.push({ row: item, inspection: insp, idx });
@@ -2057,7 +2085,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Occupancy Progress Bar */}
-                <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3">
+                <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
                   <div className="flex justify-between items-end">
                     <div>
                       <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Utilização do Armazém G0</h4>
@@ -2079,18 +2107,23 @@ const App: React.FC = () => {
                   <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${stats.occupancyRate}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={`h-full rounded-full shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all ${
-                        stats.occupancyRate > 90 ? 'bg-red-500 shadow-red-900/40' : 
-                        stats.occupancyRate > 75 ? 'bg-amber-500 shadow-amber-900/40' : 
+                      animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
+                      transition={{ duration: 1.5, ease: "easeOut" }}
+                      className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.2)] ${
+                        stats.occupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
+                        stats.occupancyRate > 80 ? 'bg-amber-500' : 
                         'bg-blue-600'
                       }`}
                     />
+                    {stats.occupancyRate > 100 && (
+                      <div className="absolute inset-0 bg-red-600/10 pointer-events-none animate-pulse" />
+                    )}
                   </div>
                   <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                    <span>0%</span>
-                    <span>{stats.occupiedSlots} / {stats.totalSlots} Vagas</span>
+                    <span>Vazio</span>
+                    <span className={stats.occupancyRate > 90 ? 'text-red-500' : 'text-slate-500'}>
+                      {stats.occupiedSlots} / {stats.totalSlots} Vagas
+                    </span>
                     <span>100%</span>
                   </div>
                 </div>
@@ -2116,7 +2149,12 @@ const App: React.FC = () => {
                     {['A', 'B', 'C', 'D', 'E', 'F'].map(rack => {
                       const rackSlots = slots.filter(s => s.rack === rack);
                       const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
-                      const total = 32; // Fixed limit as requested
+                      const totalCapacities: Record<string, number> = {
+                        A: 48, B: 48, C: 48,
+                        D: 54,
+                        E: 45, F: 45
+                      };
+                      const total = totalCapacities[rack] || 32;
                       const rate = Math.round((occupied / total) * 100);
                       const color = 
                         rack === 'A' ? 'bg-blue-600' : 
@@ -2131,18 +2169,14 @@ const App: React.FC = () => {
                             <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Porta Pallet {rack}</span>
                             <span className="text-[10px] font-black text-slate-400">{rate}% ({occupied}/{total})</span>
                           </div>
-                          <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                          <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${Math.min(rate, 100)}%` }}
                               className={`h-full ${color} rounded-full`}
                             />
                             {rate > 100 && (
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${rate - 100}%` }}
-                                className="h-full bg-red-500 rounded-full opacity-50 absolute top-0 left-0"
-                              />
+                              <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-red-600/40 to-transparent animate-pulse" />
                             )}
                           </div>
                         </div>
@@ -2159,7 +2193,7 @@ const App: React.FC = () => {
                         <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
                            <motion.div 
                               initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((stats.waitingPallets / 32) * 100, 100)}%` }}
+                              animate={{ width: `${Math.min((stats.waitingPallets / 45) * 100, 100)}%` }}
                               className="h-full bg-purple-600 rounded-full animate-pulse"
                            />
                         </div>
@@ -2362,7 +2396,9 @@ const App: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <Filter className={`w-4 h-4 ${inventoryTypeFilter !== 'ALL' ? 'text-blue-500' : 'text-slate-500'}`} />
                           <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-white' : 'text-slate-500'}`}>
-                            {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : translateSlotContent(inventoryTypeFilter as SlotContent)}
+                            {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : 
+                             inventoryTypeFilter === 'CONTAINER' ? 'Container (SJ/LP/CP)' : 
+                             translateSlotContent(inventoryTypeFilter as SlotContent)}
                           </span>
                         </div>
                         <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-300 ${isInventoryFilterOpen ? 'rotate-180' : ''}`} />
@@ -2378,9 +2414,7 @@ const App: React.FC = () => {
                                 { value: SlotContent.BOTTLES, label: 'Frasco' },
                                 { value: SlotContent.SUPPLIES, label: 'Insumo' },
                                 { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
-                                { value: SlotContent.CONTAINER_SJ, label: 'Container SJ' },
-                                { value: SlotContent.CONTAINER_LP, label: 'Container LP' },
-                                { value: SlotContent.CONTAINER_CP, label: 'Container CP' },
+                                { value: 'CONTAINER', label: 'Container (SJ/LP/CP)' },
                                 { value: SlotContent.REWORK, label: 'Retrabalho' },
                                 { value: SlotContent.REPROCESS, label: 'Reprocesso' },
                                 { value: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' },
