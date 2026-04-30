@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
 import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check, ClipboardCheck, Warehouse, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatOP } from '../lib/formatters';
 
 interface MovementModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface MovementModalProps {
   availableSlots: WarehouseSlot[];
   occupiedSlots: WarehouseSlot[];
   inventoryData: SheetRow[];
+  history: any[];
 }
 
 export const MovementModal: React.FC<MovementModalProps> = ({ 
@@ -22,7 +24,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   onExit,
   availableSlots,
   occupiedSlots,
-  inventoryData
+  inventoryData,
+  history
 }) => {
   const [type, setType] = useState<'entry' | 'transfer' | 'exit'>('entry');
 
@@ -81,21 +84,53 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     }
   }, [transferId, type, inventoryData]);
 
-  // Auto-fill for Finished Product based on OP
+  // Auto-fill based on OP
   useEffect(() => {
-    if (type === 'entry' && contentType === SlotContent.FINISHED_PRODUCT && op.trim().length >= 3) {
-      const existingItem = inventoryData.find(item => item.originOP === op);
-      if (existingItem) {
-        setName(existingItem.description);
-        setLot(existingItem.lot);
+    if (type === 'entry' && op.trim().length >= 3) {
+      // 1. Try to find in current inventory first (most relevant)
+      const existingInInventory = inventoryData.find(item => item.originOP === formatOP(op));
+      
+      if (existingInInventory) {
+        setName(existingInInventory.description);
+        setLot(existingInInventory.lot);
         setIsAutoFilled(true);
+        // If it's a known product, suggest content type if possible
+        if (existingInInventory.inspections?.[0]?.contentType) {
+          setContentType(existingInInventory.inspections[0].contentType);
+        }
+        return;
+      }
+
+      // 2. Try to find in history (recent entries)
+      const formattedOP = formatOP(op);
+      const existingInHistory = history.find(entry => formatOP(entry.op) === formattedOP);
+
+      if (existingInHistory) {
+        setName(existingInHistory.description);
+        setLot(existingInHistory.lot);
+        setIsAutoFilled(true);
+        
+        // Try to infer content type from details or translation
+        if (existingInHistory.details?.toUpperCase().includes('PRODUTO ACABADO')) {
+          setContentType(SlotContent.FINISHED_PRODUCT);
+        } else if (existingInHistory.details?.toUpperCase().includes('INSUMO')) {
+          setContentType(SlotContent.SUPPLIES);
+        } else if (existingInHistory.details?.toUpperCase().includes('FRASCO')) {
+          setContentType(SlotContent.BOTTLES);
+        } else if (existingInHistory.details?.toUpperCase().includes('CONTAINER SJ')) {
+          setContentType(SlotContent.CONTAINER_SJ);
+        } else if (existingInHistory.details?.toUpperCase().includes('CONTAINER LP')) {
+          setContentType(SlotContent.CONTAINER_LP);
+        } else if (existingInHistory.details?.toUpperCase().includes('CONTAINER CP')) {
+          setContentType(SlotContent.CONTAINER_CP);
+        }
       } else {
         setIsAutoFilled(false);
       }
     } else {
       setIsAutoFilled(false);
     }
-  }, [op, contentType, type, inventoryData]);
+  }, [op, type, inventoryData, history]);
 
   // Suggest next free slot based on content type
   useEffect(() => {
@@ -171,9 +206,9 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     onEntry({
       id: randomId,
-      op,
-      name,
-      lot,
+      op: formatOP(op),
+      name: name.toUpperCase(),
+      lot: lot.toUpperCase(),
       quantity: finalQuantity,
       contentType,
       slotId,
@@ -182,14 +217,16 @@ export const MovementModal: React.FC<MovementModalProps> = ({
         caps: capsCount,
         boxes: boxesCount,
         cradles: cradlesCount,
-        others: others.filter(o => o.name && o.quantity > 0)
+        others: others
+          .filter(o => o.name && o.quantity > 0)
+          .map(o => ({ ...o, name: o.name.toUpperCase() }))
       } : null
     });
   };
 
   const handleTransferSubmit = () => {
     onTransfer({
-      id: transferId,
+      id: transferId.toUpperCase(),
       fromSlot,
       toSlot
     });
@@ -197,8 +234,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
   const handleExitSubmit = () => {
     onExit({
-      id: exitId,
-      reason: exitReason
+      id: exitId.toUpperCase(),
+      reason: exitReason.toUpperCase()
     });
   };
 

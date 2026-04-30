@@ -2689,6 +2689,7 @@ const App: React.FC = () => {
           onClose={() => setEditPalletContext(null)}
           pallet={editPalletContext}
           onSave={handleUpdatePallet}
+          history={history}
         />
       )}
 
@@ -2729,6 +2730,7 @@ const App: React.FC = () => {
         availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
         occupiedSlots={slots.filter(s => s.status !== SlotContent.EMPTY)}
         inventoryData={data}
+        history={history}
       />
     </div>
   );

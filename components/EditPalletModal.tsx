@@ -13,9 +13,11 @@ import {
   Truck,
   Box,
   Container,
-  Warehouse
+  Warehouse,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatOP } from '../lib/formatters';
 
 interface EditPalletModalProps {
   isOpen: boolean;
@@ -35,14 +37,16 @@ interface EditPalletModalProps {
     }
   }) => void;
   pallet: { row: SheetRow; inspection: InspectionData; idx: number } | null;
+  history: any[];
 }
 
-export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClose, onSave, pallet }) => {
+export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClose, onSave, pallet, history }) => {
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
   const [quantity, setQuantity] = useState(0);
   const [contentType, setContentType] = useState<SlotContent>(SlotContent.BOTTLES);
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
   
   // Supply Details State
   const [bottles, setBottles] = useState(0);
@@ -64,15 +68,33 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
       setBoxes(pallet.inspection.boxes || 0);
       setCradles(pallet.inspection.cradles || 0);
       setOthers(pallet.inspection.others?.map(o => ({ ...o, id: Math.random().toString(36).substring(2, 9) })) || []);
+      setIsAutoFilled(false);
     }
   }, [pallet]);
+
+  // Auto-fill based on OP
+  useEffect(() => {
+    if (op.trim().length >= 3 && history) {
+      const formattedOP = formatOP(op);
+      const existingInHistory = history.find(entry => formatOP(entry.op) === formattedOP);
+
+      if (existingInHistory) {
+        // Only auto-fill if the current description is empty or much smaller
+        if (!description || description.length < 5) {
+          setDescription(existingInHistory.description);
+          setLot(existingInHistory.lot || lot);
+          setIsAutoFilled(true);
+        }
+      }
+    }
+  }, [op, history]);
 
   const addOther = () => {
     setOthers([...others, { id: Math.random().toString(36).substring(2, 9), name: '', quantity: 0 }]);
   };
 
   const updateOther = (id: string, field: 'name' | 'quantity', value: string | number) => {
-    setOthers(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    setOthers(prev => prev.map(item => item.id === id ? { ...item, [field]: field === 'name' ? (value as string).toUpperCase() : value } : item));
   };
 
   const removeOther = (id: string) => {
@@ -83,9 +105,9 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
 
   const handleSave = () => {
     onSave({
-      description,
-      op,
-      lot,
+      description: description.toUpperCase(),
+      op: formatOP(op),
+      lot: lot.toUpperCase(),
       quantity,
       contentType,
       supplyDetails: contentType === SlotContent.SUPPLIES ? {
@@ -93,7 +115,9 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
         caps,
         boxes,
         cradles,
-        others: others.filter(o => o.name && o.quantity > 0).map(({ id, ...rest }) => rest)
+        others: others
+          .filter(o => o.name && o.quantity > 0)
+          .map(({ id, name, ...rest }) => ({ ...rest, name: name.toUpperCase() }))
       } : undefined
     });
   };
@@ -170,12 +194,20 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
               <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                 <Hash className="w-3 h-3" /> OP
               </label>
-              <input 
-                type="text" 
-                value={op}
-                onChange={e => setOp(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
-              />
+              <div className="relative group">
+                <input 
+                  type="text" 
+                  value={op}
+                  onChange={e => setOp(e.target.value)}
+                  className={`w-full bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-800'} rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all`}
+                />
+                {isAutoFilled && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 flex items-center gap-1 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
+                    <Check className="w-2.5 h-2.5" />
+                    <span className="text-[7px] font-black uppercase tracking-tighter">Auto</span>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">

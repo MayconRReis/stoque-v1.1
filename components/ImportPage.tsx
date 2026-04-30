@@ -4,6 +4,7 @@ import Papa from 'papaparse';
 import { WarehouseSlot, SlotContent, SheetRow, StockStatus, translateSlotContent } from '../types';
 import { FileUp, Upload, Check, CheckCircle2, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatOP } from '../lib/formatters';
 
 interface ImportPageProps {
   availableSlots: WarehouseSlot[];
@@ -34,9 +35,9 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
         const parsedData = results.data as any[];
         
         const mappedItems = parsedData.map((row, index) => {
-          const op = row.op || row.OP || '';
-          const nome = row.nome || row.NOME || row.description || '';
-          const lote = row.lote || row.LOTE || '';
+          const op = formatOP(row.op || row.OP || '');
+          const nome = (row.nome || row.NOME || row.description || '').toUpperCase();
+          const lote = (row.lote || row.LOTE || '').toUpperCase();
           const quantidade = row.quantidade || row.QUANTIDADE || '1';
           const tipo = (row.tipo || row.TIPO || '').toUpperCase();
 

@@ -42,7 +42,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     if (!selectedItem || !slotId || !finalId) return;
     setIsProcessing(true);
     try {
-      await onConfirm(selectedItem.id, slotId, finalId);
+      await onConfirm(selectedItem.id, slotId, finalId.toUpperCase());
       setSelectedItem(null);
       setSlotId('');
       setFinalId('');
