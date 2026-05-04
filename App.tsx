@@ -32,7 +32,11 @@ import {
   Filter,
   ChevronDown,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Tag,
+  Calendar,
+  Layers,
+  MapPin
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -2571,119 +2575,161 @@ const App: React.FC = () => {
                     ) : (
                         filteredInventory.map(({ row: item, inspection: insp, idx }) => {
                             const isSelected = selectedPallets.includes(`${item.id}::${idx}`);
-                            const isUseConsumption = insp.contentType === SlotContent.USE_CONSUMPTION;
                             const isRework = insp.contentType === SlotContent.REWORK;
                             const isReprocess = insp.contentType === SlotContent.REPROCESS;
                             const isContainer = insp.contentType === SlotContent.CONTAINER_SJ || 
                                               insp.contentType === SlotContent.CONTAINER_LP || 
                                               insp.contentType === SlotContent.CONTAINER_CP;
                             
-                            const containerColor = getContainerColor(insp.contentType);
-
                             const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : 
                                                insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
                                                (isRework || isReprocess) ? RefreshCw :
                                                isContainer ? Container :
                                                Package;
                             
+                            const getBaseColor = (content: SlotContent) => {
+                                const colors: Record<SlotContent, string> = {
+                                    [SlotContent.BOTTLES]: 'sky',
+                                    [SlotContent.SUPPLIES]: 'amber',
+                                    [SlotContent.FINISHED_PRODUCT]: 'emerald',
+                                    [SlotContent.USE_CONSUMPTION]: 'purple',
+                                    [SlotContent.CONTAINER_SJ]: 'rose',
+                                    [SlotContent.CONTAINER_LP]: 'blue',
+                                    [SlotContent.CONTAINER_CP]: 'indigo',
+                                    [SlotContent.RETURN]: 'orange',
+                                    [SlotContent.REWORK]: 'yellow',
+                                    [SlotContent.REPROCESS]: 'teal',
+                                    [SlotContent.ROTATIVE]: 'pink',
+                                    [SlotContent.DISCARD]: 'red',
+                                    [SlotContent.EMPTY]: 'slate',
+                                    [SlotContent.MISCELLANEOUS]: 'slate',
+                                    [SlotContent.OTHER]: 'slate'
+                                };
+                                return colors[content] || 'slate';
+                            };
+
+                            const baseColor = getBaseColor(insp.contentType);
+                            
                             return (
                                 <motion.div 
                                     layout
                                     key={`${item.id}::${idx}`} 
                                     onClick={() => togglePalletSelection(item.id, idx)}
-                                    className={`bg-slate-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-slate-800 shadow-xl group hover:border-slate-700 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between h-full min-h-[280px] ${isSelected ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50' : ''}`}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    whileHover={{ y: -5 }}
+                                    className={`group bg-slate-900/60 backdrop-blur-xl p-7 rounded-[2.5rem] border border-slate-800 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col h-full shadow-lg ${
+                                      isSelected 
+                                        ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50 shadow-purple-500/10' 
+                                        : `hover:border-${baseColor}-500/50 hover:shadow-${baseColor}-500/10`
+                                    }`}
                                 >
-                                  {/* Selection Indicator */}
-                                  <div className={`absolute top-4 left-4 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-950/50 border-slate-800 text-transparent'}`}>
-                                    <CheckCircle2 className="w-3 h-3" />
+                                  {/* Background Icon Accent */}
+                                  <div className={`absolute -top-10 -right-10 opacity-[0.05] group-hover:opacity-[0.5] transition-all duration-500 text-${baseColor}-500`}>
+                                    <ContentIcon className="w-56 h-56" />
                                   </div>
 
-                                  <div className="mt-4">
-                                    <div className="flex justify-between items-start mb-4">
-                                      <div className={`w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800 shadow-inner ${
-                                        insp.contentType === SlotContent.BOTTLES ? 'text-blue-400' : 
-                                        insp.contentType === SlotContent.SUPPLIES ? 'text-amber-400' : 
-                                        (isRework || isReprocess) ? 'text-purple-400' :
-                                        isContainer ? containerColor :
-                                        'text-green-500'
-                                      }`}>
-                                        <ContentIcon className="w-5 h-5" />
+                                  {/* Gradient Glow */}
+                                  <div className={`absolute -top-10 -right-10 w-40 h-40 bg-${baseColor}-500/10 blur-[80px] rounded-full group-hover:bg-${baseColor}-500/20 transition-all`} />
+
+                                  <div className="relative z-10 flex flex-col h-full">
+                                    {/* Selection Indicator */}
+                                    <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-950/50 border-slate-800 text-transparent'}`}>
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                    </div>
+
+                                    {/* Header Info */}
+                                    <div className="flex justify-between items-start mb-6 pl-6">
+                                      <div className={`w-14 h-14 bg-gradient-to-br from-${baseColor}-500/20 to-${baseColor}-600/5 text-${baseColor}-400 rounded-2xl flex items-center justify-center border border-${baseColor}-500/20 shadow-xl shadow-${baseColor}-950/20 group-hover:scale-110 transition-transform`}>
+                                        <ContentIcon className="w-7 h-7" />
                                       </div>
-                                      <div className="flex flex-col items-end gap-1">
-                                        <div className="flex items-center gap-2">
-                                          {item.operatorName && (
-                                            <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider">Op: {item.operatorName}</span>
-                                          )}
-                                          <span className={`bg-slate-950/90 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest ${
-                                            insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500 border-amber-500/30' :
-                                            insp.assignedSlot?.startsWith('D') ? 'text-green-400 border-green-500/20' : 
-                                            'text-slate-300'
+                                      <div className="text-right">
+                                        <div className="flex items-center gap-2 justify-end mb-1">
+                                          <span className={`w-1.5 h-1.5 rounded-full bg-${baseColor}-500 shadow-[0_0_8px_rgba(var(--color-${baseColor}-500),0.5)]`} />
+                                          <span className={`text-[9px] font-black uppercase tracking-widest italic ${
+                                            insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
+                                            insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
+                                            `text-${baseColor}-400`
                                           }`}>
                                             {insp.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${insp.assignedSlot}`}
                                           </span>
                                         </div>
+                                        <div className="flex items-center gap-1.5 justify-end text-slate-500">
+                                          <Calendar className="w-3 h-3" />
+                                          <p className="text-[8px] font-bold uppercase tracking-widest">{item.date}</p>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    <h4 className="font-bold text-white text-[13px] mb-4 uppercase tracking-tight leading-snug min-h-[3rem] line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</h4>
-
-                                    <div className="grid grid-cols-2 gap-2 mb-4">
-                                       {item.originOP && (
-                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">OP</p>
-                                            <p className="text-xs font-black text-blue-400 font-mono italic">{item.originOP}</p>
-                                         </div>
-                                       )}
-                                       {item.lot && (
-                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Lote</p>
-                                            <p className="text-xs font-black text-amber-400 font-mono italic">{item.lot}</p>
-                                         </div>
-                                       )}
-                                       {item.pallets > 0 && insp.contentType !== SlotContent.CONTAINER_SJ && insp.contentType !== SlotContent.CONTAINER_LP && (
-                                         <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Qtd</p>
-                                            <p className="text-xs font-black text-green-400 font-mono italic">{item.pallets}</p>
-                                         </div>
-                                       )}
-                                       <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">ID</p>
-                                          <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId}</p>
-                                       </div>
-                                       <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Tipo</p>
-                                          <p className={`text-xs font-black uppercase italic ${getContentTypeColor(insp.contentType)}`}>
+                                    {/* Product Info */}
+                                    <div className="flex-1 space-y-5 mb-8">
+                                      <div>
+                                        <h4 className={`text-lg font-black text-white uppercase tracking-tighter italic leading-[1.1] line-clamp-2 min-h-[2.5rem] group-hover:text-${baseColor}-300 transition-colors`}>
+                                          {item.description}
+                                        </h4>
+                                        {item.operatorName && (
+                                          <p className="text-[7px] text-slate-500 font-black uppercase tracking-[0.2em] mt-2">Operador: {item.operatorName}</p>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
+                                            <Tag className="w-2.5 h-2.5" /> OP Origem
+                                          </p>
+                                          <p className={`text-xs font-black text-${baseColor}-400 font-mono italic`}>{item.originOP || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
+                                            <Layers className="w-2.5 h-2.5" /> Lote
+                                          </p>
+                                          <p className="text-xs font-black text-white font-mono italic">{item.lot || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
+                                            <AlertCircle className="w-2.5 h-2.5" /> ID Final
+                                          </p>
+                                          <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
+                                            <Package className="w-2.5 h-2.5" /> Tipo
+                                          </p>
+                                          <p className={`text-[10px] font-black uppercase italic ${getContentTypeColor(insp.contentType)}`}>
                                             {translateSlotContent(insp.contentType)}
                                           </p>
-                                       </div>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                  
-                                  <div className="flex gap-2">
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); setDetailContext({ row: item, inspection: insp, idx }); }} 
-                                      className="flex-1 py-2 bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
-                                    >
-                                      <Info className="w-3 h-3" /> Detalhes
-                                    </button>
 
-                                    <button 
-                                      onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        setEditPalletMode('edit');
-                                        setEditPalletContext({ row: item, inspection: insp, idx }); 
-                                      }} 
-                                      className="flex-1 py-2 bg-slate-950 hover:bg-blue-600/10 text-blue-400 border border-slate-800 hover:border-blue-500/50 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
-                                    >
-                                      <Pencil className="w-3 h-3" /> Editar
-                                    </button>
-                                    
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); setDeleteContext({ type: 'pallet', rowId: item.id, palletIdx: idx }); }} 
-                                      className="w-9 h-9 bg-slate-950 hover:bg-red-500/10 text-slate-600 hover:text-red-500 border border-slate-800 hover:border-red-600/50 rounded-xl transition-all flex items-center justify-center shrink-0"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setDetailContext({ row: item, inspection: insp, idx }); }} 
+                                        className="flex-1 py-3 bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn"
+                                      >
+                                        <Info className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" /> Detalhes
+                                      </button>
+
+                                      <button 
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          setEditPalletMode('edit');
+                                          setEditPalletContext({ row: item, inspection: insp, idx }); 
+                                        }} 
+                                        className={`flex-1 py-3 bg-slate-950/50 hover:bg-${baseColor}-500/10 text-${baseColor}-400 border border-slate-800 hover:border-${baseColor}-500/50 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn`}
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" /> Editar
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setDeleteContext({ type: 'pallet', rowId: item.id, palletIdx: idx }); }}
+                                        className="p-3 bg-slate-950/50 hover:bg-red-600/10 text-red-500 border border-slate-800 hover:border-red-500/50 rounded-2xl transition-all flex items-center justify-center group/btn"
+                                        title="Remover do estoque"
+                                      >
+                                        <Trash2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </motion.div>
                             );
