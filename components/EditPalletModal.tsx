@@ -18,7 +18,9 @@ import {
   LayoutGrid,
   Trash2,
   MoreHorizontal,
-  RefreshCw
+  RefreshCw,
+  MapPin,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -32,6 +34,7 @@ interface EditPalletModalProps {
     lot: string; 
     quantity: number;
     contentType: SlotContent;
+    assignedSlot?: string;
     supplyDetails?: {
       bottles: number;
       caps: number;
@@ -42,14 +45,25 @@ interface EditPalletModalProps {
   }) => void;
   pallet: { row: SheetRow; inspection: InspectionData; idx: number } | null;
   history: any[];
+  availableSlots: WarehouseSlot[];
+  mode?: 'edit' | 'assign';
 }
 
-export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClose, onSave, pallet, history }) => {
+export const EditPalletModal: React.FC<EditPalletModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  pallet, 
+  history, 
+  availableSlots,
+  mode = 'edit'
+}) => {
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
   const [quantity, setQuantity] = useState(0);
   const [contentType, setContentType] = useState<SlotContent>(SlotContent.BOTTLES);
+  const [assignedSlot, setAssignedSlot] = useState<string>('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   
   // Supply Details State
@@ -66,6 +80,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
       setLot(pallet.row.lot);
       setQuantity(pallet.row.pallets);
       setContentType(pallet.inspection.contentType || SlotContent.BOTTLES);
+      setAssignedSlot(pallet.inspection.assignedSlot || '');
       
       setBottles(pallet.inspection.bottles || 0);
       setCaps(pallet.inspection.caps || 0);
@@ -114,6 +129,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
       lot: lot.toUpperCase(),
       quantity,
       contentType,
+      assignedSlot: assignedSlot || pallet?.inspection.assignedSlot,
       supplyDetails: contentType === SlotContent.SUPPLIES ? {
         bottles,
         caps,
@@ -139,9 +155,11 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
               <Pencil className="text-white w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-lg italic uppercase tracking-tighter text-white">Editar Pallet</h3>
+              <h3 className="font-black text-lg italic uppercase tracking-tighter text-white">
+                {mode === 'assign' ? 'Alocar Pallet' : 'Editar Pallet'}
+              </h3>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                {pallet.inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : (pallet.inspection.assignedSlot ? `Vaga ${pallet.inspection.assignedSlot}` : 'Pendente de Análise')}
+                {pallet.inspection.assignedSlot === 'AGUARDANDO' ? 'Status: Em Espera' : (pallet.inspection.assignedSlot ? `Vaga ${pallet.inspection.assignedSlot}` : 'Pendente de Análise')}
               </p>
             </div>
           </div>
@@ -151,8 +169,70 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
         </div>
 
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-          {/* TIPO */}
-          <div className="space-y-4">
+          {/* PALLET SUMMARY - Always show basic info in assign mode */}
+          {mode === 'assign' && (
+            <div className="p-5 bg-slate-900/40 rounded-3xl border border-slate-800/50 mb-2">
+              <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-4 leading-tight">
+                {pallet.row.description}
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[7px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Lote</p>
+                  <p className="text-xs font-black text-amber-500 font-mono italic">{pallet.row.lot}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Qtd Pallets</p>
+                  <p className="text-xs font-black text-emerald-500 font-mono italic">{pallet.row.pallets}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DESTINATION SLOT */}
+          {(pallet.inspection.assignedSlot === 'AGUARDANDO' || !pallet.inspection.assignedSlot) && (
+            <div className="space-y-3 p-5 bg-purple-600/10 rounded-3xl border border-purple-500/30 shadow-lg shadow-purple-900/10">
+              <div className="flex items-center gap-2 mb-1">
+                <Warehouse className="w-4 h-4 text-purple-500" />
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest italic">Escolher Vaga de Destino</h4>
+              </div>
+              <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-2 leading-relaxed">
+                Selecione uma vaga disponível para remover este pallet do estado de espera.
+              </p>
+              
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-500 w-3.5 h-3.5" />
+                <select
+                  value={assignedSlot}
+                  onChange={(e) => setAssignedSlot(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-[10px] uppercase focus:border-purple-600 outline-none appearance-none transition-all"
+                >
+                  <option value="AGUARDANDO">MANTER AGUARDANDO VAGA</option>
+                  {availableSlots
+                    .sort((a, b) => a.id.localeCompare(b.id))
+                    .map(slot => (
+                      <option key={slot.id} value={slot.id}>
+                        VAGA {slot.id} ({slot.rack}.{slot.level}.{slot.position})
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 w-3.5 h-3.5 pointer-events-none" />
+              </div>
+
+              {assignedSlot !== 'AGUARDANDO' && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-xl border border-green-500/20 animate-in zoom-in duration-200">
+                  <Check className="w-3 h-3 text-green-500" />
+                  <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">
+                    Pronto para alocar na vaga {assignedSlot}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === 'edit' && (
+            <>
+              {/* TIPO */}
+              <div className="space-y-4">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tipo de Conteúdo</label>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -304,6 +384,9 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             </motion.div>
           )}
 
+          </>
+          )}
+
           <div className="flex gap-3 pt-4">
             <button 
               onClick={onClose}
@@ -313,9 +396,13 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             </button>
             <button 
               onClick={handleSave}
-              className="flex-[2] py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/40 transition-all flex items-center justify-center gap-2 active:scale-95"
+              className={`flex-[2] py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 text-center ${
+                mode === 'assign' || (pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO')
+                  ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-xl shadow-amber-900/40 text-white' 
+                  : 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-xl shadow-blue-900/40 text-white'
+              }`}
             >
-              Salvar Alterações <Save className="w-4 h-4" />
+              {pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO' ? 'Confirmar Alocação' : 'Salvar Alterações'} <Save className="w-4 h-4" />
             </button>
           </div>
         </div>

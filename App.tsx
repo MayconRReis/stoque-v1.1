@@ -61,6 +61,7 @@ import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
 import { RotativeStockManager } from './components/RotativeStockManager';
+import { WaitingSlotsView } from './components/WaitingSlotsView';
 import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
@@ -109,7 +110,7 @@ const App: React.FC = () => {
   const [isPublicView, setIsPublicView] = useState(false);
   const [data, setData] = useState<SheetRow[]>([]);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
@@ -130,6 +131,7 @@ const App: React.FC = () => {
   
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
+  const [editPalletMode, setEditPalletMode] = useState<'edit' | 'assign'>('edit');
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
@@ -1344,6 +1346,7 @@ const App: React.FC = () => {
     lot: string; 
     quantity: number;
     contentType: SlotContent;
+    assignedSlot?: string;
     supplyDetails?: {
       bottles: number;
       caps: number;
@@ -1362,6 +1365,7 @@ const App: React.FC = () => {
         updatedInspections[idx] = {
           ...updatedInspections[idx],
           contentType: updatedData.contentType,
+          assignedSlot: updatedData.assignedSlot || updatedInspections[idx].assignedSlot,
           ...(updatedData.supplyDetails || {})
         };
       }
@@ -1375,6 +1379,20 @@ const App: React.FC = () => {
         inspections: updatedInspections,
         operatorName: user?.name
       };
+
+      // If a slot was assigned (moved from AGUARDANDO to a real slot)
+      if (updatedData.assignedSlot && updatedData.assignedSlot !== 'AGUARDANDO' && row.inspections?.[idx].assignedSlot === 'AGUARDANDO') {
+        const targetSlot = slots.find(s => s.id === updatedData.assignedSlot);
+        if (targetSlot) {
+          const updatedSlot: WarehouseSlot = {
+            ...targetSlot,
+            status: updatedData.contentType,
+            occupiedBy: updatedData.op || updatedRow.description
+          };
+          await supabaseService.updateSlot(updatedSlot);
+          setSlots(prev => prev.map(s => s.id === updatedData.assignedSlot ? updatedSlot : s));
+        }
+      }
 
       await supabaseService.saveInventoryItem(updatedRow);
       setData(prev => prev.map(r => r.id === updatedRow.id ? updatedRow : r));
@@ -1754,7 +1772,10 @@ const App: React.FC = () => {
         </div>
 
         {/* Aguardando Vaga */}
-        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all">
+        <div 
+          className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all cursor-pointer" 
+          onClick={() => !isPublicView && setActiveTab('waiting')}
+        >
           <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
             <RefreshCw className="w-5 h-5" />
           </div>
@@ -1989,6 +2010,7 @@ const App: React.FC = () => {
 
           <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
             <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
+            <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} />
             <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" />
             <NavItem tab="inventory" icon={Package} label="Estoque Geral" />
             <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" />
@@ -2050,6 +2072,7 @@ const App: React.FC = () => {
               {isPublicView ? 'Dashboard Público' : (
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
+                  {activeTab === 'waiting' && 'Aguardando Vaga'}
                   {activeTab === 'movement' && 'Movimentação'}
                   {activeTab === 'inventory' && 'Estoque Geral'}
                   {activeTab === 'map' && 'Mapa de vagas'}
@@ -2331,13 +2354,26 @@ const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'waiting' && (
+            <WaitingSlotsView 
+              items={data}
+              onAssignSlot={(row, idx) => {
+                setEditPalletMode('assign');
+                setEditPalletContext({ row, inspection: row.inspections![idx], idx });
+              }}
+            />
+          )}
+
           {activeTab === 'analysis' && (
             <AnalysisPage 
               pendingItems={data.filter(r => r.status === StockStatus.PENDING)}
               availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
               onConfirm={handleConfirmAnalysis}
               onReject={handleRejectAnalysis}
-              onEdit={(item) => setEditPalletContext({ row: item, inspection: item.inspections?.[0] || { contentType: SlotContent.SUPPLIES, bottles: 0, caps: 0, boxes: 0, cradles: 0 }, idx: 0 })}
+              onEdit={(item) => {
+                setEditPalletMode('edit');
+                setEditPalletContext({ row: item, inspection: item.inspections?.[0] || { contentType: SlotContent.SUPPLIES, bottles: 0, caps: 0, boxes: 0, cradles: 0 }, idx: 0 });
+              }}
             />
           )}
 
@@ -2632,7 +2668,11 @@ const App: React.FC = () => {
                                     </button>
 
                                     <button 
-                                      onClick={(e) => { e.stopPropagation(); setEditPalletContext({ row: item, inspection: insp, idx }); }} 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setEditPalletMode('edit');
+                                        setEditPalletContext({ row: item, inspection: insp, idx }); 
+                                      }} 
                                       className="flex-1 py-2 bg-slate-950 hover:bg-blue-600/10 text-blue-400 border border-slate-800 hover:border-blue-500/50 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
                                     >
                                       <Pencil className="w-3 h-3" /> Editar
@@ -2736,6 +2776,8 @@ const App: React.FC = () => {
           pallet={editPalletContext}
           onSave={handleUpdatePallet}
           history={history}
+          availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
+          mode={editPalletMode}
         />
       )}
 
