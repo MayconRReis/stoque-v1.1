@@ -36,7 +36,8 @@ import {
   Tag,
   Calendar,
   Layers,
-  MapPin
+  MapPin,
+  Hash
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -1395,6 +1396,12 @@ const App: React.FC = () => {
           };
           await supabaseService.updateSlot(updatedSlot);
           setSlots(prev => prev.map(s => s.id === updatedData.assignedSlot ? updatedSlot : s));
+          
+          // Add to history
+          await addToHistory({
+            ...createHistoryEntry(HistoryType.ALLOCATION, updatedRow, `Alocação via Aguardando Vaga para ${updatedData.assignedSlot}`, idx + 1),
+            slot: updatedData.assignedSlot
+          });
         }
       }
 
@@ -2421,11 +2428,13 @@ const App: React.FC = () => {
                                     entry.type === HistoryType.ENTRY ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
                                     entry.type === HistoryType.EXIT ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
                                     entry.type === HistoryType.TRANSFER ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                    entry.type === HistoryType.ALLOCATION ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
                                     'bg-red-500/10 text-red-500 border-red-500/20'
                                 }`}>
                                   {entry.type === HistoryType.ENTRY && 'Entrada'}
                                   {entry.type === HistoryType.EXIT && 'Saída'}
                                   {entry.type === HistoryType.TRANSFER && 'Transf.'}
+                                  {entry.type === HistoryType.ALLOCATION && 'Alocação'}
                                   {entry.type === HistoryType.REMOVAL && 'Removido'}
                                 </span>
                                 <p className="text-[9px] text-slate-600 font-bold font-mono">{entry.timestamp}</p>
@@ -2610,7 +2619,18 @@ const App: React.FC = () => {
                                 return colors[content] || 'slate';
                             };
 
+                            const isSupplies = insp.contentType === SlotContent.SUPPLIES;
+                            const isBottles = insp.contentType === SlotContent.BOTTLES;
+                            const isFinished = insp.contentType === SlotContent.FINISHED_PRODUCT;
+
                             const baseColor = getBaseColor(insp.contentType);
+                            
+                            // Determine the most relevant quantity to show
+                            const qtyValue = isSupplies 
+                                ? (insp.bottles || insp.boxes || insp.caps || insp.cradles || 0)
+                                : (isBottles ? (insp.bottles || item.pallets) : item.pallets);
+                            
+                            const qtyLabel = (isSupplies || isBottles) ? 'Qtd (UN)' : 'Qtd (PL)';
                             
                             return (
                                 <motion.div 
@@ -2689,15 +2709,21 @@ const App: React.FC = () => {
                                         </div>
                                         <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
                                           <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
+                                            <Hash className="w-2.5 h-2.5" /> {qtyLabel}
+                                          </p>
+                                          <p className="text-xs font-black text-green-400 font-mono italic">{qtyValue}</p>
+                                        </div>
+                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                                             <AlertCircle className="w-2.5 h-2.5" /> ID Final
                                           </p>
                                           <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId || 'N/A'}</p>
                                         </div>
-                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                                        <div className="col-span-2 bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
                                           <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                                             <Package className="w-2.5 h-2.5" /> Tipo
                                           </p>
-                                          <p className={`text-[10px] font-black uppercase italic ${getContentTypeColor(insp.contentType)}`}>
+                                          <p className={`text-[10px] font-black uppercase italic ${getContentTypeColor(insp.contentType)} text-center`}>
                                             {translateSlotContent(insp.contentType)}
                                           </p>
                                         </div>

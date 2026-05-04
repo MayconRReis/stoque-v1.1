@@ -32,7 +32,8 @@ export enum HistoryType {
   ENTRY = 'ENTRY',
   EXIT = 'EXIT',
   REMOVAL = 'REMOVAL',
-  TRANSFER = 'TRANSFER'
+  TRANSFER = 'TRANSFER',
+  ALLOCATION = 'ALLOCATION'
 }
 
 export enum ShipmentType {
