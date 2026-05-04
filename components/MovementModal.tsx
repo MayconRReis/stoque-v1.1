@@ -245,11 +245,14 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
     { value: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' },
     { value: SlotContent.RETURN, label: 'Retorno' },
-    { value: SlotContent.CONTAINER_SJ, label: 'Container SJ' },
-    { value: SlotContent.CONTAINER_LP, label: 'Container LP' },
-    { value: SlotContent.CONTAINER_CP, label: 'Container CP' },
+    { value: SlotContent.CONTAINER_SJ, label: 'Container Sujo' },
+    { value: SlotContent.CONTAINER_LP, label: 'Container Limpo' },
+    { value: SlotContent.CONTAINER_CP, label: 'Container Com Produto' },
     { value: SlotContent.REWORK, label: 'Retrabalho' },
     { value: SlotContent.REPROCESS, label: 'Reprocesso' },
+    { value: SlotContent.MISCELLANEOUS, label: 'Diversos' },
+    { value: SlotContent.DISCARD, label: 'Descarte' },
+    { value: SlotContent.OTHER, label: 'Outro' },
   ];
 
   return (

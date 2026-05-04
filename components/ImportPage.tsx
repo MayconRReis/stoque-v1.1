@@ -47,6 +47,9 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
           else if (tipo.includes('INSUMO')) contentType = SlotContent.SUPPLIES;
           else if (tipo.includes('RETRABALHO')) contentType = SlotContent.REWORK;
           else if (tipo.includes('REPROCESSO')) contentType = SlotContent.REPROCESS;
+          else if (tipo.includes('DIVERSOS')) contentType = SlotContent.MISCELLANEOUS;
+          else if (tipo.includes('DESCARTE')) contentType = SlotContent.DISCARD;
+          else if (tipo.includes('OUTRO')) contentType = SlotContent.OTHER;
           else if (tipo.includes('CONTAINER')) {
             if (tipo.includes('SJ')) contentType = SlotContent.CONTAINER_SJ;
             else if (tipo.includes('LP')) contentType = SlotContent.CONTAINER_LP;

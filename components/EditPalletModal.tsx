@@ -14,7 +14,10 @@ import {
   Box,
   Container,
   Warehouse,
-  Check
+  Check,
+  LayoutGrid,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -156,9 +159,12 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
                 { id: SlotContent.SUPPLIES, label: 'Insumo', icon: Package },
                 { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado', icon: Truck },
                 { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', icon: Box },
-                { id: SlotContent.CONTAINER_SJ, label: 'Cont. SJ', icon: Container },
-                { id: SlotContent.CONTAINER_LP, label: 'Cont. LP', icon: Container },
-                { id: SlotContent.CONTAINER_CP, label: 'Cont. CP', icon: Container }
+                { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo', icon: Container },
+                { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo', icon: Container },
+                { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto', icon: Container },
+                { id: SlotContent.MISCELLANEOUS, label: 'Diversos', icon: LayoutGrid },
+                { id: SlotContent.DISCARD, label: 'Descarte', icon: Trash2 },
+                { id: SlotContent.OTHER, label: 'Outro', icon: MoreHorizontal }
               ].map((type) => (
                 <button
                   key={type.id}

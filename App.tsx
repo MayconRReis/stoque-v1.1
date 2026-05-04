@@ -2435,11 +2435,17 @@ const App: React.FC = () => {
                                 { value: SlotContent.BOTTLES, label: 'Frasco' },
                                 { value: SlotContent.SUPPLIES, label: 'Insumo' },
                                 { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
-                                { value: 'CONTAINER', label: 'Container (SJ/LP/CP)' },
+                                { value: 'CONTAINER', label: 'Todos os Containers' },
+                                { value: SlotContent.CONTAINER_SJ, label: '• Container Sujo', isSub: true },
+                                { value: SlotContent.CONTAINER_LP, label: '• Container Limpo', isSub: true },
+                                { value: SlotContent.CONTAINER_CP, label: '• Container com Produto', isSub: true },
                                 { value: SlotContent.REWORK, label: 'Retrabalho' },
                                 { value: SlotContent.REPROCESS, label: 'Reprocesso' },
                                 { value: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' },
-                                { value: SlotContent.RETURN, label: 'Retorno' }
+                                { value: SlotContent.RETURN, label: 'Retorno' },
+                                { value: SlotContent.MISCELLANEOUS, label: 'Diversos' },
+                                { value: SlotContent.DISCARD, label: 'Descarte' },
+                                { value: SlotContent.OTHER, label: 'Outro' }
                               ].map((type) => (
                                 <button
                                   key={type.value}
@@ -2448,6 +2454,8 @@ const App: React.FC = () => {
                                     setIsInventoryFilterOpen(false);
                                   }}
                                   className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                    (type as any).isSub ? 'ml-4 bg-slate-950/30' : ''
+                                  } ${
                                     inventoryTypeFilter === type.value 
                                       ? 'bg-blue-600 text-white' 
                                       : 'text-slate-400 hover:bg-slate-800 hover:text-white'

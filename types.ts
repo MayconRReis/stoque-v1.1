@@ -22,7 +22,10 @@ export enum SlotContent {
   USE_CONSUMPTION = 'USE_CONSUMPTION',
   REWORK = 'REWORK',
   REPROCESS = 'REPROCESS',
-  ROTATIVE = 'ROTATIVE'
+  ROTATIVE = 'ROTATIVE',
+  MISCELLANEOUS = 'MISCELLANEOUS',
+  DISCARD = 'DISCARD',
+  OTHER = 'OTHER'
 }
 
 export enum HistoryType {
@@ -131,13 +134,16 @@ export const translateSlotContent = (content: SlotContent): string => {
     [SlotContent.SUPPLIES]: 'Insumo',
     [SlotContent.FINISHED_PRODUCT]: 'Produto Acabado',
     [SlotContent.RETURN]: 'Retorno',
-    [SlotContent.CONTAINER_SJ]: 'Container SJ',
-    [SlotContent.CONTAINER_LP]: 'Container LP',
-    [SlotContent.CONTAINER_CP]: 'Container CP',
+    [SlotContent.CONTAINER_SJ]: 'Container Sujo',
+    [SlotContent.CONTAINER_LP]: 'Container Limpo',
+    [SlotContent.CONTAINER_CP]: 'Container Com Produto',
     [SlotContent.USE_CONSUMPTION]: 'Uso e Consumo',
     [SlotContent.REWORK]: 'Retrabalho',
     [SlotContent.REPROCESS]: 'Reprocesso',
-    [SlotContent.ROTATIVE]: 'Estoque Rotativo'
+    [SlotContent.ROTATIVE]: 'Estoque Rotativo',
+    [SlotContent.MISCELLANEOUS]: 'Diversos',
+    [SlotContent.DISCARD]: 'Descarte',
+    [SlotContent.OTHER]: 'Outro'
   };
   return translations[content] || content;
 };
