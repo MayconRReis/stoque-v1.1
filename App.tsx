@@ -612,6 +612,15 @@ const App: React.FC = () => {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: SlotContent.ROTATIVE, occupiedBy: 'ESTOQUE ROTATIVO' } : s));
       showNotification(`Vaga ${slot.id} dedicada ao Estoque Rotativo`);
       setSelectedMappingSlot(null);
+      
+      // Notify all users
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} dedicou a vaga ${slot.id} ao Estoque Rotativo`,
+          type: 'info'
+        });
+      }
     } catch (error) {
       console.error('Error dedicating slot:', error);
       showNotification('Erro ao dedicar vaga', 'error');
@@ -637,6 +646,15 @@ const App: React.FC = () => {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
       showNotification(`Vaga ${slot.id} liberada do Estoque Rotativo`);
       setSelectedMappingSlot(null);
+
+      // Notify all users
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} liberou a vaga ${slot.id} do Estoque Rotativo`,
+          type: 'info'
+        });
+      }
     } catch (error) {
       console.error('Error releasing slot:', error);
       showNotification('Erro ao liberar vaga', 'error');
@@ -852,7 +870,7 @@ const App: React.FC = () => {
 
       const promises: Promise<any>[] = [
         supabaseService.saveInventoryItem(updatedRow),
-        supabaseService.addHistoryEntry(historyEntry)
+        addToHistory(historyEntry)
       ];
 
       if (updatedSlot) {
@@ -865,7 +883,6 @@ const App: React.FC = () => {
       if (updatedSlot) {
         setSlots(prev => prev.map(s => s.id === slotId ? updatedSlot : s));
       }
-      setHistory(prev => [historyEntry, ...prev]);
 
       showNotification(`Entrada confirmada! ID: ${finalId}`);
       
@@ -1129,6 +1146,16 @@ const App: React.FC = () => {
       setData(updatedInv);
       
       showNotification(`Pallets adicionados ao carregamento ${shipmentId}!`);
+
+      // Broadcast to others
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} adicionou ${selections.length} pallets ao carregamento ${shipmentId}`,
+          type: 'info'
+        });
+      }
+
       setSelectedPallets([]);
     } catch (error: any) {
       console.error('Error adding to shipment:', error);
@@ -1141,6 +1168,15 @@ const App: React.FC = () => {
       const [rowId, palletIdx] = palletId.split('::');
       await supabaseService.updateInventoryShipment([{ rowId, palletIdx: parseInt(palletIdx) }], null);
       showNotification('Pallet removido do carregamento.');
+
+      // Broadcast to others
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} removeu um pallet do carregamento`,
+          type: 'info'
+        });
+      }
     } catch (error: any) {
       console.error('Error removing from shipment:', error);
       showNotification(`Erro ao remover pallet: ${error.message}`, 'error');
@@ -1211,7 +1247,7 @@ const App: React.FC = () => {
             slot: inspection.assignedSlot || 'N/A',
             details: `Saída automática via Finalização de Carregamento ${shipmentId}`,
             operatorName: user?.name
-          });
+          }, true);
         }
 
         // Update or Delete Inventory Item
@@ -1229,6 +1265,15 @@ const App: React.FC = () => {
       }
 
       showNotification(`Carregamento ${shipmentId} finalizado com sucesso!`);
+
+      // Broadcast summary
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} finalizou o carregamento ${shipmentId}`,
+          type: 'info'
+        });
+      }
       
       // Auto-reorganize E/F stacks as many pallets might have left
       // We need to fetch latest state or at least calculate what happened.
@@ -1254,6 +1299,15 @@ const App: React.FC = () => {
       setData(updatedInv);
       
       showNotification('Carregamento excluído com sucesso.');
+
+      // Broadcast to others
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} excluiu o carregamento ${shipmentId}`,
+          type: 'info'
+        });
+      }
     } catch (error: any) {
       console.error('Error deleting shipment:', error);
       showNotification(`Erro ao excluir carregamento: ${error.message}`, 'error');
@@ -1320,10 +1374,19 @@ const App: React.FC = () => {
     }, 4000);
   };
 
-  const addToHistory = async (entry: HistoryEntry) => {
+  const addToHistory = async (entry: HistoryEntry, silent: boolean = false) => {
     try {
       await supabaseService.addHistoryEntry(entry);
       setHistory(prev => [entry, ...prev]);
+      
+      // Broadcast to all users
+      if (user && !silent) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: entry.details,
+          type: 'info'
+        });
+      }
     } catch (error) {
       console.error('Error adding history entry:', error);
       showNotification('Erro ao salvar histórico no servidor.', 'error');
@@ -1403,6 +1466,9 @@ const App: React.FC = () => {
             slot: updatedData.assignedSlot
           });
         }
+      } else {
+        // Regular Edit
+        await addToHistory(createHistoryEntry(HistoryType.EDIT, updatedRow, `Edição de dados do pallet por ${user?.name || 'Operador'}`, idx + 1));
       }
 
       await supabaseService.saveInventoryItem(updatedRow);
@@ -1423,6 +1489,10 @@ const App: React.FC = () => {
     if (!deleteContext) return;
     try {
       if (deleteContext.type === 'row') {
+        const row = data.find(r => r.id === deleteContext.rowId);
+        if (row) {
+          await addToHistory(createHistoryEntry(HistoryType.REMOVAL, row, `Remoção total da OP ${row.originOP} por ${user?.name || 'Operador'}`));
+        }
         await supabaseService.deleteInventoryItem(deleteContext.rowId);
         setData(prev => prev.filter(item => item.id !== deleteContext.rowId));
       } else if (deleteContext.type === 'pallet' && deleteContext.palletIdx !== undefined) {
@@ -1530,7 +1600,7 @@ const App: React.FC = () => {
         const row = data.find(r => r.id === rowId);
         if (row && row.inspections) {
           const inspection = row.inspections[palletIdx];
-          await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Saída em massa', palletIdx + 1));
+          await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Saída em massa', palletIdx + 1), true);
           
           if (inspection.assignedSlot) {
             const slotIdx = updatedSlots.findIndex(s => s.id === inspection.assignedSlot);
@@ -1576,6 +1646,16 @@ const App: React.FC = () => {
       });
 
       showNotification(`${selectedPallets.length} pallets enviados com sucesso`);
+      
+      // Broadcast summary to others
+      if (user) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: `${user.name} realizou saída em massa de ${selectedPallets.length} pallets`,
+          type: 'info'
+        });
+      }
+
       setSelectedPallets([]);
       setIsBulkConfirmOpen(false);
       
@@ -2429,12 +2509,14 @@ const App: React.FC = () => {
                                     entry.type === HistoryType.EXIT ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
                                     entry.type === HistoryType.TRANSFER ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                                     entry.type === HistoryType.ALLOCATION ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                    entry.type === HistoryType.EDIT ? 'bg-slate-500/10 text-slate-500 border-slate-500/20' :
                                     'bg-red-500/10 text-red-500 border-red-500/20'
                                 }`}>
                                   {entry.type === HistoryType.ENTRY && 'Entrada'}
                                   {entry.type === HistoryType.EXIT && 'Saída'}
                                   {entry.type === HistoryType.TRANSFER && 'Transf.'}
                                   {entry.type === HistoryType.ALLOCATION && 'Alocação'}
+                                  {entry.type === HistoryType.EDIT && 'Edição'}
                                   {entry.type === HistoryType.REMOVAL && 'Removido'}
                                 </span>
                                 <p className="text-[9px] text-slate-600 font-bold font-mono">{entry.timestamp}</p>
@@ -2443,7 +2525,7 @@ const App: React.FC = () => {
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">ID: {entry.loadingId}</p>
                                   <div className="h-px flex-1 bg-slate-800/50"></div>
-                                  <span className="text-[9px] font-black text-slate-400 uppercase italic">Vaga {entry.slot}</span>
+                                  <span className="text-[13px] font-black text-slate-400 uppercase italic">Vaga {entry.slot}</span>
                                 </div>
                                 <h4 className="text-white font-bold uppercase text-xs truncate">{entry.description}</h4>
                                 <div className="flex flex-wrap gap-3 mt-1">
@@ -2668,7 +2750,7 @@ const App: React.FC = () => {
                                       <div className="text-right">
                                         <div className="flex items-center gap-2 justify-end mb-1">
                                           <span className={`w-1.5 h-1.5 rounded-full bg-${baseColor}-500 shadow-[0_0_8px_rgba(var(--color-${baseColor}-500),0.5)]`} />
-                                          <span className={`text-[9px] font-black uppercase tracking-widest italic ${
+                                          <span className={`text-[13px] font-black uppercase tracking-widest italic ${
                                             insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
                                             insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
                                             `text-${baseColor}-400`

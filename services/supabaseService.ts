@@ -351,7 +351,7 @@ export const supabaseService = {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
     const channel = supabase.channel('app-notifications');
     channel
-      .on('broadcast', { event: 'new-import' }, ({ payload }) => callback(payload))
+      .on('broadcast', { event: 'pallet-change' }, ({ payload }) => callback(payload))
       .subscribe();
     return channel;
   },
@@ -360,7 +360,7 @@ export const supabaseService = {
     if (!isSupabaseConfigured) return;
     supabase.channel('app-notifications').send({
       type: 'broadcast',
-      event: 'new-import',
+      event: 'pallet-change',
       payload
     });
   },

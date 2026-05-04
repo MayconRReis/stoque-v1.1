@@ -402,8 +402,9 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Informar conforme etiqueta</p>
                       <input 
                         type="text" 
+                        inputMode="numeric"
                         value={lot}
-                        onChange={e => setLot(e.target.value)}
+                        onChange={e => setLot(e.target.value.replace(/\D/g, ''))}
                         placeholder="Ex: 01260307143"
                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
                       />
@@ -422,9 +423,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       </label>
                       <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">informar quantidade total (unidades ou kg)</p>
                       <input 
-                        type="number" 
-                        value={quantity}
-                        onChange={e => setQuantity(Number(e.target.value))}
+                        type="text" 
+                        inputMode="numeric"
+                        value={quantity === 0 ? '' : quantity}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setQuantity(val === '' ? 0 : Number(val));
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
                       />
                     </div>
@@ -470,19 +475,43 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Caixas</label>
-                        <input type="number" value={boxesCount} onChange={e => setBoxesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={boxesCount === 0 ? '' : boxesCount} 
+                          onChange={e => setBoxesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Frascos</label>
-                        <input type="number" value={bottlesCount} onChange={e => setBottlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={bottlesCount === 0 ? '' : bottlesCount} 
+                          onChange={e => setBottlesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Berços</label>
-                        <input type="number" value={cradlesCount} onChange={e => setCradlesCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={cradlesCount === 0 ? '' : cradlesCount} 
+                          onChange={e => setCradlesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest text-center block">Tampas</label>
-                        <input type="number" value={capsCount} onChange={e => setCapsCount(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={capsCount === 0 ? '' : capsCount} 
+                          onChange={e => setCapsCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                        />
                       </div>
                     </div>
 
@@ -513,9 +542,10 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                             <div className="w-24 space-y-1.5">
                               <label className="text-[7px] font-bold text-slate-700 uppercase tracking-widest">Qtd</label>
                               <input 
-                                type="number" 
-                                value={other.quantity}
-                                onChange={e => updateOther(other.id, 'quantity', Number(e.target.value))}
+                                type="text" 
+                                inputMode="numeric"
+                                value={other.quantity === 0 ? '' : other.quantity}
+                                onChange={e => updateOther(other.id, 'quantity', Number(e.target.value.replace(/\D/g, '')) || 0)}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
                               />
                             </div>

@@ -232,38 +232,38 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
           {mode === 'edit' && (
             <>
               {/* TIPO */}
-              <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tipo de Conteúdo</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo', icon: Container },
-                { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto', icon: Container },
-                { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo', icon: Container },
-                { id: SlotContent.DISCARD, label: 'Descarte', icon: Trash2 },
-                { id: SlotContent.MISCELLANEOUS, label: 'Diversos', icon: LayoutGrid },
-                { id: SlotContent.BOTTLES, label: 'Frasco', icon: FlaskConical },
-                { id: SlotContent.SUPPLIES, label: 'Insumo', icon: Package },
-                { id: SlotContent.OTHER, label: 'Outro', icon: MoreHorizontal },
-                { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado', icon: Truck },
-                { id: SlotContent.REPROCESS, label: 'Reprocesso', icon: RefreshCw },
-                { id: SlotContent.REWORK, label: 'Retrabalho', icon: RefreshCw },
-                { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', icon: Box }
-              ].sort((a, b) => a.label.localeCompare(b.label)).map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => setContentType(type.id)}
-                  className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${
-                    contentType === type.id 
-                      ? 'bg-blue-600/10 border-blue-600 text-blue-500 shadow-lg shadow-blue-600/10' 
-                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                  }`}
-                >
-                  <type.icon className="w-4 h-4" />
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                  <Package className="w-3 h-3" /> Tipo de Conteúdo
+                </label>
+                <div className="relative">
+                  <select
+                    value={contentType}
+                    onChange={(e) => setContentType(e.target.value as SlotContent)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm uppercase focus:border-blue-600 outline-none appearance-none transition-all"
+                  >
+                    {[
+                      { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo' },
+                      { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto' },
+                      { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo' },
+                      { id: SlotContent.DISCARD, label: 'Descarte' },
+                      { id: SlotContent.MISCELLANEOUS, label: 'Diversos' },
+                      { id: SlotContent.ROTATIVE, label: 'Estoque Rotativo' },
+                      { id: SlotContent.BOTTLES, label: 'Frasco' },
+                      { id: SlotContent.SUPPLIES, label: 'Insumo' },
+                      { id: SlotContent.OTHER, label: 'Outro' },
+                      { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado' },
+                      { id: SlotContent.REPROCESS, label: 'Reprocesso' },
+                      { id: SlotContent.RETURN, label: 'Retorno' },
+                      { id: SlotContent.REWORK, label: 'Retrabalho' },
+                      { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' }
+                    ].sort((a, b) => a.label.localeCompare(b.label)).map((type) => (
+                      <option key={type.id} value={type.id}>{type.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+                </div>
+              </div>
 
           <div className="space-y-1.5">
             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
@@ -304,8 +304,9 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               </label>
               <input 
                 type="text" 
+                inputMode="numeric"
                 value={lot}
-                onChange={e => setLot(e.target.value)}
+                onChange={e => setLot(e.target.value.replace(/\D/g, ''))}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
               />
             </div>
@@ -317,9 +318,13 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 <Hash className="w-3 h-3" /> Quantidade Total (Unidades ou Kg)
               </label>
               <input 
-                type="number" 
-                value={quantity}
-                onChange={e => setQuantity(Number(e.target.value))}
+                type="text" 
+                inputMode="numeric"
+                value={quantity === 0 ? '' : quantity}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setQuantity(val === '' ? 0 : Number(val));
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
               />
             </div>
@@ -339,19 +344,43 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[7px] font-bold text-slate-600 uppercase tracking-widest text-center block">Caixas</label>
-                  <input type="number" value={boxes} onChange={e => setBoxes(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={boxes === 0 ? '' : boxes} 
+                    onChange={e => setBoxes(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[7px] font-bold text-slate-600 uppercase tracking-widest text-center block">Frascos</label>
-                  <input type="number" value={bottles} onChange={e => setBottles(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={bottles === 0 ? '' : bottles} 
+                    onChange={e => setBottles(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[7px] font-bold text-slate-600 uppercase tracking-widest text-center block">Berços</label>
-                  <input type="number" value={cradles} onChange={e => setCradles(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={cradles === 0 ? '' : cradles} 
+                    onChange={e => setCradles(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[7px] font-bold text-slate-600 uppercase tracking-widest text-center block">Tampas</label>
-                  <input type="number" value={caps} onChange={e => setCaps(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={caps === 0 ? '' : caps} 
+                    onChange={e => setCaps(Number(e.target.value.replace(/\D/g, '')) || 0)} 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                  />
                 </div>
               </div>
 
