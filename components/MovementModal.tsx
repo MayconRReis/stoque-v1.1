@@ -193,8 +193,6 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleEntrySubmit = () => {
     const isSupplies = contentType === SlotContent.SUPPLIES;
     if (!name || !slotId) return;
@@ -239,7 +237,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     });
   };
 
-  const contentTypes = [
+  const contentTypes = useMemo(() => [
     { value: SlotContent.BOTTLES, label: 'Frasco' },
     { value: SlotContent.SUPPLIES, label: 'Insumo' },
     { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
@@ -253,7 +251,9 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     { value: SlotContent.MISCELLANEOUS, label: 'Diversos' },
     { value: SlotContent.DISCARD, label: 'Descarte' },
     { value: SlotContent.OTHER, label: 'Outro' },
-  ];
+  ].sort((a, b) => a.label.localeCompare(b.label)), []);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">

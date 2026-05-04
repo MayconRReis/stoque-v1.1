@@ -147,3 +147,24 @@ export const translateSlotContent = (content: SlotContent): string => {
   };
   return translations[content] || content;
 };
+
+export const getContentTypeColor = (content: SlotContent): string => {
+  const colors: Record<SlotContent, string> = {
+    [SlotContent.EMPTY]: 'text-slate-400',
+    [SlotContent.BOTTLES]: 'text-sky-400',
+    [SlotContent.SUPPLIES]: 'text-amber-400',
+    [SlotContent.FINISHED_PRODUCT]: 'text-emerald-400',
+    [SlotContent.USE_CONSUMPTION]: 'text-purple-400',
+    [SlotContent.CONTAINER_SJ]: 'text-rose-400',
+    [SlotContent.CONTAINER_LP]: 'text-blue-400',
+    [SlotContent.CONTAINER_CP]: 'text-indigo-400',
+    [SlotContent.RETURN]: 'text-orange-400',
+    [SlotContent.REWORK]: 'text-yellow-400',
+    [SlotContent.REPROCESS]: 'text-teal-400',
+    [SlotContent.ROTATIVE]: 'text-pink-400',
+    [SlotContent.MISCELLANEOUS]: 'text-slate-400',
+    [SlotContent.DISCARD]: 'text-red-500',
+    [SlotContent.OTHER]: 'text-gray-400'
+  };
+  return colors[content] || 'text-slate-400';
+};

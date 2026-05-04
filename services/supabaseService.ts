@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem } from '../types';
 
 /**
@@ -84,13 +84,18 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
 export const supabaseService = {
   // Inventory
   async getInventory(): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('inventory');
+
     const { data, error } = await supabase
       .from('inventory')
       .select('*')
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
-    return (data || []).map(item => ({
+    if (error) {
+      console.warn('Supabase getInventory failed, falling back to local storage:', error);
+      return localStorageHelper.get('inventory');
+    }
+    const inventory = (data || []).map(item => ({
       id: item.id,
       loadingId: item.loading_id,
       originOP: item.origin_op,
@@ -102,28 +107,32 @@ export const supabaseService = {
       inspections: item.inspections || [],
       operatorName: item.operator_name
     }));
+    localStorageHelper.save('inventory', inventory);
+    return inventory;
   },
 
   async saveInventoryItem(item: SheetRow) {
-    const { error } = await supabase
-      .from('inventory')
-      .upsert({
-        id: item.id,
-        loading_id: item.loadingId,
-        origin_op: item.originOP,
-        description: item.description,
-        lot: item.lot,
-        pallets: item.pallets,
-        date: item.date,
-        status: item.status,
-        inspections: item.inspections || [],
-        operator_name: item.operatorName
-      });
-    
-    if (error) {
-      console.error('Supabase saveInventoryItem error:', error);
-      throw new Error(`Erro ao salvar item no estoque: ${error.message} (${error.details || 'Sem detalhes'})`);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('inventory')
+        .upsert({
+          id: item.id,
+          loading_id: item.loadingId,
+          origin_op: item.originOP,
+          description: item.description,
+          lot: item.lot,
+          pallets: item.pallets,
+          date: item.date,
+          status: item.status,
+          inspections: item.inspections || [],
+          operator_name: item.operatorName
+        });
+      
+      if (error) {
+        console.error('Supabase saveInventoryItem error:', error);
+      }
     }
+    localStorageHelper.update('inventory', item);
   },
 
   async deleteInventoryItem(id: string) {
@@ -136,6 +145,8 @@ export const supabaseService = {
 
   // Slots
   async getSlots(): Promise<WarehouseSlot[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('warehouse_slots');
+
     const { data, error } = await supabase
       .from('warehouse_slots')
       .select('*')
@@ -143,8 +154,11 @@ export const supabaseService = {
       .order('level')
       .order('position');
     
-    if (error) throw error;
-    return (data || []).map(slot => ({
+    if (error) {
+      console.warn('Supabase getSlots failed, falling back to local storage:', error);
+      return localStorageHelper.get('warehouse_slots');
+    }
+    const slots = (data || []).map(slot => ({
       id: slot.id,
       rack: slot.rack as any,
       level: slot.level,
@@ -152,25 +166,29 @@ export const supabaseService = {
       status: slot.status as SlotContent,
       occupiedBy: slot.occupied_by
     }));
+    localStorageHelper.save('warehouse_slots', slots);
+    return slots;
   },
 
   async updateSlot(slot: WarehouseSlot) {
-    const { error } = await supabase
-      .from('warehouse_slots')
-      .upsert({
-        id: slot.id,
-        rack: slot.rack,
-        level: slot.level,
-        position: slot.position,
-        status: slot.status,
-        occupied_by: slot.occupiedBy,
-        updated_at: new Date().toISOString()
-      });
-    
-    if (error) {
-      console.error('Supabase updateSlot error:', error);
-      throw new Error(`Erro ao atualizar vaga: ${error.message}`);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('warehouse_slots')
+        .upsert({
+          id: slot.id,
+          rack: slot.rack,
+          level: slot.level,
+          position: slot.position,
+          status: slot.status,
+          occupied_by: slot.occupiedBy,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) {
+        console.error('Supabase updateSlot error:', error);
+      }
     }
+    localStorageHelper.update('warehouse_slots', slot);
   },
 
   async bulkUpdateSlots(slots: WarehouseSlot[]) {
@@ -191,13 +209,18 @@ export const supabaseService = {
 
   // History
   async getHistory(): Promise<HistoryEntry[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('history');
+
     const { data, error } = await supabase
       .from('history')
       .select('*')
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
-    return (data || []).map(entry => ({
+    if (error) {
+      console.warn('Supabase getHistory failed, falling back to local storage:', error);
+      return localStorageHelper.get('history');
+    }
+    const history = (data || []).map(entry => ({
       id: entry.id,
       type: entry.type as HistoryType,
       timestamp: entry.timestamp,
@@ -211,34 +234,52 @@ export const supabaseService = {
       details: entry.details,
       operatorName: entry.operator_name
     }));
+    localStorageHelper.save('history', history);
+    return history;
   },
 
   async addHistoryEntry(entry: HistoryEntry) {
-    const { error } = await supabase
-      .from('history')
-      .insert({
-        id: entry.id,
-        type: entry.type,
-        timestamp: entry.timestamp,
-        loading_id: entry.loadingId,
-        description: entry.description,
-        op: entry.op,
-        lot: entry.lot,
-        pallet_number: entry.palletNumber,
-        total_pallets: entry.totalPallets,
-        slot: entry.slot,
-        details: entry.details,
-        operator_name: entry.operatorName
-      });
-    
-    if (error) {
-      console.error('Supabase addHistoryEntry error:', error);
-      throw new Error(`Erro ao salvar histórico: ${error.message}`);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('history')
+        .insert({
+          id: entry.id,
+          type: entry.type,
+          timestamp: entry.timestamp,
+          loading_id: entry.loadingId,
+          description: entry.description,
+          op: entry.op,
+          lot: entry.lot,
+          pallet_number: entry.palletNumber,
+          total_pallets: entry.totalPallets,
+          slot: entry.slot,
+          details: entry.details,
+          operator_name: entry.operatorName
+        });
+      
+      if (error) {
+        console.error('Supabase addHistoryEntry error:', error);
+      }
     }
+    localStorageHelper.add('history', entry);
   },
 
   // Auth
   async signIn(username: string, password: string) {
+    if (!isSupabaseConfigured) {
+      // Mock login for offline mode
+      const mockUser = {
+        id: 'offline-user',
+        email: `${username}@stoqueplus.com`,
+      };
+      localStorage.setItem('stoque_plus_logged_user', JSON.stringify({
+        id: mockUser.id,
+        name: username,
+        role: username.toLowerCase() === 'admin' ? 'admin' : 'operator'
+      }));
+      return { user: mockUser, session: { access_token: 'mock-token' } };
+    }
+
     // We append a domain to the username to use Supabase Auth's email system
     const email = `${username.toLowerCase().trim()}@stoqueplus.com`;
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -250,11 +291,20 @@ export const supabaseService = {
   },
 
   async signOut() {
+    if (!isSupabaseConfigured) {
+      localStorage.removeItem('stoque_plus_logged_user');
+      return;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   },
 
   async getCurrentUser() {
+    if (!isSupabaseConfigured) {
+      const localUser = localStorage.getItem('stoque_plus_logged_user');
+      return localUser ? JSON.parse(localUser) : null;
+    }
+
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) return null;
@@ -282,6 +332,7 @@ export const supabaseService = {
 
   // Real-time Subscriptions
   subscribeToInventory(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
     return supabase
       .channel('inventory-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, callback)
@@ -289,6 +340,7 @@ export const supabaseService = {
   },
 
   subscribeToSlots(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
     return supabase
       .channel('slot-changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warehouse_slots' }, callback)
@@ -296,6 +348,7 @@ export const supabaseService = {
   },
 
   subscribeToNotifications(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
     const channel = supabase.channel('app-notifications');
     channel
       .on('broadcast', { event: 'new-import' }, ({ payload }) => callback(payload))
@@ -304,6 +357,7 @@ export const supabaseService = {
   },
 
   broadcastNotification(payload: { user: string, message: string, type?: string }) {
+    if (!isSupabaseConfigured) return;
     supabase.channel('app-notifications').send({
       type: 'broadcast',
       event: 'new-import',
@@ -313,13 +367,18 @@ export const supabaseService = {
 
   // Shipments
   async getShipments(): Promise<Shipment[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('shipments');
+
     const { data, error } = await supabase
       .from('shipments')
       .select('*')
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
-    return (data || []).map(s => ({
+    if (error) {
+       console.warn('Supabase getShipments failed, falling back to local storage:', error);
+       return localStorageHelper.get('shipments');
+    }
+    const shipments = (data || []).map(s => ({
       id: s.id,
       type: s.type as ShipmentType,
       status: s.status as ShipmentStatus,
@@ -328,22 +387,27 @@ export const supabaseService = {
       operatorName: s.operator_name,
       closedAt: s.closed_at
     }));
+    localStorageHelper.save('shipments', shipments);
+    return shipments;
   },
 
   async saveShipment(shipment: Shipment) {
-    const { error } = await supabase
-      .from('shipments')
-      .upsert({
-        id: shipment.id,
-        type: shipment.type,
-        status: shipment.status,
-        created_at: shipment.createdAt,
-        scheduled_date: shipment.scheduledDate,
-        operator_name: shipment.operatorName,
-        closed_at: shipment.closedAt
-      });
-    
-    if (error) throw error;
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('shipments')
+        .upsert({
+          id: shipment.id,
+          type: shipment.type,
+          status: shipment.status,
+          created_at: shipment.createdAt,
+          scheduled_date: shipment.scheduledDate,
+          operator_name: shipment.operatorName,
+          closed_at: shipment.closedAt
+        });
+      
+      if (error) console.error('Supabase saveShipment error:', error);
+    }
+    localStorageHelper.update('shipments', shipment);
   },
 
   async deleteShipment(shipmentId: string) {
@@ -426,13 +490,18 @@ export const supabaseService = {
 
   // Rotative Stock
   async getRotativeStock(): Promise<RotativeStockItem[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('rotative_stock');
+
     const { data, error } = await supabase
       .from('rotative_stock')
       .select('*')
       .order('updated_at', { ascending: false });
     
-    if (error) throw error;
-    return (data || []).map(item => ({
+    if (error) {
+       console.warn('Supabase getRotativeStock failed, falling back to local storage:', error);
+       return localStorageHelper.get('rotative_stock');
+    }
+    const rotativeStock = (data || []).map(item => ({
       id: item.id,
       productName: item.product_name,
       quantity: item.quantity,
@@ -440,21 +509,26 @@ export const supabaseService = {
       type: item.type || 'Frasco',
       updatedAt: item.updated_at
     }));
+    localStorageHelper.save('rotative_stock', rotativeStock);
+    return rotativeStock;
   },
 
   async saveRotativeStockItem(item: RotativeStockItem) {
-    const { error } = await supabase
-      .from('rotative_stock')
-      .upsert({
-        id: item.id,
-        product_name: item.productName,
-        quantity: item.quantity,
-        slot_id: item.slotId,
-        type: item.type,
-        updated_at: new Date().toISOString()
-      });
-    
-    if (error) throw error;
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('rotative_stock')
+        .upsert({
+          id: item.id,
+          product_name: item.productName,
+          quantity: item.quantity,
+          slot_id: item.slotId,
+          type: item.type,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) console.error('Supabase saveRotativeStockItem error:', error);
+    }
+    localStorageHelper.update('rotative_stock', item);
   },
 
   async deleteRotativeStockItem(id: string) {
@@ -477,5 +551,33 @@ export const supabaseService = {
       .channel('shipment-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
       .subscribe();
+  }
+};
+
+const localStorageHelper = {
+  get: (key: string) => {
+    const data = localStorage.getItem(`stoque_plus_${key}`);
+    return data ? JSON.parse(data) : [];
+  },
+  save: (key: string, data: any) => {
+    localStorage.setItem(`stoque_plus_${key}`, JSON.stringify(data));
+  },
+  add: (key: string, item: any) => {
+    const data = localStorageHelper.get(key);
+    localStorageHelper.save(key, [item, ...data]);
+  },
+  update: (key: string, item: any, idField: string = 'id') => {
+    const data = localStorageHelper.get(key);
+    const index = data.findIndex((i: any) => i[idField] === item[idField]);
+    if (index !== -1) {
+      data[index] = item;
+      localStorageHelper.save(key, data);
+    } else {
+      localStorageHelper.add(key, item);
+    }
+  },
+  remove: (key: string, id: string, idField: string = 'id') => {
+    const data = localStorageHelper.get(key);
+    localStorageHelper.save(key, data.filter((i: any) => i[idField] !== id));
   }
 };

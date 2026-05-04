@@ -44,6 +44,7 @@ import {
   HistoryEntry, 
   HistoryType, 
   translateSlotContent,
+  getContentTypeColor,
   Shipment,
   ShipmentType,
   ShipmentStatus
@@ -121,6 +122,7 @@ const App: React.FC = () => {
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
 
   const [deleteContext, setDeleteContext] = useState<{ type: 'row' | 'pallet', rowId: string, palletIdx?: number } | null>(null);
   const [matrixConfirmContext, setMatrixConfirmContext] = useState<{ rowId: string, palletIdx: number, slotId?: string } | null>(null);
@@ -1779,6 +1781,19 @@ const App: React.FC = () => {
     </div>
   );
 
+  const filteredHistory = useMemo(() => {
+    const term = historySearch.toLowerCase().trim();
+    if (!term) return history;
+    return history.filter(entry => 
+      entry.op.toLowerCase().includes(term) ||
+      entry.description.toLowerCase().includes(term) ||
+      entry.lot.toLowerCase().includes(term) ||
+      entry.details.toLowerCase().includes(term) ||
+      entry.loadingId.toLowerCase().includes(term) ||
+      (entry.operatorName && entry.operatorName.toLowerCase().includes(term))
+    );
+  }, [history, historySearch]);
+
   const filteredInventory = useMemo(() => {
     const term = inventorySearch.toLowerCase().trim();
     const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
@@ -1805,6 +1820,15 @@ const App: React.FC = () => {
       });
     });
     return allPallets.sort((a, b) => {
+      // Sort by date descending (most recent first)
+      const dateA = new Date(a.row.date).getTime();
+      const dateB = new Date(b.row.date).getTime();
+      
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+      
+      // Secondary sort by slot
       const slotA = a.inspection.assignedSlot || '';
       const slotB = b.inspection.assignedSlot || '';
       return slotA.localeCompare(slotB, undefined, { numeric: true });
@@ -2327,14 +2351,28 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'history' && (
-            <div className="max-w-5xl mx-auto space-y-3 animate-in fade-in duration-500">
-                {history.length === 0 ? (
-                    <div className="py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
-                        <History className="w-12 h-12 text-slate-800 mx-auto mb-4" />
-                        <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">Sem movimentações registradas</p>
-                    </div>
-                ) : (
-                    history.map(entry => (
+            <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
+                <div className="relative w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 w-4 h-4" />
+                    <input 
+                        type="text" 
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        placeholder="Pesquisar no histórico (OP, Produto, Lote, ID)..." 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    {filteredHistory.length === 0 ? (
+                        <div className="py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
+                            <History className="w-12 h-12 text-slate-800 mx-auto mb-4" />
+                            <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">
+                                {historySearch ? 'Nenhum registro encontrado para esta pesquisa' : 'Sem movimentações registradas'}
+                            </p>
+                        </div>
+                    ) : (
+                        filteredHistory.map(entry => (
                         <div key={entry.id} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:border-slate-700 transition-all group">
                             <div className="flex flex-col items-start min-w-[120px]">
                                 <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border mb-2 ${
@@ -2369,8 +2407,8 @@ const App: React.FC = () => {
                               <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{entry.details}</p>
                             </div>
                         </div>
-                    ))
-                )}
+                    )))}
+                </div>
             </div>
           )}
 
@@ -2576,12 +2614,12 @@ const App: React.FC = () => {
                                           <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">ID</p>
                                           <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId}</p>
                                        </div>
-                                       {isUseConsumption && (
-                                         <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
-                                            <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Tipo</p>
-                                            <p className="text-xs font-black text-purple-400 uppercase italic">Uso e Consumo</p>
-                                         </div>
-                                       )}
+                                       <div className="col-span-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50 text-center">
+                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5 tracking-widest">Tipo</p>
+                                          <p className={`text-xs font-black uppercase italic ${getContentTypeColor(insp.contentType)}`}>
+                                            {translateSlotContent(insp.contentType)}
+                                          </p>
+                                       </div>
                                     </div>
                                   </div>
                                   

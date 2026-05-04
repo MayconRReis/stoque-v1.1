@@ -17,7 +17,8 @@ import {
   Check,
   LayoutGrid,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -155,17 +156,19 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({ isOpen, onClos
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tipo de Conteúdo</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: SlotContent.BOTTLES, label: 'Frasco', icon: FlaskConical },
-                { id: SlotContent.SUPPLIES, label: 'Insumo', icon: Package },
-                { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado', icon: Truck },
-                { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', icon: Box },
-                { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo', icon: Container },
                 { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo', icon: Container },
                 { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto', icon: Container },
-                { id: SlotContent.MISCELLANEOUS, label: 'Diversos', icon: LayoutGrid },
+                { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo', icon: Container },
                 { id: SlotContent.DISCARD, label: 'Descarte', icon: Trash2 },
-                { id: SlotContent.OTHER, label: 'Outro', icon: MoreHorizontal }
-              ].map((type) => (
+                { id: SlotContent.MISCELLANEOUS, label: 'Diversos', icon: LayoutGrid },
+                { id: SlotContent.BOTTLES, label: 'Frasco', icon: FlaskConical },
+                { id: SlotContent.SUPPLIES, label: 'Insumo', icon: Package },
+                { id: SlotContent.OTHER, label: 'Outro', icon: MoreHorizontal },
+                { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado', icon: Truck },
+                { id: SlotContent.REPROCESS, label: 'Reprocesso', icon: RefreshCw },
+                { id: SlotContent.REWORK, label: 'Retrabalho', icon: RefreshCw },
+                { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', icon: Box }
+              ].sort((a, b) => a.label.localeCompare(b.label)).map((type) => (
                 <button
                   key={type.id}
                   onClick={() => setContentType(type.id)}
