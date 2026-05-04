@@ -1815,6 +1815,7 @@ const App: React.FC = () => {
       entry.lot.toLowerCase().includes(term) ||
       entry.details.toLowerCase().includes(term) ||
       entry.loadingId.toLowerCase().includes(term) ||
+      entry.slot.toLowerCase().includes(term) ||
       (entry.operatorName && entry.operatorName.toLowerCase().includes(term))
     );
   }, [history, historySearch]);
@@ -1832,6 +1833,7 @@ const App: React.FC = () => {
           item.originOP.includes(term) || 
           item.lot.toLowerCase().includes(term) ||
           item.loadingId.toLowerCase().includes(term) ||
+          (insp.assignedSlot && insp.assignedSlot.toLowerCase().includes(term)) ||
           item.id.toLowerCase().includes(term);
         
         // Type filter check
