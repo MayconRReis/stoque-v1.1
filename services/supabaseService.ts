@@ -305,34 +305,28 @@ export const supabaseService = {
       const all = localStorageHelper.get('inventory');
       return all.filter((r: any) => r.inspections?.some((i: any) => i.shipmentId === shipmentId || i.shipment_id === shipmentId));
     }
-    // We fetch all items whose inspections array contains an object with shipmentId === shipmentId
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .filter('inspections', 'cs', JSON.stringify([{ shipmentId: shipmentId }]));
     
-    if (error) {
-        // Fallback or retry with snake_case if first fails (for older data)
-        const { data: d2, error: e2 } = await supabase
-          .from('inventory')
-          .select('*')
-          .filter('inspections', 'cs', JSON.stringify([{ shipment_id: shipmentId }]));
-        if (e2) throw e2;
-        return (d2 || []).map(item => ({
-          id: item.id,
-          loadingId: item.loading_id,
-          originOP: item.origin_op,
-          description: item.description,
-          lot: item.lot,
-          pallets: item.pallets,
-          date: item.date,
-          status: item.status as StockStatus,
-          inspections: item.inspections || [],
-          operatorName: item.operator_name
-        }));
-    }
+    // We fetch using both camelCase and snake_case to ensure we catch all records
+    const [camelCaseRes, snakeCaseRes] = await Promise.all([
+      supabase
+        .from('inventory')
+        .select('*')
+        .filter('inspections', 'cs', JSON.stringify([{ shipmentId: shipmentId }])),
+      supabase
+        .from('inventory')
+        .select('*')
+        .filter('inspections', 'cs', JSON.stringify([{ shipment_id: shipmentId }]))
+    ]);
 
-    return (data || []).map(item => ({
+    if (camelCaseRes.error) throw camelCaseRes.error;
+    if (snakeCaseRes.error) throw snakeCaseRes.error;
+
+    // Merge results and remove duplicates (some items might have both or we might have fetched them twice)
+    const combinedData = [...(camelCaseRes.data || []), ...(snakeCaseRes.data || [])];
+    const uniqueMap = new Map<string, any>();
+    combinedData.forEach(item => uniqueMap.set(item.id, item));
+    
+    return Array.from(uniqueMap.values()).map(item => ({
       id: item.id,
       loadingId: item.loading_id,
       originOP: item.origin_op,
@@ -775,20 +769,10 @@ export const supabaseService = {
 
   async deleteShipment(shipmentId: string) {
     // 1. Unlink all inventory items from this shipment
-    const { data: items, error: fetchError } = await supabase
-      .from('inventory')
-      .select('*');
+    const items = await this.getInventoryItemsByShipmentId(shipmentId);
     
-    if (fetchError) throw fetchError;
-
-    const updates = (items || []).filter(item => {
-      return (item.inspections || []).some((insp: any) => 
-        insp.shipmentId === shipmentId || insp.shipment_id === shipmentId
-      );
-    });
-
-    for (const item of updates) {
-      const updatedInspections = item.inspections.map((insp: any) => {
+    for (const item of items) {
+      const updatedInspections = (item.inspections || []).map((insp: any) => {
         if (insp.shipmentId === shipmentId || insp.shipment_id === shipmentId) {
           const newInsp = { ...insp };
           delete newInsp.shipmentId;
@@ -837,7 +821,14 @@ export const supabaseService = {
       const inspections = [...(item.inspections || [])];
       grouped[rowId].forEach(idx => {
         if (inspections[idx]) {
-          inspections[idx] = { ...inspections[idx], shipmentId: shipmentId || undefined };
+          if (shipmentId === null) {
+            const newInsp = { ...inspections[idx] };
+            delete newInsp.shipmentId;
+            delete (newInsp as any).shipment_id;
+            inspections[idx] = newInsp;
+          } else {
+            inspections[idx] = { ...inspections[idx], shipmentId: shipmentId };
+          }
         }
       });
 
