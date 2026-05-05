@@ -111,6 +111,239 @@ export const supabaseService = {
     return inventory;
   },
 
+  async getInventoryPaginated(page: number, pageSize: number, filters?: { searchTerm?: string, typeFilter?: string }): Promise<{ data: SheetRow[], count: number }> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      let filtered = [...all];
+      if (filters?.searchTerm) {
+        const term = filters.searchTerm.toLowerCase();
+        filtered = filtered.filter(row => 
+          row.originOP.toLowerCase().includes(term) ||
+          row.description.toLowerCase().includes(term) ||
+          row.lot.toLowerCase().includes(term) ||
+          row.id.toLowerCase().includes(term)
+        );
+      }
+      if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
+        filtered = filtered.filter(row => {
+          if (filters.typeFilter === 'CONTAINER') {
+             return row.inspections?.some((i: any) => 
+               [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(i.contentType)
+             );
+          }
+          return row.inspections?.some((i: any) => i.contentType === filters.typeFilter);
+        });
+      }
+
+      const from = page * pageSize;
+      const to = from + pageSize;
+      return {
+        data: filtered.slice(from, to),
+        count: filtered.length
+      };
+    }
+
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('inventory')
+      .select('*', { count: 'exact' });
+
+    if (filters?.searchTerm) {
+      const term = `%${filters.searchTerm}%`;
+      query = query.or(`origin_op.ilike.${term},description.ilike.${term},lot.ilike.${term},id.ilike.${term}`);
+    }
+
+    if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
+      if (filters.typeFilter === 'CONTAINER') {
+        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]);
+        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]);
+        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]);
+        query = query.or(`inspections.cs.${sj},inspections.cs.${lp},inspections.cs.${cp}`);
+      } else {
+        query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
+      }
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('Supabase getInventoryPaginated error:', error);
+      throw error;
+    }
+
+    const inventory = (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
+
+    return { data: inventory, count: count || 0 };
+  },
+
+  async getPendingInventory(): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('inventory').filter((r: any) => r.status === StockStatus.PENDING);
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('status', 'PENDING')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
+  },
+
+  async getWaitingInventory(): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('inventory');
+    // We need to find items where inspections have assignedSlot === 'AGUARDANDO'
+    // Since we can't easily filter by nested JSON array value in a simple .eq(), 
+    // we fetch items that likely have it or just fetch and filter.
+    // Given 'AGUARDANDO' is a specific use case, we fetch all non-pending and filter.
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .neq('status', 'PENDING');
+    
+    if (error) throw error;
+    
+    const inventory = (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
+
+    return inventory.filter(row => row.inspections?.some(insp => insp.assignedSlot === 'AGUARDANDO'));
+  },
+
+  async getAllInventoryForExport(filters?: { searchTerm?: string, typeFilter?: string }): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) return localStorageHelper.get('inventory');
+
+    let query = supabase
+      .from('inventory')
+      .select('*');
+
+    if (filters?.searchTerm) {
+      const term = `%${filters.searchTerm}%`;
+      query = query.or(`origin_op.ilike.${term},description.ilike.${term},lot.ilike.${term},id.ilike.${term}`);
+    }
+
+    if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
+      if (filters.typeFilter === 'CONTAINER') {
+        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]);
+        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]);
+        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]);
+        query = query.or(`inspections.cs.${sj},inspections.cs.${lp},inspections.cs.${cp}`);
+      } else {
+        query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
+      }
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
+  },
+
+  async getGlobalStats(): Promise<DashboardStats> {
+    if (!isSupabaseConfigured) {
+      // Basic mock fallback for offline
+      return {
+        totalSlots: 264,
+        freeSlots: 200,
+        pendingEntries: 0,
+        occupancyRate: 24,
+        dailyMovements: 0,
+        occupiedSlots: 64,
+        totalBottles: 0,
+        waitingPallets: 0,
+        finishedShipments24h: 0,
+        openShipmentsCount: 0
+      };
+    }
+
+    const results = await Promise.all([
+      supabase.from('warehouse_slots').select('*', { count: 'exact', head: true }),
+      supabase.from('warehouse_slots').select('*', { count: 'exact', head: true }).neq('status', 'EMPTY'),
+      supabase.from('inventory').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
+      supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
+      supabase.from('history').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+      supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'CLOSED').gte('closed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+      supabase.from('inventory').select('inspections') 
+    ]);
+
+    const totalSlotsCount = results[0].count || 0;
+    const occupiedSlotsCount = results[1].count || 0;
+    const pendingCount = results[2].count || 0;
+    const openShipments = results[3].count || 0;
+    const movements24h = results[4].count || 0;
+    const finishedShipments = results[5].count || 0;
+    const allInspections = results[6].data || [];
+
+    let totalBottles = 0;
+    let waitingPallets = 0;
+
+    allInspections.forEach(item => {
+      (item.inspections || []).forEach((insp: any) => {
+        totalBottles += (insp.bottles || 0);
+        if (insp.assignedSlot === 'AGUARDANDO') {
+          waitingPallets += 1;
+        }
+      });
+    });
+
+    return {
+      totalSlots: totalSlotsCount,
+      occupiedSlots: occupiedSlotsCount,
+      freeSlots: totalSlotsCount - occupiedSlotsCount,
+      occupancyRate: totalSlotsCount > 0 ? Math.round((occupiedSlotsCount / totalSlotsCount) * 100) : 0,
+      pendingEntries: pendingCount,
+      openShipmentsCount: openShipments,
+      dailyMovements: movements24h,
+      finishedShipments24h: finishedShipments,
+      totalBottles,
+      waitingPallets
+    };
+  },
+
   async saveInventoryItem(item: SheetRow) {
     if (isSupabaseConfigured) {
       const { error } = await supabase
