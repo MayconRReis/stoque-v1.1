@@ -28,25 +28,27 @@ import { formatOP } from '../lib/formatters';
 interface EditPalletModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updatedData: { 
-    description: string; 
-    op: string; 
-    lot: string; 
-    quantity: number;
-    contentType: SlotContent;
-    assignedSlot?: string;
-    supplyDetails?: {
-      bottles: number;
-      caps: number;
-      boxes: number;
-      cradles: number;
-      others: { name: string; quantity: number }[];
-    }
-  }) => void;
+    onSave: (updatedData: { 
+      description: string; 
+      op: string; 
+      lot: string; 
+      quantity: number;
+      contentType: SlotContent;
+      assignedSlot?: string;
+      reason?: string;
+      supplyDetails?: {
+        bottles: number;
+        caps: number;
+        boxes: number;
+        cradles: number;
+        others: { name: string; quantity: number }[];
+      }
+    }) => void;
   pallet: { row: SheetRow; inspection: InspectionData; idx: number } | null;
   history: any[];
   availableSlots: WarehouseSlot[];
   mode?: 'edit' | 'assign';
+  userRole?: 'admin' | 'operator';
 }
 
 export const EditPalletModal: React.FC<EditPalletModalProps> = ({ 
@@ -56,7 +58,8 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   pallet, 
   history, 
   availableSlots,
-  mode = 'edit'
+  mode = 'edit',
+  userRole = 'admin'
 }) => {
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
@@ -65,6 +68,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const [contentType, setContentType] = useState<SlotContent>(SlotContent.BOTTLES);
   const [assignedSlot, setAssignedSlot] = useState<string>('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [reason, setReason] = useState('');
   
   // Supply Details State
   const [bottles, setBottles] = useState(0);
@@ -123,12 +127,18 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   if (!isOpen || !pallet) return null;
 
   const handleSave = () => {
+    if (userRole === 'operator' && mode === 'edit' && !reason.trim()) {
+      alert('Por favor, informe o motivo da alteração.');
+      return;
+    }
+
     onSave({
       description: description.toUpperCase(),
       op: formatOP(op),
       lot: lot.toUpperCase(),
       quantity,
       contentType,
+      reason: userRole === 'operator' ? reason : undefined,
       assignedSlot: assignedSlot || pallet?.inspection.assignedSlot,
       supplyDetails: contentType === SlotContent.SUPPLIES ? {
         bottles,
@@ -140,7 +150,13 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
           .map(({ id, name, ...rest }) => ({ ...rest, name: name.toUpperCase() }))
       } : undefined
     });
+
+    if (userRole === 'operator') {
+      setReason('');
+    }
   };
+
+  const isOperatorEdit = userRole === 'operator' && mode === 'edit';
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
@@ -151,12 +167,12 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       >
         <div className="bg-slate-800/30 p-6 flex justify-between items-center border-b border-slate-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40 transform -rotate-3">
+            <div className={`w-10 h-10 ${isOperatorEdit ? 'bg-amber-600' : 'bg-blue-600'} rounded-xl flex items-center justify-center shadow-lg ${isOperatorEdit ? 'shadow-amber-900/40' : 'shadow-blue-900/40'} transform -rotate-3`}>
               <Pencil className="text-white w-5 h-5" />
             </div>
             <div>
               <h3 className="font-black text-lg italic uppercase tracking-tighter text-white">
-                {mode === 'assign' ? 'Alocar Pallet' : 'Editar Pallet'}
+                {mode === 'assign' ? 'Alocar Pallet' : (isOperatorEdit ? 'Solicitar Alteração' : 'Editar Pallet')}
               </h3>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                 {pallet.inspection.assignedSlot === 'AGUARDANDO' ? 'Status: Em Espera' : (pallet.inspection.assignedSlot ? `Vaga ${pallet.inspection.assignedSlot}` : 'Pendente de Análise')}
@@ -413,6 +429,22 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
             </motion.div>
           )}
 
+          {isOperatorEdit && (
+            <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
+              <label className="text-[9px] font-black text-amber-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                <FileText className="w-3 h-3" /> Motivo da Alteração (Obrigatório)
+              </label>
+              <textarea 
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                rows={3}
+                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-amber-500 outline-none transition-all resize-none placeholder:text-amber-500/20 shadow-inner"
+                placeholder="Explique por que esta alteração é necessária..."
+                required
+              />
+            </div>
+          )}
+
           </>
           )}
 
@@ -428,10 +460,11 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               className={`flex-[2] py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 text-center ${
                 mode === 'assign' || (pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO')
                   ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-xl shadow-amber-900/40 text-white' 
-                  : 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-xl shadow-blue-900/40 text-white'
+                  : (isOperatorEdit ? 'bg-amber-600 hover:bg-amber-500 shadow-xl shadow-amber-900/20 text-white' : 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-xl shadow-blue-900/40 text-white')
               }`}
             >
-              {pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO' ? 'Confirmar Alocação' : 'Salvar Alterações'} <Save className="w-4 h-4" />
+              {pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO' ? 'Confirmar Alocação' : (isOperatorEdit ? 'Enviar Solicitação' : 'Salvar Alterações')} 
+              <Save className="w-4 h-4" />
             </button>
           </div>
         </div>

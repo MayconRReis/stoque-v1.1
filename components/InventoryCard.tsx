@@ -27,6 +27,7 @@ interface InventoryCardProps {
   onShowDetail: (row: SheetRow, insp: InspectionData, idx: number) => void;
   onEdit: (row: SheetRow, insp: InspectionData, idx: number) => void;
   onDelete: (rowId: string, idx: number) => void;
+  userRole?: 'admin' | 'operator';
 }
 
 const InventoryCard: React.FC<InventoryCardProps> = ({ 
@@ -37,7 +38,8 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
   onToggleSelection, 
   onShowDetail, 
   onEdit, 
-  onDelete 
+  onDelete,
+  userRole = 'admin'
 }) => {
   const isRework = insp.contentType === SlotContent.REWORK;
   const isReprocess = insp.contentType === SlotContent.REPROCESS;
@@ -187,7 +189,7 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
             }} 
             className={`flex-1 py-2.5 bg-slate-950/50 hover:bg-${baseColor}-500/10 text-${baseColor}-400 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2`}
           >
-            <Pencil className="w-3.5 h-3.5" /> Editar
+            <Pencil className="w-3.5 h-3.5" /> {userRole === 'admin' ? 'Editar' : 'Solicitar Alteração'}
           </button>
           
           <button 

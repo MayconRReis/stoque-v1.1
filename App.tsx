@@ -65,6 +65,7 @@ import { ShipmentDetailModal } from './components/ShipmentDetailModal';
 import { supabaseService } from './services/supabaseService';
 import { Login } from './components/Login';
 import { UserManager } from './components/UserManager';
+import ApprovalsPage from './components/ApprovalsPage';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
@@ -160,7 +161,7 @@ const App: React.FC = () => {
     openShipmentsCount: 0
   });
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users'>('dashboard');
+  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -1605,6 +1606,7 @@ const App: React.FC = () => {
     quantity: number;
     contentType: SlotContent;
     assignedSlot?: string;
+    reason?: string;
     supplyDetails?: {
       bottles: number;
       caps: number;
@@ -1638,6 +1640,24 @@ const App: React.FC = () => {
         operatorName: user?.name
       };
 
+      // Check if it's an operator requesting a change
+      if (user?.role === 'operator' && editPalletMode === 'edit') {
+        const { id: inventory_id } = row;
+        
+        await supabaseService.createEditRequest({
+          inventory_id: inventory_id,
+          requested_by: user.id,
+          before_data: row,
+          after_data: updatedRow,
+          reason: updatedData.reason || 'Alteração de dados do pallet'
+        });
+
+        showNotification('Solicitação de alteração enviada para aprovação do administrador!');
+        setEditPalletContext(null);
+        return;
+      }
+
+      // Admin direct edit or Assignment mode logic
       // If a slot was assigned (moved from AGUARDANDO to a real slot)
       if (updatedData.assignedSlot && updatedData.assignedSlot !== 'AGUARDANDO' && row.inspections?.[idx].assignedSlot === 'AGUARDANDO') {
         const targetSlot = slots.find(s => s.id === updatedData.assignedSlot);
@@ -2204,7 +2224,10 @@ const App: React.FC = () => {
             <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             {user?.role === 'admin' && (
-              <NavItem tab="users" icon={Users} label="Usuários" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+              <>
+                <NavItem tab="approvals" icon={ClipboardCheck} label="Aprovações" isActive={activeTab === 'approvals'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+                <NavItem tab="users" icon={Users} label="Usuários" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+              </>
             )}
           </nav>
 
@@ -2268,6 +2291,8 @@ const App: React.FC = () => {
                   {activeTab === 'history' && 'Histórico'}
                   {activeTab === 'shipments' && 'Gestão de Carregamentos'}
                   {activeTab === 'rotative' && 'Estoque Rotativo'}
+                  {activeTab === 'approvals' && 'Aprovações de Edição'}
+                  {activeTab === 'users' && 'Gerenciamento de Usuários'}
                 </>
               )}
             </h2>
@@ -2497,6 +2522,12 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'approvals' && user?.role === 'admin' && (
+            <div className="max-w-7xl mx-auto">
+              <ApprovalsPage currentUser={user} />
+            </div>
+          )}
+
           {activeTab === 'inventory' && (
             <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
                 {/* Search and Filter Area */}
@@ -2612,6 +2643,7 @@ const App: React.FC = () => {
                                 onShowDetail={handleShowDetail}
                                 onEdit={handleEditPallet}
                                 onDelete={handleDeletePallet}
+                                userRole={user?.role}
                             />
                         ))}
                     </div>
@@ -2719,6 +2751,7 @@ const App: React.FC = () => {
           history={history}
           availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
           mode={editPalletMode}
+          userRole={user?.role}
         />
       )}
 

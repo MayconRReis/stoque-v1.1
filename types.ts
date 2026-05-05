@@ -170,3 +170,21 @@ export const getContentTypeColor = (content: SlotContent): string => {
   };
   return colors[content] || 'text-slate-400';
 };
+
+export interface InventoryEditRequest {
+  id: string;
+  inventory_id: string;
+  requested_by: string;
+  requested_at: string;
+  before_data: Partial<SheetRow>;
+  after_data: Partial<SheetRow>;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  admin_comment?: string;
+  // Join data
+  requester_name?: string;
+  reviewer_name?: string;
+  product_description?: string;
+}

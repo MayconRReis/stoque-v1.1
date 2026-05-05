@@ -844,6 +844,106 @@ export const supabaseService = {
     return signUpData;
   },
 
+  // Edit Requests
+  async createEditRequest(request: {
+    inventory_id: string,
+    requested_by: string,
+    before_data: any,
+    after_data: any,
+    reason: string
+  }) {
+    if (!isSupabaseConfigured) throw new Error('O Supabase não está configurado.');
+    const { data, error } = await supabase
+      .from('inventory_edit_requests')
+      .insert(request)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getEditRequests(): Promise<any[]> {
+    if (!isSupabaseConfigured) return [];
+    
+    // Using a manual join approach since simple joins depend on FK structure and Supabase config
+    // First, get the requests
+    const { data: requests, error } = await supabase
+      .from('inventory_edit_requests')
+      .select('*')
+      .order('requested_at', { ascending: false });
+    
+    if (error) throw error;
+    if (!requests || requests.length === 0) return [];
+
+    // Get all relevant profiles and inventory items to "join" them manually
+    const userIds = [...new Set([
+      ...requests.map(r => r.requested_by),
+      ...requests.map(r => r.reviewed_by).filter(Boolean)
+    ])];
+    
+    const inventoryIds = [...new Set(requests.map(r => r.inventory_id))];
+
+    const [profilesRes, inventoryRes] = await Promise.all([
+      supabase.from('profiles').select('id, name').in('id', userIds),
+      supabase.from('inventory').select('id, description').in('id', inventoryIds)
+    ]);
+
+    const profilesMap = new Map((profilesRes.data || []).map(p => [p.id, p.name]));
+    const inventoryMap = new Map((inventoryRes.data || []).map(i => [i.id, i.description]));
+
+    return requests.map(r => ({
+      ...r,
+      requester_name: profilesMap.get(r.requested_by) || 'Desconhecido',
+      reviewer_name: r.reviewed_by ? profilesMap.get(r.reviewed_by) : undefined,
+      product_description: inventoryMap.get(r.inventory_id) || 'Produto não encontrado'
+    }));
+  },
+
+  async processEditRequest(requestId: string, adminId: string, status: 'approved' | 'rejected', adminComment?: string) {
+    if (!isSupabaseConfigured) throw new Error('O Supabase não está configurado.');
+
+    // 1. Get the request
+    const { data: request, error: fetchError } = await supabase
+      .from('inventory_edit_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+
+    // 2. If approved, apply changes to inventory
+    if (status === 'approved') {
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({
+          loading_id: request.after_data.loadingId,
+          origin_op: request.after_data.originOP,
+          description: request.after_data.description,
+          lot: request.after_data.lot,
+          pallets: request.after_data.pallets,
+          status: request.after_data.status,
+          inspections: request.after_data.inspections
+        })
+        .eq('id', request.inventory_id);
+      
+      if (updateError) throw updateError;
+    }
+
+    // 3. Update the request status
+    const { error: statusError } = await supabase
+      .from('inventory_edit_requests')
+      .update({
+        status,
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+        admin_comment: adminComment
+      })
+      .eq('id', requestId);
+    
+    if (statusError) throw statusError;
+  },
+
   // Real-time Subscriptions
   subscribeToInventory(callback: (payload: any) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
