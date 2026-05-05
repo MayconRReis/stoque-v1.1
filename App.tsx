@@ -67,12 +67,12 @@ import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
 import { RotativeStockManager } from './components/RotativeStockManager';
 import { WaitingSlotsView } from './components/WaitingSlotsView';
-import InventoryCard from './components/InventoryCard';
 import HistoryItem from './components/HistoryItem';
 import StatsSection from './components/StatsSection';
 import WarehouseMap from './components/WarehouseMap';
 import RackDistributionChart from './components/RackDistributionChart';
 import ProductDistributionChart from './components/ProductDistributionChart';
+import InventoryVirtualizedList from './components/InventoryVirtualizedList';
 import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
@@ -138,7 +138,7 @@ const App: React.FC = () => {
 
   const [deleteContext, setDeleteContext] = useState<{ type: 'row' | 'pallet', rowId: string, palletIdx?: number } | null>(null);
   const [matrixConfirmContext, setMatrixConfirmContext] = useState<{ rowId: string, palletIdx: number, slotId?: string } | null>(null);
-  const [notifications, setNotifications] = useState<{ id: string, message: string, type?: 'info' | 'error' }[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string, message: string, type?: 'info' | 'error' | 'success' }[]>([]);
   
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
@@ -1803,117 +1803,7 @@ const App: React.FC = () => {
     );
   };
 
-  const StatsSection = () => (
-    <div className="space-y-6">
-      {/* Large Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-900/60 p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-blue-500/30 transition-all relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-            <FlaskConical className="w-40 h-40" />
-          </div>
-          <div className="flex justify-between items-start mb-6">
-            <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-3xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-900/40">
-              <FlaskConical className="w-8 h-8" />
-            </div>
-            <div className="text-right">
-              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Total de Frascos</h4>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Estoque Consolidado</p>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-4">
-            <p className="text-6xl md:text-8xl font-black text-white tracking-tighter">{stats.totalBottles.toLocaleString()}</p>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Unidades</p>
-          </div>
-        </div>
 
-        <div className="bg-slate-900/60 p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl hover:border-green-500/30 transition-all relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-            <CheckCircle2 className="w-40 h-40" />
-          </div>
-          <div className="flex justify-between items-start mb-6">
-            <div className="w-16 h-16 bg-green-600/10 text-green-500 rounded-3xl flex items-center justify-center border border-green-500/20 shadow-lg shadow-green-900/40">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <div className="text-right">
-              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Vagas Livres</h4>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Capacidade Disponível</p>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-4">
-            <p className="text-6xl md:text-8xl font-black text-white tracking-tighter">{stats.freeSlots}</p>
-            <div className="space-y-1">
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Espaços</p>
-              <p className="text-[10px] text-slate-600 font-bold uppercase">De {stats.totalSlots} Total</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Small Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Registros */}
-        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-indigo-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('history')}>
-          <div className="w-10 h-10 bg-indigo-600/10 text-indigo-500 rounded-xl flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
-            <History className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Registros (24h)</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stats.dailyMovements}</p>
-          </div>
-        </div>
-
-        {/* Aguardando Análise */}
-        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-red-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('analysis')}>
-          <div className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
-            <ClipboardCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Análise</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stats.pendingEntries}</p>
-          </div>
-        </div>
-
-        {/* Alocados */}
-        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-amber-500/30 transition-all">
-          <div className="w-10 h-10 bg-amber-600/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
-            <Boxes className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Alocados</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stats.occupiedSlots}</p>
-          </div>
-        </div>
-
-        {/* Aguardando Vaga */}
-        <div 
-          className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-purple-500/30 transition-all cursor-pointer" 
-          onClick={() => !isPublicView && setActiveTab('waiting')}
-        >
-          <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
-            <RefreshCw className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Aguardando Vaga</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stats.waitingPallets}</p>
-          </div>
-        </div>
-
-        {/* Carregamentos */}
-        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 group hover:border-fuchsia-500/30 transition-all cursor-pointer" onClick={() => !isPublicView && navigateToTab('shipments')}>
-          <div className="w-10 h-10 bg-fuchsia-600/10 text-fuchsia-500 rounded-xl flex items-center justify-center border border-fuchsia-500/20 group-hover:scale-110 transition-transform">
-            <Truck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Carregamentos</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-2xl font-black text-white tracking-tight">{stats.openShipmentsCount}</p>
-              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Em Aberto</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const filteredHistory = useMemo(() => {
     const term = historySearch.toLowerCase().trim();
@@ -2182,7 +2072,7 @@ const App: React.FC = () => {
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            {isPublicView && <Logo isSm={true} />}
+            {isPublicView && <Logo size="sm" />}
             <h2 className="text-base md:text-xl font-black text-white tracking-tight uppercase italic line-clamp-1">
               {isPublicView ? 'Dashboard Público' : (
                 <>
@@ -2335,6 +2225,7 @@ const App: React.FC = () => {
           {activeTab === 'import' && (
             <ImportPage 
               onProcess={handleImportProcess} 
+              availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
             />
           )}
 
@@ -2513,27 +2404,22 @@ const App: React.FC = () => {
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-                    {filteredInventory.length === 0 ? (
+                {filteredInventory.length === 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                         <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-900 rounded-[32px]">
                             <p className="text-slate-700 font-black uppercase text-[10px] tracking-[0.3em]">Nenhum item encontrado no estoque</p>
                         </div>
-                    ) : (
-                        filteredInventory.map(({ row: item, inspection: insp, idx }) => (
-                          <InventoryCard 
-                            key={`${item.id}::${idx}`}
-                            item={item}
-                            insp={insp}
-                            idx={idx}
-                            isSelected={selectedPallets.includes(`${item.id}::${idx}`)}
-                            onToggleSelection={togglePalletSelection}
-                            onShowDetail={handleShowDetail}
-                            onEdit={handleEditPallet}
-                            onDelete={handleDeletePallet}
-                          />
-                        ))
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <InventoryVirtualizedList
+                        items={filteredInventory}
+                        selectedPallets={selectedPallets}
+                        onToggleSelection={togglePalletSelection}
+                        onShowDetail={handleShowDetail}
+                        onEdit={handleEditPallet}
+                        onDelete={handleDeletePallet}
+                    />
+                )}
             </div>
           )}
         </div>
@@ -2642,9 +2528,10 @@ const App: React.FC = () => {
           (row.inspections || [])
             .map((insp, idx) => {
               const sId = insp.shipmentId || (insp as any).shipment_id;
-              return (sId && sId === shipmentDetailContext.id) 
-                ? { ...row, inspections: [insp], id: `${row.id}::${idx}` } 
-                : null;
+              if (sId && sId === shipmentDetailContext.id) {
+                return { ...row, inspections: [insp], id: `${row.id}::${idx}` } as SheetRow;
+              }
+              return null;
             })
             .filter((p): p is SheetRow => p !== null)
         ) : []}
