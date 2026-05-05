@@ -81,10 +81,9 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
 
   return (
     <motion.div 
-      layout
       onClick={() => onToggleSelection(item.id, idx)}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className={`group bg-slate-900/60 backdrop-blur-md p-6 rounded-[2rem] border border-slate-800 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full ${
         isSelected 
           ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50' 

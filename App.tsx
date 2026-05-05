@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -116,6 +116,28 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
   );
 };
 
+const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, activeTab }: { tab: string, icon: React.ElementType, label: string, badge?: number, isActive: boolean, onNavigate: (tab: any) => void, activeTab: string }) => (
+  <button 
+    onClick={() => onNavigate(tab)} 
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'}`}
+  >
+    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+    <span className="font-semibold text-sm">{label}</span>
+    {badge ? (
+      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-950 text-blue-400 border border-blue-900/30">
+        {badge}
+      </span>
+    ) : null}
+    {isActive && (
+      <motion.div 
+        layoutId="activeTab"
+        className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      />
+    )}
+  </button>
+));
+
 const App: React.FC = () => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -136,7 +158,17 @@ const App: React.FC = () => {
     openShipmentsCount: 0
   });
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting'>('dashboard');
+  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting'>('dashboard');
+  const [isPending, startTransition] = React.useTransition();
+  
+  const setActiveTab = useCallback((tab: typeof activeTab) => {
+    const start = performance.now();
+    startTransition(() => {
+      setActiveTabInternal(tab);
+      const end = performance.now();
+      console.log(`[Performance] Tab switch to ${tab} initiated in ${(end - start).toFixed(2)}ms`);
+    });
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
@@ -345,10 +377,13 @@ const App: React.FC = () => {
   const navigateToTab = useCallback((tab: typeof activeTab) => {
     if (isPublicView) return;
     if (tab !== activeTab) {
+      const start = performance.now();
       window.history.pushState({ tab }, '');
       setActiveTab(tab);
+      const end = performance.now();
+      console.log(`[Performance] navigateToTab to ${tab} took ${(end - start).toFixed(2)}ms`);
     }
-  }, [activeTab, isPublicView]);
+  }, [activeTab, isPublicView, setActiveTab]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -1924,6 +1959,10 @@ const App: React.FC = () => {
   }, [history, historySearch]);
 
   const filteredInventory = useMemo(() => {
+    // Only calculate if we are on the inventory tab or shipments or needed for bulk
+    if (activeTab !== 'inventory' && activeTab !== 'shipments' && !isBulkConfirmOpen) return [];
+    
+    const start = performance.now();
     const term = inventorySearch.toLowerCase().trim();
     const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
     const allPallets: { row: SheetRow, inspection: InspectionData, idx: number }[] = [];
@@ -1949,7 +1988,8 @@ const App: React.FC = () => {
         }
       });
     });
-    return allPallets.sort((a, b) => {
+    
+    const sorted = allPallets.sort((a, b) => {
       // Sort by date descending (most recent first)
       const dateA = new Date(a.row.date).getTime();
       const dateB = new Date(b.row.date).getTime();
@@ -1963,32 +2003,11 @@ const App: React.FC = () => {
       const slotB = b.inspection.assignedSlot || '';
       return slotA.localeCompare(slotB, undefined, { numeric: true });
     });
-  }, [data, inventorySearch, inventoryTypeFilter]);
-
-  const NavItem = ({ tab, icon: Icon, label, badge }: { tab: typeof activeTab, icon: React.ElementType, label: string, badge?: number }) => (
-    <button 
-      onClick={() => { 
-        setIsSidebarOpen(false);
-        navigateToTab(tab); 
-      }} 
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${activeTab === tab ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'}`}
-    >
-      <Icon className={`w-4 h-4 ${activeTab === tab ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
-      <span className="font-semibold text-sm">{label}</span>
-      {badge ? (
-        <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-950 text-blue-400 border border-blue-900/30">
-          {badge}
-        </span>
-      ) : null}
-      {activeTab === tab && (
-        <motion.div 
-          layoutId="activeTab"
-          className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
-    </button>
-  );
+    
+    const end = performance.now();
+    console.log(`[Performance] filteredInventory re-calculated in ${(end - start).toFixed(2)}ms for ${sorted.length} items`);
+    return sorted;
+  }, [data, inventorySearch, inventoryTypeFilter, activeTab, isBulkConfirmOpen]);
 
   if (isAuthLoading) {
     return (
@@ -2118,16 +2137,16 @@ const App: React.FC = () => {
           </div>
 
           <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
-            <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
-            <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} />
-            <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" />
-            <NavItem tab="inventory" icon={Package} label="Estoque Geral" />
-            <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" />
-            <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} />
-            <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" />
-            <NavItem tab="import" icon={FileUp} label="Importar CSV" />
-            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} />
-            <NavItem tab="history" icon={History} label="Histórico" />
+            <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} isActive={activeTab === 'waiting'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" isActive={activeTab === 'movement'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="inventory" icon={Package} label="Estoque Geral" isActive={activeTab === 'inventory'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" isActive={activeTab === 'rotative'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" isActive={activeTab === 'map'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="import" icon={FileUp} label="Importar CSV" isActive={activeTab === 'import'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
           </nav>
 
           <div className="p-4 space-y-3">
