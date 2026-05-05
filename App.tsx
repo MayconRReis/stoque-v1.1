@@ -38,7 +38,8 @@ import {
   Calendar,
   Layers,
   MapPin,
-  Hash
+  Hash,
+  Users
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -63,6 +64,7 @@ import { ShipmentModal } from './components/ShipmentModal';
 import { ShipmentDetailModal } from './components/ShipmentDetailModal';
 import { supabaseService } from './services/supabaseService';
 import { Login } from './components/Login';
+import { UserManager } from './components/UserManager';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
@@ -158,7 +160,7 @@ const App: React.FC = () => {
     openShipmentsCount: 0
   });
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting'>('dashboard');
+  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -878,6 +880,17 @@ const App: React.FC = () => {
 
   const handleMovementEntry = async (entryData: any) => {
     try {
+      // 1. Pre-validation: check if slot is still free
+      const isWaiting = entryData.slotId === 'AGUARDANDO';
+      if (!isWaiting) {
+        const currentSlot = await supabaseService.getSlotById(entryData.slotId);
+        if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
+          showNotification(`A vaga ${entryData.slotId} acabou de ser ocupada por outro operador (${currentSlot.occupiedBy}). Escolha outra vaga.`, 'error');
+          refreshCombinedData();
+          return;
+        }
+      }
+
       const newEntry: SheetRow = {
         id: entryData.id,
         loadingId: entryData.id,
@@ -901,7 +914,6 @@ const App: React.FC = () => {
       };
 
       // Update Slot
-      const isWaiting = entryData.slotId === 'AGUARDANDO';
       if (!isWaiting) {
         const targetSlot = slots.find(s => s.id === entryData.slotId);
         if (targetSlot) {
@@ -957,6 +969,23 @@ const App: React.FC = () => {
 
   const handleImportProcess = async (entries: { row: SheetRow, slotId: string }[]) => {
     try {
+      // 1. Pre-validation: check if any of the target slots are occupied
+      const physicalSlotsToCheck = entries.filter(e => e.slotId && e.slotId !== 'AGUARDANDO').map(e => e.slotId);
+      if (physicalSlotsToCheck.length > 0) {
+        // We could fetch all slots, but for simplicity we fetch the current state to be sure
+        const allSlots = await supabaseService.getSlots();
+        const occupied = physicalSlotsToCheck.filter(id => {
+          const s = allSlots.find(slot => slot.id === id);
+          return s && s.status !== SlotContent.EMPTY;
+        });
+
+        if (occupied.length > 0) {
+          showNotification(`A importação foi cancelada pois as seguintes vagas já estão ocupadas: ${occupied.join(', ')}. Atualize os dados e tente novamente com outras vagas.`, 'error');
+          refreshCombinedData();
+          return;
+        }
+      }
+
       const updatedSlots = [...slots];
       const newRows: SheetRow[] = [];
       const newHistory: HistoryEntry[] = [];
@@ -1038,6 +1067,17 @@ const App: React.FC = () => {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
 
+      // 1. Pre-validation: check if slot is still free
+      const isWaiting = slotId === 'AGUARDANDO';
+      if (!isWaiting) {
+        const currentSlot = await supabaseService.getSlotById(slotId);
+        if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
+          showNotification(`A vaga ${slotId} acabou de ser ocupada por outro operador (${currentSlot.occupiedBy}). Escolha outra vaga.`, 'error');
+          refreshCombinedData();
+          return;
+        }
+      }
+
       const updatedRow: SheetRow = {
         ...row,
         loadingId: finalId,
@@ -1046,7 +1086,6 @@ const App: React.FC = () => {
         inspections: row.inspections?.map(insp => ({ ...insp, assignedSlot: slotId }))
       };
 
-      const isWaiting = slotId === 'AGUARDANDO';
       let updatedSlot: WarehouseSlot | null = null;
 
       if (!isWaiting) {
@@ -1120,14 +1159,32 @@ const App: React.FC = () => {
 
   const handleMovementTransfer = async (transferData: any) => {
     try {
-      // Direct fetch from server to bypass pagination limits
+      // 1. Direct fetch from server to bypass pagination limits
       const item = await supabaseService.getInventoryItemByLoadingId(transferData.id);
       if (!item) {
         showNotification('Produto não encontrado com este ID no sistema.', 'error');
         return;
       }
 
-      // Update From Slot
+      // 2. Pre-validation: check if destination is still free
+      const isWaitingDestination = transferData.toSlot === 'AGUARDANDO';
+      if (!isWaitingDestination) {
+        const targetSlotStatus = await supabaseService.getSlotById(transferData.toSlot);
+        if (targetSlotStatus && targetSlotStatus.status !== SlotContent.EMPTY) {
+          showNotification(`A vaga de destino ${transferData.toSlot} acabou de ser ocupada por outro operador (${targetSlotStatus.occupiedBy}).`, 'error');
+          refreshCombinedData();
+          return;
+        }
+      }
+
+      // 3. Pre-validation: check if pallet is still in the expected source slot
+      if (item.inspections && item.inspections[0]?.assignedSlot !== transferData.fromSlot) {
+        showNotification(`Divergência de posição: O pallet ${transferData.id} não está mais na vaga ${transferData.fromSlot}. Ele parece estar em ${item.inspections[0]?.assignedSlot}. A interface será atualizada.`, 'error');
+        refreshCombinedData();
+        return;
+      }
+
+      // 4. Update From Slot
       const fromSlotObj = slots.find(s => s.id === transferData.fromSlot);
       if (fromSlotObj) {
         const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
@@ -1136,7 +1193,6 @@ const App: React.FC = () => {
       }
 
       // Update To Slot
-      const isWaitingDestination = transferData.toSlot === 'AGUARDANDO';
       if (!isWaitingDestination) {
         const toSlotObj = slots.find(s => s.id === transferData.toSlot);
         if (toSlotObj) {
@@ -2147,6 +2203,9 @@ const App: React.FC = () => {
             <NavItem tab="import" icon={FileUp} label="Importar CSV" isActive={activeTab === 'import'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            {user?.role === 'admin' && (
+              <NavItem tab="users" icon={Users} label="Usuários" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            )}
           </nav>
 
           <div className="p-4 space-y-3">
@@ -2429,6 +2488,12 @@ const App: React.FC = () => {
                 onShowNotification={showNotification}
                 onAddHistory={addToHistory}
               />
+            </div>
+          )}
+
+          {activeTab === 'users' && user?.role === 'admin' && (
+            <div className="max-w-7xl mx-auto">
+              <UserManager />
             </div>
           )}
 

@@ -1,5 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User } from '../types';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -48,8 +49,26 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
  *   name TEXT,
  *   role TEXT DEFAULT 'operator',
+ *   active BOOLEAN DEFAULT true,
+ *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
  *   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
+ * 
+ * -- Enable RLS for profiles
+ * ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ * 
+ * -- Policies for profiles
+ * CREATE POLICY "Profiles are viewable by authenticated users" 
+ * ON public.profiles FOR SELECT TO authenticated USING (true);
+ * 
+ * CREATE POLICY "Only admins can update profiles" 
+ * ON public.profiles FOR UPDATE TO authenticated 
+ * USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+ * WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+ * 
+ * CREATE POLICY "Only admins can insert profiles" 
+ * ON public.profiles FOR INSERT TO authenticated 
+ * WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
  * 
  * CREATE TABLE shipments (
  *   id TEXT PRIMARY KEY,
@@ -527,6 +546,30 @@ export const supabaseService = {
     return slots;
   },
 
+  async getSlotById(id: string): Promise<WarehouseSlot | null> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('warehouse_slots');
+      return all.find((s: any) => s.id === id) || null;
+    }
+    const { data, error } = await supabase
+      .from('warehouse_slots')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      rack: data.rack as any,
+      level: data.level,
+      position: data.position,
+      status: data.status as SlotContent,
+      occupiedBy: data.occupied_by
+    };
+  },
+
   async updateSlot(slot: WarehouseSlot) {
     if (isSupabaseConfigured) {
       const { error } = await supabase
@@ -674,17 +717,131 @@ export const supabaseService = {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
-        
+        .maybeSingle();
+      
+      if (!profile) {
+        // If profile doesn't exist but user does, create a default one
+        const newProfile = {
+          id: user.id,
+          name: user.email?.split('@')[0] || 'Usuário',
+          role: 'operator',
+          active: true
+        };
+        await supabase.from('profiles').insert(newProfile);
+        return {
+          id: user.id,
+          name: newProfile.name,
+          role: 'operator'
+        } as User;
+      }
+
+      if (!profile.active) {
+        await this.signOut();
+        throw new Error('Sua conta está desativada. Entre em contato com o administrador.');
+      }
+
       return {
         id: user.id,
-        name: profile?.name || user.email?.split('@')[0] || 'Usuário',
-        role: profile?.role || 'operator'
-      };
+        name: profile.name || user.email?.split('@')[0] || 'Usuário',
+        role: profile.role || 'operator'
+      } as User;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error('Error in getCurrentUser:', error);
       return null;
     }
+  },
+
+  async getProfiles() {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role,
+      active: p.active,
+      createdAt: p.created_at
+    }));
+  },
+
+  async updateProfile(id: string, updates: { name?: string, role?: string, active?: boolean }) {
+    if (isSupabaseConfigured) {
+      // Step 0: Verify if current user is admin
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Apenas administradores podem gerenciar perfis.');
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
+    }
+  },
+
+  async signUpNewUser(username: string, name: string, password: string, role: 'admin' | 'operator') {
+    if (!isSupabaseConfigured) {
+      throw new Error('O Supabase não está configurado.');
+    }
+
+    // Step 0: Verify if current user is admin
+    const currentUser = await this.getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+      throw new Error('Apenas administradores podem criar novos usuários.');
+    }
+
+    const email = `${username.toLowerCase().trim()}@stoqueplus.com`;
+    
+    // Step 1: Create a temporary client that doesn't persist session
+    // This prevents the admin from being logged out when creating a new user
+    const tempClient = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
+
+    // Step 2: Sign up in Auth using the temp client
+    const { data: signUpData, error: signUpError } = await tempClient.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name
+        }
+      }
+    });
+
+    if (signUpError) throw signUpError;
+    if (!signUpData.user) throw new Error('Não foi possível criar o usuário no Auth.');
+
+    // Step 3: Create the profile using the MAIN supabase client (authenticating as Admin)
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: signUpData.user.id,
+        name: name,
+        role: role,
+        active: true
+      });
+    
+    if (profileError) throw profileError;
+    
+    return signUpData;
   },
 
   // Real-time Subscriptions

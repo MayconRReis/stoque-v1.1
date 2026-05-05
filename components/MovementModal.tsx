@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
-import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check, ClipboardCheck, Warehouse, Search } from 'lucide-react';
+import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check, ClipboardCheck, Warehouse, Search, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
+import { supabaseService } from '../services/supabaseService';
 
 interface MovementModalProps {
   isOpen: boolean;
@@ -73,16 +74,73 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const [exitId, setExitId] = useState('');
   const [exitReason, setExitReason] = useState('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [foundPallet, setFoundPallet] = useState<SheetRow | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Auto-select origin slot when transferId is entered
   useEffect(() => {
-    if (type === 'transfer' && transferId.length >= 3) {
-      const item = inventoryData.find(i => i.id === transferId);
-      if (item && item.inspections && item.inspections[0]?.assignedSlot) {
-        setFromSlot(item.inspections[0].assignedSlot);
+    const searchPallet = async () => {
+      if (type === 'transfer' && transferId.length >= 3) {
+        setIsSearching(true);
+        try {
+          const item = await supabaseService.getInventoryItemByLoadingId(transferId);
+          if (item) {
+            setFoundPallet(item);
+            if (item.inspections && item.inspections[0]?.assignedSlot) {
+              setFromSlot(item.inspections[0].assignedSlot);
+            }
+          } else {
+            setFoundPallet(null);
+            setFromSlot('');
+          }
+        } catch (error) {
+          console.error("Error searching pallet:", error);
+          setFoundPallet(null);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setFoundPallet(null);
+        setFromSlot('');
       }
-    }
-  }, [transferId, type, inventoryData]);
+    };
+
+    const timer = setTimeout(() => {
+      searchPallet();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [transferId, type]);
+
+  // Auto-select origin slot when exitId is entered
+  useEffect(() => {
+    const searchPallet = async () => {
+      if (type === 'exit' && exitId.length >= 3) {
+        setIsSearching(true);
+        try {
+          const item = await supabaseService.getInventoryItemByLoadingId(exitId);
+          if (item) {
+            setFoundPallet(item);
+          } else {
+            setFoundPallet(null);
+          }
+        } catch (error) {
+          console.error("Error searching pallet:", error);
+          setFoundPallet(null);
+        } finally {
+          setIsSearching(false);
+        }
+      } else if (type === 'exit') {
+        setFoundPallet(null);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      searchPallet();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [exitId, type]);
 
   // Auto-fill based on OP
   useEffect(() => {
@@ -190,6 +248,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
       setCapsCount(0);
       setBoxesCount(0);
       setCradlesCount(0);
+      setFoundPallet(null);
+      setIsSearching(false);
     }
   }, [isOpen]);
 
@@ -585,14 +645,75 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     ID do Produto
                   </label>
                   <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite o ID para localizar automaticamente</p>
-                  <input 
-                    type="text" 
-                    value={transferId}
-                    onChange={e => setTransferId(e.target.value.toUpperCase())}
-                    placeholder="Ex: ABC123"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700"
-                  />
+                  <div className="relative group">
+                    <input 
+                      type="text" 
+                      value={transferId}
+                      onChange={e => setTransferId(e.target.value.toUpperCase())}
+                      placeholder="Ex: ABC123"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700"
+                    />
+                    {isSearching && (
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 text-amber-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence>
+                  {foundPallet && type === 'transfer' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-5 bg-amber-600/10 border border-amber-500/20 rounded-[2rem] space-y-3 mb-2">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest leading-none">Pallet Identificado</p>
+                            <h4 className="text-white font-black text-base uppercase leading-tight">{foundPallet.description}</h4>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest leading-none">Status</p>
+                            <span className="inline-block mt-1 text-[8px] font-black text-white bg-amber-600/30 px-2.5 py-1 rounded-full border border-amber-500/30 uppercase tracking-wider">
+                              {foundPallet.status}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-amber-500/10">
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Lote</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.lot}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Vaga Atual</p>
+                            <p className="text-[11px] font-mono text-amber-400 font-black">{foundPallet.inspections?.[0]?.assignedSlot || '---'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {!isSearching && transferId.length >= 3 && !foundPallet && type === 'transfer' && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 bg-red-600/10 border border-red-500/20 rounded-2xl flex items-start gap-3"
+                  >
+                    <Info className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Não Encontrado</p>
+                      <p className="text-[11px] text-slate-400 font-medium">Nenhum pallet identificado com o ID final <span className="font-mono text-white">{transferId}</span>.</p>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -611,7 +732,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         {sortedOccupiedSlots
                           .filter(slot => {
                             if (!transferId) return true;
-                            const item = inventoryData.find(i => i.id === transferId);
+                            const item = foundPallet || inventoryData.find(i => i.id === transferId);
                             return item ? item.inspections?.[0]?.assignedSlot === slot.id : true;
                           })
                           .map(slot => (
@@ -671,14 +792,71 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     ID do Produto
                   </label>
                   <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite o ID do item que está saindo</p>
-                  <input 
-                    type="text" 
-                    value={exitId}
-                    onChange={e => setExitId(e.target.value.toUpperCase())}
-                    placeholder="Ex: ABC123"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700"
-                  />
+                  <div className="relative group">
+                    <input 
+                      type="text" 
+                      value={exitId}
+                      onChange={e => setExitId(e.target.value.toUpperCase())}
+                      placeholder="Ex: ABC123"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700"
+                    />
+                    {isSearching && (
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 text-red-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence>
+                  {foundPallet && type === 'exit' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-5 bg-red-600/10 border border-red-500/20 rounded-[2rem] space-y-3 mb-2">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-red-500 uppercase tracking-widest leading-none">Pallet Identificado</p>
+                            <h4 className="text-white font-black text-base uppercase leading-tight">{foundPallet.description}</h4>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[9px] font-black text-red-500 uppercase tracking-widest leading-none">Status</p>
+                            <span className="inline-block mt-1 text-[8px] font-black text-white bg-red-600/30 px-2.5 py-1 rounded-full border border-red-500/30 uppercase tracking-wider">
+                              {foundPallet.status}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-red-500/10">
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Vaga Atual</p>
+                            <p className="text-[11px] font-mono text-red-500 font-black">{foundPallet.inspections?.[0]?.assignedSlot || '---'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {!isSearching && exitId.length >= 3 && !foundPallet && type === 'exit' && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 bg-red-600/10 border border-red-500/20 rounded-2xl flex items-start gap-3"
+                  >
+                    <Info className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Não Encontrado</p>
+                      <p className="text-[11px] text-slate-400 font-medium">Nenhum pallet identificado com o ID final <span className="font-mono text-white">{exitId}</span>.</p>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
