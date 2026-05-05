@@ -67,6 +67,12 @@ import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
 import { RotativeStockManager } from './components/RotativeStockManager';
 import { WaitingSlotsView } from './components/WaitingSlotsView';
+import InventoryCard from './components/InventoryCard';
+import HistoryItem from './components/HistoryItem';
+import StatsSection from './components/StatsSection';
+import WarehouseMap from './components/WarehouseMap';
+import RackDistributionChart from './components/RackDistributionChart';
+import ProductDistributionChart from './components/ProductDistributionChart';
 import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
@@ -215,13 +221,55 @@ const App: React.FC = () => {
     activeTab
   ]);
 
-  const navigateToTab = (tab: typeof activeTab) => {
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
+
+  const addToHistory = useCallback(async (entry: HistoryEntry, silent: boolean = false) => {
+    try {
+      await supabaseService.addHistoryEntry(entry);
+      setHistory(prev => [entry, ...prev]);
+      
+      // Broadcast to all users
+      if (user && !silent) {
+        supabaseService.broadcastNotification({
+          user: user.id,
+          message: entry.details,
+          type: 'info'
+        });
+      }
+    } catch (error) {
+      console.error('Error adding history entry:', error);
+      showNotification('Erro ao salvar histórico no servidor.', 'error');
+    }
+  }, [user]);
+
+  const createHistoryEntry = useCallback((type: HistoryType, row: SheetRow, details: string, palletNum: number = 1): HistoryEntry => ({
+    id: Math.random().toString(36).substring(2, 9),
+    type,
+    timestamp: new Date().toLocaleString('pt-BR'),
+    loadingId: row.loadingId,
+    description: row.description,
+    op: row.originOP,
+    lot: row.lot,
+    palletNumber: palletNum,
+    totalPallets: row.pallets,
+    slot: row.inspections?.[0]?.assignedSlot || 'N/A',
+    details,
+    operatorName: user?.name
+  }), [user]);
+
+  const navigateToTab = useCallback((tab: typeof activeTab) => {
     if (isPublicView) return;
     if (tab !== activeTab) {
       window.history.pushState({ tab }, '');
       setActiveTab(tab);
     }
-  };
+  }, [activeTab, isPublicView]);
 
   useEffect(() => {
     const anyModalOpen = 
@@ -826,7 +874,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConfirmAnalysis = async (rowId: string, slotId: string, finalId: string) => {
+  const handleConfirmAnalysis = useCallback(async (rowId: string, slotId: string, finalId: string) => {
     try {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
@@ -881,7 +929,8 @@ const App: React.FC = () => {
 
       setData(prev => prev.map(r => r.id === rowId ? updatedRow : r));
       if (updatedSlot) {
-        setSlots(prev => prev.map(s => s.id === slotId ? updatedSlot : s));
+        const newSlot = updatedSlot;
+        setSlots(prev => prev.map(s => s.id === slotId ? newSlot : s));
       }
 
       showNotification(`Entrada confirmada! ID: ${finalId}`);
@@ -895,7 +944,7 @@ const App: React.FC = () => {
       console.error('Analysis confirmation error:', error);
       showNotification(`Erro ao confirmar análise: ${error.message}`, 'error');
     }
-  };
+  }, [data, slots, user, addToHistory]);
 
   const handleRejectAnalysis = async (rowId: string) => {
     try {
@@ -1314,12 +1363,12 @@ const App: React.FC = () => {
     }
   };
 
-  const togglePalletSelection = (rowId: string, palletIdx: number) => {
+  const togglePalletSelection = useCallback((rowId: string, palletIdx: number) => {
     const id = `${rowId}::${palletIdx}`;
     setSelectedPallets(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
-  };
+  }, []);
 
   const stats = useMemo((): DashboardStats => {
     const occupied = slots.filter(s => s.status !== SlotContent.EMPTY).length;
@@ -1366,47 +1415,7 @@ const App: React.FC = () => {
     };
   }, [slots, history, data, shipments]);
 
-  const showNotification = (message: string, type: 'info' | 'error' = 'info') => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setNotifications(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 4000);
-  };
 
-  const addToHistory = async (entry: HistoryEntry, silent: boolean = false) => {
-    try {
-      await supabaseService.addHistoryEntry(entry);
-      setHistory(prev => [entry, ...prev]);
-      
-      // Broadcast to all users
-      if (user && !silent) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: entry.details,
-          type: 'info'
-        });
-      }
-    } catch (error) {
-      console.error('Error adding history entry:', error);
-      showNotification('Erro ao salvar histórico no servidor.', 'error');
-    }
-  };
-
-  const createHistoryEntry = (type: HistoryType, row: SheetRow, details: string, palletNum: number = 1): HistoryEntry => ({
-    id: Math.random().toString(36).substring(2, 9),
-    type,
-    timestamp: new Date().toLocaleString('pt-BR'),
-    loadingId: row.loadingId,
-    description: row.description,
-    op: row.originOP,
-    lot: row.lot,
-    palletNumber: palletNum,
-    totalPallets: row.pallets,
-    slot: row.inspections?.[0]?.assignedSlot || 'N/A',
-    details: details,
-    operatorName: user?.name
-  });
 
   const handleUpdatePallet = async (updatedData: { 
     description: string; 
@@ -1670,9 +1679,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendToMatrix = (rowId: string, palletIdx: number, slotId?: string) => {
+  const handleSendToMatrix = useCallback((rowId: string, palletIdx: number, slotId?: string) => {
     setMatrixConfirmContext({ rowId, palletIdx, slotId });
-  };
+  }, []);
+
+  const handleShowDetail = useCallback((row: SheetRow, inspection: InspectionData, idx: number) => {
+    setDetailContext({ row, inspection, idx });
+  }, []);
+
+  const handleEditPallet = useCallback((row: SheetRow, inspection: InspectionData, idx: number) => {
+    setEditPalletMode('edit');
+    setEditPalletContext({ row, inspection, idx });
+  }, []);
+
+  const handleDeletePallet = useCallback((rowId: string, idx: number) => {
+    setDeleteContext({ type: 'pallet', rowId, palletIdx: idx });
+  }, []);
 
   const RackView = ({ rack }: { rack: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' }) => {
     const rackSlots = slots.filter(s => s.rack === rack);
@@ -2290,155 +2312,24 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Stats Section */}
-                <StatsSection />
+                <StatsSection stats={stats} isPublicView={isPublicView} onNavigate={navigateToTab} />
 
                 {/* Charts Area - Keeping some but making them more modern */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
                   {/* Rack Distribution Chart */}
-                  <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                      <div>
-                        <h4 className="text-lg font-black text-white uppercase italic tracking-tighter">Distribuição por Rack</h4>
-                        <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Ocupação Setorial G0</p>
-                      </div>
-                      <div className="flex gap-4">
-                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span></div>
-                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Aguardando Vaga</span></div>
-                    </div>
-                  </div>
-                  <div className="space-y-6">
-                    {['A', 'B', 'C', 'D', 'E', 'F'].map(rack => {
-                      const rackSlots = slots.filter(s => s.rack === rack);
-                      const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
-                      const totalCapacities: Record<string, number> = {
-                        A: 48, B: 48, C: 48,
-                        D: 54,
-                        E: 45, F: 45
-                      };
-                      const total = totalCapacities[rack] || 32;
-                      const rate = Math.round((occupied / total) * 100);
-                      const color = 
-                        rack === 'A' ? 'bg-blue-600' : 
-                        rack === 'B' ? 'bg-amber-600' : 
-                        rack === 'C' ? 'bg-indigo-600' : 
-                        rack === 'D' ? 'bg-green-600' :
-                        'bg-purple-600';
-                      
-                      return (
-                        <div key={rack} className="space-y-2">
-                          <div className="flex justify-between items-end">
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Porta Pallet {rack}</span>
-                            <span className="text-[10px] font-black text-slate-400">{rate}% ({occupied}/{total})</span>
-                          </div>
-                          <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min(rate, 100)}%` }}
-                              className={`h-full ${color} rounded-full`}
-                            />
-                            {rate > 100 && (
-                              <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-red-600/40 to-transparent animate-pulse" />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Aguardando Vagas row */}
-                    {stats.waitingPallets > 0 && (
-                      <div className="pt-4 mt-4 border-t border-slate-800/50 space-y-2">
-                        <div className="flex justify-between items-end">
-                          <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest italic">Aguardando Vaga Geral</span>
-                          <span className="text-[10px] font-black text-slate-400">{stats.waitingPallets} Pallets</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
-                           <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((stats.waitingPallets / 45) * 100, 100)}%` }}
-                              className="h-full bg-purple-600 rounded-full animate-pulse"
-                           />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  </div>
+                  <RackDistributionChart slots={slots} waitingPallets={stats.waitingPallets} />
 
                   {/* Product Distribution Card */}
-                  <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                      <div>
-                        <h4 className="text-lg font-black text-white uppercase italic tracking-tighter">Distribuição por Produto</h4>
-                        <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Ocupação por Categoria G0</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-600"></div><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Categoria</span></div>
-                      </div>
-                    </div>
-                    <div className="space-y-6">
-                      {[
-                        { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600' },
-                        { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600' },
-                        { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
-                        { type: SlotContent.RETURN, label: 'Retorno', color: 'bg-red-600' },
-                        { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600' },
-                        { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-purple-600' },
-                        { type: 'OTHER', label: 'Outros', color: 'bg-slate-600' }
-                      ].map(item => {
-                        const count = item.type === 'OTHER' 
-                          ? slots.filter(s => s.status !== SlotContent.EMPTY && ![SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT, SlotContent.RETURN, SlotContent.REWORK, SlotContent.REPROCESS].includes(s.status)).length
-                          : slots.filter(s => s.status === item.type).length;
-                        
-                        const totalOccupied = stats.occupiedSlots || 1;
-                        const rate = Math.round((count / totalOccupied) * 100);
-                        
-                        return (
-                          <div key={item.label} className="space-y-2">
-                            <div className="flex justify-between items-end">
-                              <span className="text-[10px] font-black text-white uppercase tracking-widest italic">{item.label}</span>
-                              <span className="text-[10px] font-black text-slate-400">{rate}% ({count})</span>
-                            </div>
-                            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${rate}%` }}
-                                className={`h-full ${item.color} rounded-full`}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <ProductDistributionChart slots={slots} occupiedSlots={stats.occupiedSlots} />
                 </div>
             </div>
           )}
 
           {activeTab === 'map' && (
-            <div className="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
-              {stats.waitingPallets > 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-500/30">
-                      <Clock className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-black text-white uppercase italic tracking-tight">Pallets Aguardando Vaga</h3>
-                      <p className="text-[10px] text-amber-500/70 font-bold uppercase tracking-widest">Estes itens estão analisados mas sem vaga física atribuída</p>
-                    </div>
-                  </div>
-                  <div className="bg-slate-950/50 px-8 py-3 rounded-2xl border border-slate-800 flex items-center gap-4">
-                    <span className="text-3xl font-black text-white">{stats.waitingPallets}</span>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pallets</span>
-                  </div>
-                </div>
-              )}
-              <RackView rack="A" />
-              <RackView rack="B" />
-              <RackView rack="C" />
-              <RackView rack="D" />
-              <RackView rack="E" />
-              <RackView rack="F" />
-            </div>
+            <WarehouseMap 
+              slots={slots} 
+              onSlotClick={setSelectedMappingSlot} 
+            />
           )}
 
           {activeTab === 'import' && (
@@ -2502,45 +2393,8 @@ const App: React.FC = () => {
                         </div>
                     ) : (
                         filteredHistory.map(entry => (
-                        <div key={entry.id} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:border-slate-700 transition-all group">
-                            <div className="flex flex-col items-start min-w-[120px]">
-                                <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border mb-2 ${
-                                    entry.type === HistoryType.ENTRY ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
-                                    entry.type === HistoryType.EXIT ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
-                                    entry.type === HistoryType.TRANSFER ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                    entry.type === HistoryType.ALLOCATION ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
-                                    entry.type === HistoryType.EDIT ? 'bg-slate-500/10 text-slate-500 border-slate-500/20' :
-                                    'bg-red-500/10 text-red-500 border-red-500/20'
-                                }`}>
-                                  {entry.type === HistoryType.ENTRY && 'Entrada'}
-                                  {entry.type === HistoryType.EXIT && 'Saída'}
-                                  {entry.type === HistoryType.TRANSFER && 'Transf.'}
-                                  {entry.type === HistoryType.ALLOCATION && 'Alocação'}
-                                  {entry.type === HistoryType.EDIT && 'Edição'}
-                                  {entry.type === HistoryType.REMOVAL && 'Removido'}
-                                </span>
-                                <p className="text-[9px] text-slate-600 font-bold font-mono">{entry.timestamp}</p>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">ID: {entry.loadingId}</p>
-                                  <div className="h-px flex-1 bg-slate-800/50"></div>
-                                  <span className="text-[13px] font-black text-slate-400 uppercase italic">Vaga {entry.slot}</span>
-                                </div>
-                                <h4 className="text-white font-bold uppercase text-xs truncate">{entry.description}</h4>
-                                <div className="flex flex-wrap gap-3 mt-1">
-                                  <span className="text-[9px] font-bold text-blue-500/80">OP {entry.op}</span>
-                                  <span className="text-[9px] font-bold text-amber-500/80">Lote {entry.lot}</span>
-                                  {entry.operatorName && (
-                                    <span className="text-[9px] font-bold text-purple-500/80">Op: {entry.operatorName}</span>
-                                  )}
-                                </div>
-                            </div>
-                            <div className="bg-slate-950/50 px-4 py-2.5 rounded-xl border border-slate-800/50 min-w-[140px] text-center">
-                              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{entry.details}</p>
-                            </div>
-                        </div>
-                    )))}
+                          <HistoryItem key={entry.id} entry={entry} />
+                        )))}
                 </div>
             </div>
           )}
@@ -2558,7 +2412,6 @@ const App: React.FC = () => {
                   }
                 }}
                 onShowNotification={showNotification}
-                operatorName={user?.name}
                 onAddHistory={addToHistory}
               />
             </div>
@@ -2666,184 +2519,19 @@ const App: React.FC = () => {
                             <p className="text-slate-700 font-black uppercase text-[10px] tracking-[0.3em]">Nenhum item encontrado no estoque</p>
                         </div>
                     ) : (
-                        filteredInventory.map(({ row: item, inspection: insp, idx }) => {
-                            const isSelected = selectedPallets.includes(`${item.id}::${idx}`);
-                            const isRework = insp.contentType === SlotContent.REWORK;
-                            const isReprocess = insp.contentType === SlotContent.REPROCESS;
-                            const isContainer = insp.contentType === SlotContent.CONTAINER_SJ || 
-                                              insp.contentType === SlotContent.CONTAINER_LP || 
-                                              insp.contentType === SlotContent.CONTAINER_CP;
-                            
-                            const ContentIcon = insp.contentType === SlotContent.BOTTLES ? FlaskConical : 
-                                               insp.contentType === SlotContent.FINISHED_PRODUCT ? Truck : 
-                                               (isRework || isReprocess) ? RefreshCw :
-                                               isContainer ? Container :
-                                               Package;
-                            
-                            const getBaseColor = (content: SlotContent) => {
-                                const colors: Record<SlotContent, string> = {
-                                    [SlotContent.BOTTLES]: 'sky',
-                                    [SlotContent.SUPPLIES]: 'amber',
-                                    [SlotContent.FINISHED_PRODUCT]: 'emerald',
-                                    [SlotContent.USE_CONSUMPTION]: 'purple',
-                                    [SlotContent.CONTAINER_SJ]: 'rose',
-                                    [SlotContent.CONTAINER_LP]: 'blue',
-                                    [SlotContent.CONTAINER_CP]: 'indigo',
-                                    [SlotContent.RETURN]: 'orange',
-                                    [SlotContent.REWORK]: 'yellow',
-                                    [SlotContent.REPROCESS]: 'teal',
-                                    [SlotContent.ROTATIVE]: 'pink',
-                                    [SlotContent.DISCARD]: 'red',
-                                    [SlotContent.EMPTY]: 'slate',
-                                    [SlotContent.MISCELLANEOUS]: 'slate',
-                                    [SlotContent.OTHER]: 'slate'
-                                };
-                                return colors[content] || 'slate';
-                            };
-
-                            const isSupplies = insp.contentType === SlotContent.SUPPLIES;
-                            const isBottles = insp.contentType === SlotContent.BOTTLES;
-                            const isFinished = insp.contentType === SlotContent.FINISHED_PRODUCT;
-
-                            const baseColor = getBaseColor(insp.contentType);
-                            
-                            // Determine the most relevant quantity to show
-                            const qtyValue = isSupplies 
-                                ? (insp.bottles || insp.boxes || insp.caps || insp.cradles || 0)
-                                : (isBottles ? (insp.bottles || item.pallets) : item.pallets);
-                            
-                            const qtyLabel = (isSupplies || isBottles) ? 'Qtd (UN)' : 'Qtd (PL)';
-                            
-                            return (
-                                <motion.div 
-                                    layout
-                                    key={`${item.id}::${idx}`} 
-                                    onClick={() => togglePalletSelection(item.id, idx)}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    whileHover={{ y: -5 }}
-                                    className={`group bg-slate-900/60 backdrop-blur-xl p-7 rounded-[2.5rem] border border-slate-800 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col h-full shadow-lg ${
-                                      isSelected 
-                                        ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50 shadow-purple-500/10' 
-                                        : `hover:border-${baseColor}-500/50 hover:shadow-${baseColor}-500/10`
-                                    }`}
-                                >
-                                  {/* Background Icon Accent */}
-                                  <div className={`absolute -top-10 -right-10 opacity-[0.05] group-hover:opacity-[0.5] transition-all duration-500 text-${baseColor}-500`}>
-                                    <ContentIcon className="w-56 h-56" />
-                                  </div>
-
-                                  {/* Gradient Glow */}
-                                  <div className={`absolute -top-10 -right-10 w-40 h-40 bg-${baseColor}-500/10 blur-[80px] rounded-full group-hover:bg-${baseColor}-500/20 transition-all`} />
-
-                                  <div className="relative z-10 flex flex-col h-full">
-                                    {/* Selection Indicator */}
-                                    <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-950/50 border-slate-800 text-transparent'}`}>
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                    </div>
-
-                                    {/* Header Info */}
-                                    <div className="flex justify-between items-start mb-6 pl-6">
-                                      <div className={`w-14 h-14 bg-gradient-to-br from-${baseColor}-500/20 to-${baseColor}-600/5 text-${baseColor}-400 rounded-2xl flex items-center justify-center border border-${baseColor}-500/20 shadow-xl shadow-${baseColor}-950/20 group-hover:scale-110 transition-transform`}>
-                                        <ContentIcon className="w-7 h-7" />
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="flex items-center gap-2 justify-end mb-1">
-                                          <span className={`w-1.5 h-1.5 rounded-full bg-${baseColor}-500 shadow-[0_0_8px_rgba(var(--color-${baseColor}-500),0.5)]`} />
-                                          <span className={`text-[13px] font-black uppercase tracking-widest italic ${
-                                            insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
-                                            insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
-                                            `text-${baseColor}-400`
-                                          }`}>
-                                            {insp.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${insp.assignedSlot}`}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 justify-end text-slate-500">
-                                          <Calendar className="w-3 h-3" />
-                                          <p className="text-[8px] font-bold uppercase tracking-widest">{item.date}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Product Info */}
-                                    <div className="flex-1 space-y-5 mb-8">
-                                      <div>
-                                        <h4 className={`text-lg font-black text-white uppercase tracking-tighter italic leading-[1.1] line-clamp-2 min-h-[2.5rem] group-hover:text-${baseColor}-300 transition-colors`}>
-                                          {item.description}
-                                        </h4>
-                                        {item.operatorName && (
-                                          <p className="text-[7px] text-slate-500 font-black uppercase tracking-[0.2em] mt-2">Operador: {item.operatorName}</p>
-                                        )}
-                                      </div>
-                                      
-                                      <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
-                                            <Tag className="w-2.5 h-2.5" /> OP Origem
-                                          </p>
-                                          <p className={`text-xs font-black text-${baseColor}-400 font-mono italic`}>{item.originOP || 'N/A'}</p>
-                                        </div>
-                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
-                                            <Layers className="w-2.5 h-2.5" /> Lote
-                                          </p>
-                                          <p className="text-xs font-black text-white font-mono italic">{item.lot || 'N/A'}</p>
-                                        </div>
-                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
-                                            <Hash className="w-2.5 h-2.5" /> {qtyLabel}
-                                          </p>
-                                          <p className="text-xs font-black text-green-400 font-mono italic">{qtyValue}</p>
-                                        </div>
-                                        <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
-                                            <AlertCircle className="w-2.5 h-2.5" /> ID Final
-                                          </p>
-                                          <p className="text-xs font-black text-[#955251] font-mono italic">{item.loadingId || 'N/A'}</p>
-                                        </div>
-                                        <div className="col-span-2 bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
-                                          <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
-                                            <Package className="w-2.5 h-2.5" /> Tipo
-                                          </p>
-                                          <p className={`text-[10px] font-black uppercase italic ${getContentTypeColor(insp.contentType)} text-center`}>
-                                            {translateSlotContent(insp.contentType)}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2">
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); setDetailContext({ row: item, inspection: insp, idx }); }} 
-                                        className="flex-1 py-3 bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn"
-                                      >
-                                        <Info className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" /> Detalhes
-                                      </button>
-
-                                      <button 
-                                        onClick={(e) => { 
-                                          e.stopPropagation(); 
-                                          setEditPalletMode('edit');
-                                          setEditPalletContext({ row: item, inspection: insp, idx }); 
-                                        }} 
-                                        className={`flex-1 py-3 bg-slate-950/50 hover:bg-${baseColor}-500/10 text-${baseColor}-400 border border-slate-800 hover:border-${baseColor}-500/50 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn`}
-                                      >
-                                        <Pencil className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" /> Editar
-                                      </button>
-                                      
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); setDeleteContext({ type: 'pallet', rowId: item.id, palletIdx: idx }); }}
-                                        className="p-3 bg-slate-950/50 hover:bg-red-600/10 text-red-500 border border-slate-800 hover:border-red-500/50 rounded-2xl transition-all flex items-center justify-center group/btn"
-                                        title="Remover do estoque"
-                                      >
-                                        <Trash2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                            );
-                        })
+                        filteredInventory.map(({ row: item, inspection: insp, idx }) => (
+                          <InventoryCard 
+                            key={`${item.id}::${idx}`}
+                            item={item}
+                            insp={insp}
+                            idx={idx}
+                            isSelected={selectedPallets.includes(`${item.id}::${idx}`)}
+                            onToggleSelection={togglePalletSelection}
+                            onShowDetail={handleShowDetail}
+                            onEdit={handleEditPallet}
+                            onDelete={handleDeletePallet}
+                          />
+                        ))
                     )}
                 </div>
             </div>
