@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats } from '../types';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -240,6 +240,136 @@ export const supabaseService = {
     }));
 
     return inventory.filter(row => row.inspections?.some(insp => insp.assignedSlot === 'AGUARDANDO'));
+  },
+
+  async getInventoryItemById(id: string): Promise<SheetRow | null> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.find((r: any) => r.id === id) || null;
+    }
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      loadingId: data.loading_id,
+      originOP: data.origin_op,
+      description: data.description,
+      lot: data.lot,
+      pallets: data.pallets,
+      date: data.date,
+      status: data.status as StockStatus,
+      inspections: data.inspections || [],
+      operatorName: data.operator_name
+    };
+  },
+
+  async getInventoryItemByLoadingId(loadingId: string): Promise<SheetRow | null> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.find((r: any) => r.loadingId === loadingId) || null;
+    }
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('loading_id', loadingId)
+      .maybeSingle(); // multiple might exist if not unique, but usually it is
+    
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      loadingId: data.loading_id,
+      originOP: data.origin_op,
+      description: data.description,
+      lot: data.lot,
+      pallets: data.pallets,
+      date: data.date,
+      status: data.status as StockStatus,
+      inspections: data.inspections || [],
+      operatorName: data.operator_name
+    };
+  },
+
+  async getInventoryItemsByShipmentId(shipmentId: string): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.filter((r: any) => r.inspections?.some((i: any) => i.shipmentId === shipmentId || i.shipment_id === shipmentId));
+    }
+    // We fetch all items whose inspections array contains an object with shipmentId === shipmentId
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .filter('inspections', 'cs', JSON.stringify([{ shipmentId: shipmentId }]));
+    
+    if (error) {
+        // Fallback or retry with snake_case if first fails (for older data)
+        const { data: d2, error: e2 } = await supabase
+          .from('inventory')
+          .select('*')
+          .filter('inspections', 'cs', JSON.stringify([{ shipment_id: shipmentId }]));
+        if (e2) throw e2;
+        return (d2 || []).map(item => ({
+          id: item.id,
+          loadingId: item.loading_id,
+          originOP: item.origin_op,
+          description: item.description,
+          lot: item.lot,
+          pallets: item.pallets,
+          date: item.date,
+          status: item.status as StockStatus,
+          inspections: item.inspections || [],
+          operatorName: item.operator_name
+        }));
+    }
+
+    return (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
+  },
+
+  async getInventoryItemsByIds(ids: string[]): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.filter((r: any) => ids.includes(r.id));
+    }
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .in('id', ids);
+    
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date,
+      status: item.status as StockStatus,
+      inspections: item.inspections || [],
+      operatorName: item.operator_name
+    }));
   },
 
   async getAllInventoryForExport(filters?: { searchTerm?: string, typeFilter?: string }): Promise<SheetRow[]> {
@@ -719,6 +849,26 @@ export const supabaseService = {
       
       if (updateError) throw updateError;
     }
+  },
+
+  async getShipmentPalletCounts(): Promise<Record<string, number>> {
+    if (!isSupabaseConfigured) return {};
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('inspections');
+    
+    if (error) throw error;
+    
+    const counts: Record<string, number> = {};
+    data?.forEach(row => {
+      row.inspections?.forEach((insp: any) => {
+        const sId = insp.shipmentId || insp.shipment_id;
+        if (sId) {
+          counts[sId] = (counts[sId] || 0) + 1;
+        }
+      });
+    });
+    return counts;
   },
 
   // Rotative Stock

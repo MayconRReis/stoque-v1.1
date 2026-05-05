@@ -15,19 +15,14 @@ import { motion } from 'motion/react';
 interface ShipmentPageProps {
   shipments: Shipment[];
   inventory: SheetRow[];
+  shipmentCounts: Record<string, number>;
   onOpenDetail: (shipment: Shipment) => void;
   onDelete?: (shipmentId: string) => void;
 }
 
-export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory, onOpenDetail, onDelete }) => {
+export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory, shipmentCounts, onOpenDetail, onDelete }) => {
   const getPalletCount = (shipmentId: string) => {
-    return inventory.reduce((acc, item) => {
-      const count = (item.inspections || []).filter(insp => {
-        const sId = insp.shipmentId || (insp as any).shipment_id;
-        return sId === shipmentId;
-      }).length;
-      return acc + count;
-    }, 0);
+    return shipmentCounts[shipmentId] || 0;
   };
 
   const openShipments = shipments.filter(s => s.status === ShipmentStatus.OPEN);

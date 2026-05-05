@@ -73,7 +73,7 @@ import StatsSection from './components/StatsSection';
 import WarehouseMap from './components/WarehouseMap';
 import RackDistributionChart from './components/RackDistributionChart';
 import ProductDistributionChart from './components/ProductDistributionChart';
-import InventoryVirtualizedList from './components/InventoryVirtualizedList';
+import InventoryCard from './components/InventoryCard';
 import { User as AppUser } from './types';
 
 const generateSlots = (): WarehouseSlot[] => {
@@ -147,6 +147,32 @@ const App: React.FC = () => {
   const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
   const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
+  const [selectedPalletsData, setSelectedPalletsData] = useState<{ row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string }[]>([]);
+
+  useEffect(() => {
+    if (isBulkConfirmOpen && selectedPallets.length > 0) {
+      const fetchSelectedData = async () => {
+        const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
+        try {
+          const items = await supabaseService.getInventoryItemsByIds(rowIds);
+          const mapped = selectedPallets.map(key => {
+            const parts = key.split('::');
+            const rowId = parts.slice(0, parts.length - 1).join('::');
+            const palletIdx = parseInt(parts[parts.length - 1]);
+            const row = items.find(r => r.id === rowId);
+            if (!row || !row.inspections || !row.inspections[palletIdx]) return null;
+            return { row, inspection: row.inspections[palletIdx], idx: palletIdx, selectionKey: key };
+          }).filter((p): p is { row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string } => p !== null);
+          setSelectedPalletsData(mapped);
+        } catch (error) {
+          console.error('Error fetching selected pallets data:', error);
+        }
+      };
+      fetchSelectedData();
+    } else if (!isBulkConfirmOpen) {
+      setSelectedPalletsData([]);
+    }
+  }, [isBulkConfirmOpen, selectedPallets]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historySearch, setHistorySearch] = useState('');
@@ -161,7 +187,39 @@ const App: React.FC = () => {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
+  const [shipmentCounts, setShipmentCounts] = useState<Record<string, number>>({});
   const [shipmentDetailContext, setShipmentDetailContext] = useState<Shipment | null>(null);
+  const [shipmentDetailPallets, setShipmentDetailPallets] = useState<SheetRow[]>([]);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+
+  const fetchShipmentDetailPallets = async (shipmentId: string) => {
+    setIsDetailLoading(true);
+    try {
+      const items = await supabaseService.getInventoryItemsByShipmentId(shipmentId);
+      const linked = items.flatMap(row => 
+        (row.inspections || [])
+          .map((insp, idx) => {
+            const sId = insp.shipmentId || (insp as any).shipment_id;
+            if (sId === shipmentId) {
+              return { ...row, inspections: [insp], id: `${row.id}::${idx}` } as SheetRow;
+            }
+            return null;
+          })
+          .filter((p): p is SheetRow => p !== null)
+      );
+      setShipmentDetailPallets(linked);
+    } catch (error) {
+      console.error('Error fetching detail pallets:', error);
+      showNotification('Erro ao carregar pallets do carregamento', 'error');
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleOpenShipmentDetail = async (shipment: Shipment) => {
+    setShipmentDetailContext(shipment);
+    await fetchShipmentDetailPallets(shipment.id);
+  };
 
   // Pagination State for Inventory
   const [inventoryPage, setInventoryPage] = useState(0);
@@ -304,19 +362,21 @@ const App: React.FC = () => {
   const refreshCombinedData = useCallback(async () => {
     // Refresh current page of inventory, global stats, pending and waiting rows
     try {
-      const [invResult, globalStats, pendingRes, waitingRes] = await Promise.all([
+      const [invResult, globalStats, pendingRes, waitingRes, countsData] = await Promise.all([
         supabaseService.getInventoryPaginated(0, (inventoryPage + 1) * PAGE_SIZE, { 
           searchTerm: inventorySearch, 
           typeFilter: inventoryTypeFilter 
         }),
         supabaseService.getGlobalStats(),
         supabaseService.getPendingInventory(),
-        supabaseService.getWaitingInventory()
+        supabaseService.getWaitingInventory(),
+        supabaseService.getShipmentPalletCounts()
       ]);
       setData(invResult.data);
       setStats(globalStats);
       setPendingRows(pendingRes);
       setWaitingRows(waitingRes);
+      setShipmentCounts(countsData);
       setHasMoreInventory(invResult.data.length < invResult.count);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -1025,9 +1085,10 @@ const App: React.FC = () => {
 
   const handleMovementTransfer = async (transferData: any) => {
     try {
-      const item = data.find(d => d.loadingId === transferData.id);
+      // Direct fetch from server to bypass pagination limits
+      const item = await supabaseService.getInventoryItemByLoadingId(transferData.id);
       if (!item) {
-        showNotification('Produto não encontrado com este ID.', 'error');
+        showNotification('Produto não encontrado com este ID no sistema.', 'error');
         return;
       }
 
@@ -1100,9 +1161,10 @@ const App: React.FC = () => {
 
   const handleMovementExit = async (exitData: any) => {
     try {
-      const item = data.find(d => d.loadingId === exitData.id);
+      // Direct fetch from server to bypass pagination limits
+      const item = await supabaseService.getInventoryItemByLoadingId(exitData.id);
       if (!item) {
-        showNotification('Produto não encontrado com este ID.', 'error');
+        showNotification('Produto não encontrado com este ID no sistema.', 'error');
         return;
       }
 
@@ -1305,9 +1367,11 @@ const App: React.FC = () => {
       const shipment = shipments.find(s => s.id === shipmentId);
       if (!shipment) return;
 
-      // 1. Find all pallets linked to this shipment
+      // 1. Find all pallets linked to this shipment directly from server
+      const linkedPallets = await supabaseService.getInventoryItemsByShipmentId(shipmentId);
+      
       const itemsToProcess: { row: SheetRow, palletIndices: number[] }[] = [];
-      data.forEach(row => {
+      linkedPallets.forEach(row => {
         const indices = (row.inspections || [])
           .map((insp, idx) => {
             const sId = insp.shipmentId || (insp as any).shipment_id;
@@ -1630,14 +1694,21 @@ const App: React.FC = () => {
   const handleBulkSend = async () => {
     try {
       const updatedSlots: WarehouseSlot[] = [...slots];
+      
+      const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
+      const itemsToProcess = await supabaseService.getInventoryItemsByIds(rowIds);
       const rowsToUpdate: Map<string, SheetRow> = new Map();
 
       for (const key of selectedPallets) {
-        const [rowId, palletIdxStr] = key.split('::');
-        const palletIdx = parseInt(palletIdxStr);
-        const row = data.find(r => r.id === rowId);
+        const parts = key.split('::');
+        const rowId = parts.slice(0, parts.length - 1).join('::');
+        const palletIdx = parseInt(parts[parts.length - 1]);
+        
+        const row = itemsToProcess.find(r => r.id === rowId);
         if (row && row.inspections) {
           const inspection = row.inspections[palletIdx];
+          if (!inspection) continue;
+
           await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Saída em massa', palletIdx + 1), true);
           
           if (inspection.assignedSlot) {
@@ -1651,7 +1722,10 @@ const App: React.FC = () => {
           const currentRow = rowsToUpdate.get(rowId) || { ...row };
           const rowSelectedIndices = selectedPallets
             .filter(k => k.startsWith(`${rowId}::`))
-            .map(k => parseInt(k.split('::')[1]));
+            .map(k => {
+              const p = k.split('::');
+              return parseInt(p[p.length - 1]);
+            });
           
           const newInsps = row.inspections?.filter((_, i) => !rowSelectedIndices.includes(i));
           currentRow.inspections = newInsps;
@@ -2286,7 +2360,8 @@ const App: React.FC = () => {
             <ShipmentPage 
               shipments={shipments}
               inventory={data}
-              onOpenDetail={setShipmentDetailContext}
+              shipmentCounts={shipmentCounts}
+              onOpenDetail={handleOpenShipmentDetail}
               onDelete={handleDeleteShipment}
             />
           )}
@@ -2441,14 +2516,21 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <InventoryVirtualizedList
-                        items={filteredInventory}
-                        selectedPallets={selectedPallets}
-                        onToggleSelection={togglePalletSelection}
-                        onShowDetail={handleShowDetail}
-                        onEdit={handleEditPallet}
-                        onDelete={handleDeletePallet}
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredInventory.map(({ row, inspection, idx }) => (
+                            <InventoryCard
+                                key={`${row.id}::${idx}`}
+                                item={row}
+                                insp={inspection}
+                                idx={idx}
+                                isSelected={selectedPallets.includes(`${row.id}::${idx}`)}
+                                onToggleSelection={togglePalletSelection}
+                                onShowDetail={handleShowDetail}
+                                onEdit={handleEditPallet}
+                                onDelete={handleDeletePallet}
+                            />
+                        ))}
+                    </div>
                 )}
 
                 {activeTab === 'inventory' && hasMoreInventory && (
@@ -2485,14 +2567,7 @@ const App: React.FC = () => {
           onClose={() => setIsBulkConfirmOpen(false)}
           onConfirm={handleBulkSend}
           onRemovePallet={(key) => setSelectedPallets(prev => prev.filter(k => k !== key))}
-          selectedPallets={selectedPallets.map(key => {
-            const parts = key.split('::');
-            const rowId = parts.slice(0, parts.length - 1).join('::');
-            const palletIdx = parseInt(parts[parts.length - 1]);
-            const row = data.find(r => r.id === rowId);
-            if (!row || !row.inspections || !row.inspections[palletIdx]) return null;
-            return { row, inspection: row.inspections[palletIdx], idx: palletIdx, selectionKey: key };
-          }).filter((p): p is { row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string } => p !== null)}
+          selectedPallets={selectedPalletsData}
         />
       )}
 
@@ -2574,21 +2649,19 @@ const App: React.FC = () => {
 
       <ShipmentDetailModal 
         isOpen={!!shipmentDetailContext}
-        onClose={() => setShipmentDetailContext(null)}
+        onClose={() => {
+          setShipmentDetailContext(null);
+          setShipmentDetailPallets([]);
+        }}
         shipment={shipmentDetailContext}
-        linkedPallets={shipmentDetailContext ? data.flatMap(row => 
-          (row.inspections || [])
-            .map((insp, idx) => {
-              const sId = insp.shipmentId || (insp as any).shipment_id;
-              if (sId && sId === shipmentDetailContext.id) {
-                return { ...row, inspections: [insp], id: `${row.id}::${idx}` } as SheetRow;
-              }
-              return null;
-            })
-            .filter((p): p is SheetRow => p !== null)
-        ) : []}
+        linkedPallets={shipmentDetailPallets}
         onFinalize={handleFinalizeShipment}
-        onRemovePallet={handleRemoveFromShipment}
+        onRemovePallet={async (palletId) => {
+          await handleRemoveFromShipment(palletId);
+          if (shipmentDetailContext) {
+            fetchShipmentDetailPallets(shipmentDetailContext.id);
+          }
+        }}
         onDelete={handleDeleteShipment}
       />
       
