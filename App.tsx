@@ -1166,10 +1166,10 @@ const App: React.FC = () => {
 
   const handleMovementTransfer = async (transferData: any) => {
     try {
-      // 1. Direct fetch from server to bypass pagination limits
-      const item = await supabaseService.getInventoryItemByLoadingId(transferData.id);
+      // 1. Get the item, either from the passed data or by searching
+      const item = transferData.pallet || await supabaseService.findPalletByLoadingId(transferData.id);
       if (!item) {
-        showNotification('Produto não encontrado com este ID no sistema.', 'error');
+        showNotification('Produto não encontrado no sistema.', 'error');
         return;
       }
 
@@ -1184,22 +1184,28 @@ const App: React.FC = () => {
         }
       }
 
-      // 3. Pre-validation: check if pallet is still in the expected source slot
-      if (item.inspections && item.inspections[0]?.assignedSlot !== transferData.fromSlot) {
-        showNotification(`Divergência de posição: O pallet ${transferData.id} não está mais na vaga ${transferData.fromSlot}. Ele parece estar em ${item.inspections[0]?.assignedSlot}. A interface será atualizada.`, 'error');
+      // 3. Resolve actual source slot
+      const actualOrigin = item.inspections?.[0]?.assignedSlot;
+      const expectedOrigin = transferData.fromSlot || actualOrigin;
+
+      // Only check divergence if we have an explicit expected origin
+      if (transferData.fromSlot && actualOrigin !== expectedOrigin) {
+        showNotification(`Divergência de posição: O pallet não está mais na vaga esperada (${expectedOrigin}). Ele parece estar em ${actualOrigin}.`, 'error');
         refreshCombinedData();
         return;
       }
 
-      // 4. Update From Slot
-      const fromSlotObj = slots.find(s => s.id === transferData.fromSlot);
-      if (fromSlotObj) {
-        const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
-        await supabaseService.updateSlot(updatedFrom);
-        setSlots(prev => prev.map(s => s.id === transferData.fromSlot ? updatedFrom : s));
+      // 4. Update From Slot (Free it up)
+      if (actualOrigin && actualOrigin !== 'AGUARDANDO') {
+        const fromSlotObj = slots.find(s => s.id === actualOrigin);
+        if (fromSlotObj) {
+          const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
+          await supabaseService.updateSlot(updatedFrom);
+          setSlots(prev => prev.map(s => s.id === actualOrigin ? updatedFrom : s));
+        }
       }
 
-      // Update To Slot
+      // 5. Update To Slot (Occupy it)
       if (!isWaitingDestination) {
         const toSlotObj = slots.find(s => s.id === transferData.toSlot);
         if (toSlotObj) {
@@ -1213,7 +1219,7 @@ const App: React.FC = () => {
         }
       }
 
-      // Update Inventory Item Slot
+      // 6. Update Inventory Item Record
       const updatedItem = {
         ...item,
         inspections: item.inspections?.map(ins => ({ ...ins, assignedSlot: transferData.toSlot }))
@@ -1221,19 +1227,19 @@ const App: React.FC = () => {
       await supabaseService.saveInventoryItem(updatedItem);
       setData(prev => prev.map(d => d.id === item.id ? updatedItem : d));
 
-      // Add History
+      // 7. Add History
       await addToHistory({
         id: Math.random().toString(36).substring(2, 9),
         type: HistoryType.TRANSFER,
         timestamp: new Date().toLocaleString(),
-        loadingId: transferData.id,
+        loadingId: item.loadingId || item.id,
         description: item.description,
         op: item.originOP,
         lot: item.lot,
         palletNumber: 1,
         totalPallets: item.pallets,
         slot: transferData.toSlot,
-        details: `Transferência por ${user?.name || 'Operador'} de ${transferData.fromSlot} para ${transferData.toSlot}${isWaitingDestination ? ' (Aguardando Vaga)' : ''}`,
+        details: `Transferência por ${user?.name || 'Operador'} de ${actualOrigin || 'N/A'} para ${transferData.toSlot}${isWaitingDestination ? ' (Aguardando Vaga)' : ''}`,
         operatorName: user?.name
       });
 
@@ -1241,10 +1247,10 @@ const App: React.FC = () => {
       setIsMovementModalOpen(false);
       refreshCombinedData();
       
-      // Auto-reorganize E/F stacks after transfer
+      // Auto-reorganize stack positions if applicable
       const finalData = data.map(d => d.id === item.id ? updatedItem : d);
       const finalSlots = slots.map(s => {
-        if (s.id === transferData.fromSlot) return { ...s, status: SlotContent.EMPTY, occupiedBy: undefined };
+        if (s.id === actualOrigin) return { ...s, status: SlotContent.EMPTY, occupiedBy: undefined };
         if (s.id === transferData.toSlot && !isWaitingDestination) {
            return { ...s, status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, occupiedBy: item.originOP || item.description };
         }
@@ -1259,10 +1265,9 @@ const App: React.FC = () => {
 
   const handleMovementExit = async (exitData: any) => {
     try {
-      // Direct fetch from server to bypass pagination limits
-      const item = await supabaseService.getInventoryItemByLoadingId(exitData.id);
+      const item = exitData.pallet || await supabaseService.findPalletByLoadingId(exitData.id);
       if (!item) {
-        showNotification('Produto não encontrado com este ID no sistema.', 'error');
+        showNotification('Produto não encontrado.', 'error');
         return;
       }
 
@@ -1283,7 +1288,7 @@ const App: React.FC = () => {
         id: Math.random().toString(36).substring(2, 9),
         type: HistoryType.EXIT,
         timestamp: new Date().toLocaleString(),
-        loadingId: exitData.id,
+        loadingId: item.loadingId || item.id,
         description: item.description,
         op: item.originOP,
         lot: item.lot,

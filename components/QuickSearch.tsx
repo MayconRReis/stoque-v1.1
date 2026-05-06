@@ -44,11 +44,22 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
     setPallet(null);
 
     try {
-      const result = await supabaseService.findPalletByLoadingId(searchTerm.trim().toUpperCase());
+      const term = searchTerm.trim().toUpperCase();
+      const isSlotPattern = /^[A-F](\.\d+){0,2}$/.test(term);
+      
+      let result = null;
+      if (isSlotPattern) {
+        result = await supabaseService.findPalletBySlot(term);
+      }
+      
+      if (!result) {
+        result = await supabaseService.findPalletByLoadingId(term);
+      }
+
       if (result) {
         setPallet(result);
       } else {
-        setError('Pallet não encontrado com este ID.');
+        setError('Nenhum pallet encontrado nesta vaga ou ID.');
       }
     } catch (err) {
       console.error('Search error:', err);

@@ -190,25 +190,28 @@ export const supabaseService = {
       const originalTerm = filters.searchTerm.trim();
       const upperTerm = originalTerm.toUpperCase();
       const termFragment = `%${originalTerm}%`;
-      const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+      const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
       
-      console.log('[Busca] Termo pesquisado:', originalTerm);
-      console.log('[Busca] É padrão de vaga?', isSlot);
-
       let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
 
-      if (isSlot) {
+      if (isSlotSearch) {
         try {
-          // Find all slot IDs that match the pattern
-          const { data: slots } = await supabase
-            .from('warehouse_slots')
-            .select('id')
-            .ilike('id', `${upperTerm}%`);
-          
-          if (slots && slots.length > 0) {
-            const slotClauses = slots.map(s => `inspections.cs.[{"assignedSlot":"${s.id}"}]`);
-            orClause += `,${slotClauses.join(',')}`;
-            console.log(`[Busca] Encontradas ${slots.length} vagas correspondentes para o filtro.`);
+          // If it's a slot search, let's find the IDs of pallets in those slots
+          // This avoids complex JSONB containment queries in the main OR clause
+          const { data: matchedPallets } = await supabase
+            .from('inventory')
+            .select('id, inspections');
+
+          if (matchedPallets) {
+            const palletsInTargetSlots = matchedPallets.filter(p => 
+              p.inspections?.some((insp: any) => 
+                insp.assignedSlot?.toUpperCase().startsWith(upperTerm)
+              )
+            ).map(p => p.id);
+
+            if (palletsInTargetSlots.length > 0) {
+              orClause += `,id.in.(${palletsInTargetSlots.join(',')})`;
+            }
           }
         } catch (e) {
           console.warn('Erro ao processar busca por vaga:', e);
@@ -944,7 +947,39 @@ export const supabaseService = {
     if (error) throw error;
     if (!data) return null;
 
-    // Map to application standard
+    // Map to application standard (SheetRow)
+    return {
+      id: data.id,
+      loadingId: data.loading_id,
+      originOP: data.origin_op,
+      description: data.description,
+      lot: data.lot,
+      pallets: data.pallets,
+      date: data.date || data.created_at,
+      status: data.status as StockStatus,
+      operatorName: data.operator_name,
+      inspections: data.inspections || [],
+    } as SheetRow;
+  },
+
+  async findPalletBySlot(slotId: string) {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.find((row: any) => row.inspections?.some((i: any) => i.assignedSlot === slotId)) || null;
+    }
+
+    // Use containment operator to find pallet with this assignedSlot in history/current
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .contains('inspections', [{ assignedSlot: slotId }])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
     return {
       id: data.id,
       loadingId: data.loading_id,
