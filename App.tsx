@@ -542,7 +542,7 @@ const App: React.FC = () => {
 
     const loadData = async () => {
       try {
-        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes] = await Promise.all([
+        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData] = await Promise.all([
           supabaseService.getInventoryPaginated(0, PAGE_SIZE, { 
             searchTerm: inventorySearch, 
             typeFilter: inventoryTypeFilter 
@@ -552,7 +552,8 @@ const App: React.FC = () => {
           supabaseService.getShipments(),
           supabaseService.getGlobalStats(),
           supabaseService.getPendingInventory(),
-          supabaseService.getWaitingInventory()
+          supabaseService.getWaitingInventory(),
+          supabaseService.getShipmentPalletCounts()
         ]);
 
         setData(invPaginatied.data);
@@ -561,6 +562,7 @@ const App: React.FC = () => {
         setStats(globalStats);
         setPendingRows(pendingRes);
         setWaitingRows(waitingRes);
+        setShipmentCounts(countsData);
         
         setHistory(historyData);
         setShipments(shipData);
@@ -1408,6 +1410,7 @@ const App: React.FC = () => {
 
       showNotification(`Carregamento ${newShipment.id} criado com sucesso!`);
       setSelectedPallets([]);
+      refreshCombinedData();
     } catch (error: any) {
       console.error('Error creating shipment:', error);
       showNotification(`Erro ao criar carregamento: ${error.message}`, 'error');
@@ -1439,6 +1442,7 @@ const App: React.FC = () => {
       }
 
       setSelectedPallets([]);
+      refreshCombinedData();
     } catch (error: any) {
       console.error('Error adding to shipment:', error);
       showNotification(`Erro ao adicionar ao carregamento: ${error.message}`, 'error');
@@ -1460,6 +1464,7 @@ const App: React.FC = () => {
       
       fetchShipmentDetailPallets(shipmentId);
       showNotification(`Pallet adicionado ao carregamento ${shipmentId}!`);
+      refreshCombinedData();
     } catch (error: any) {
       console.error('Error adding single pallet to shipment:', error);
       showNotification(`Erro ao adicionar pallet: ${error.message}`, 'error');
@@ -1480,6 +1485,7 @@ const App: React.FC = () => {
           type: 'info'
         });
       }
+      refreshCombinedData();
     } catch (error: any) {
       console.error('Error removing from shipment:', error);
       showNotification(`Erro ao remover pallet: ${error.message}`, 'error');
@@ -1605,6 +1611,7 @@ const App: React.FC = () => {
       setData(result.data);
       
       showNotification('Carregamento excluído com sucesso.');
+      refreshCombinedData();
 
       // Broadcast to others
       if (user) {

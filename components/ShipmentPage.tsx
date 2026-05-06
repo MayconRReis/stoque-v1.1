@@ -147,7 +147,11 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
                   </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase italic">Enviado em {new Date(shipment.scheduledDate).toLocaleDateString('pt-BR')}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800">
+                    <Package className="w-3 h-3 text-fuchsia-500/70" />
+                    <span className="text-[9px] font-bold text-white italic">{getPalletCount(shipment.id)} PL</span>
+                  </div>
                   <div 
                     onClick={() => onOpenDetail(shipment)}
                     className="w-8 h-8 rounded-lg bg-slate-950 text-slate-500 flex items-center justify-center border border-slate-800 cursor-pointer hover:bg-fuchsia-600 hover:text-white hover:border-fuchsia-500 transition-all"
