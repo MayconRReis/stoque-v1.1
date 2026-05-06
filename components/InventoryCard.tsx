@@ -14,7 +14,8 @@ import {
   AlertCircle, 
   Info, 
   Pencil, 
-  Trash2 
+  Trash2,
+  Warehouse 
 } from 'lucide-react';
 import { SheetRow, InspectionData, SlotContent, translateSlotContent, getContentTypeColor } from '../types';
 
@@ -110,8 +111,8 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
           </div>
           <div className="text-right">
             <div className="flex items-center gap-2 justify-end mb-1">
-              <span className={`w-1.5 h-1.5 rounded-full bg-${baseColor}-500`} />
-              <span className={`text-[12px] font-black uppercase tracking-widest italic ${
+              <span className={`w-2 h-2 rounded-full bg-${baseColor}-500`} />
+              <span className={`text-[14px] font-black uppercase tracking-widest italic ${
                 insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
                 insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
                 `text-${baseColor}-400`
@@ -158,9 +159,9 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
             </div>
             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
-                <AlertCircle className="w-2.5 h-2.5" /> ID Final
+                <Warehouse className="w-2.5 h-2.5" /> Vaga
               </p>
-              <p className="text-[10px] font-black text-rose-400 font-mono italic">{item.loadingId || 'N/A'}</p>
+              <p className={`text-[10px] font-black text-blue-400 font-mono italic`}>{insp.assignedSlot || 'N/A'}</p>
             </div>
             <div className="col-span-2 bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">

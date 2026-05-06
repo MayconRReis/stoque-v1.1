@@ -10,9 +10,14 @@ import {
   Trash2,
   AlertCircle,
   Hash,
-  ArrowRight
+  ArrowRight,
+  Search,
+  Loader2,
+  Plus,
+  Warehouse
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabaseService } from '../services/supabaseService';
 
 interface ShipmentDetailModalProps {
   isOpen: boolean;
@@ -21,6 +26,7 @@ interface ShipmentDetailModalProps {
   linkedPallets: SheetRow[];
   onFinalize: (shipmentId: string) => Promise<void>;
   onRemovePallet: (palletId: string) => Promise<void>;
+  onAddPallet: (pallet: SheetRow) => Promise<void>;
   onDelete?: (shipmentId: string) => Promise<void>;
 }
 
@@ -31,12 +37,59 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
   linkedPallets,
   onFinalize,
   onRemovePallet,
+  onAddPallet,
   onDelete
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [searchSlots, setSearchSlots] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   if (!isOpen || !shipment) return null;
+
+  const handleSlotSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const term = searchSlots.trim().toUpperCase();
+    if (!term) return;
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      // Split by comma in case they entered multiple slots
+      const terms = term.split(/[\s,]+/).filter(t => t.length > 0);
+      let foundAny = false;
+
+      for (const t of terms) {
+        const results = await supabaseService.findPalletsBySlot(t);
+        if (results.length > 1) {
+          setSearchError(`Conflito na vaga ${t}: Encontrados ${results.length} pallets.`);
+          continue;
+        }
+        const pallet = results[0];
+        if (pallet) {
+          // Check if already in this shipment
+          if (linkedPallets.some(p => p.id === pallet.id)) {
+            continue;
+          }
+          await onAddPallet(pallet);
+          foundAny = true;
+        }
+      }
+
+      if (foundAny) {
+        setSearchSlots('');
+      } else {
+        setSearchError('Nenhum pallet disponível encontrado nestas vagas.');
+      }
+    } catch (error) {
+      console.error('Error adding by slot:', error);
+      setSearchError('Erro ao buscar pallets.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleFinalize = async () => {
     if (linkedPallets.length === 0) return;
@@ -144,6 +197,42 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Total Pallets</p>
               <p className="text-sm font-black text-white italic">{linkedPallets.length} Unidades</p>
             </div>
+          </div>
+
+          {/* Quick Add by Slot */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-2">
+              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] italic">Adicionar por Vaga</h4>
+            </div>
+            <form onSubmit={handleSlotSearch} className="flex gap-3">
+              <div className="relative flex-1">
+                <Warehouse className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <input 
+                  type="text"
+                  value={searchSlots}
+                  onChange={e => setSearchSlots(e.target.value)}
+                  placeholder="EX: E.1.1, E.1.2..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-4 py-4 text-white font-mono font-black text-sm focus:border-fuchsia-600 outline-none transition-all placeholder:text-slate-700"
+                />
+                {isSearching && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-4 h-4 text-fuchsia-500 animate-spin" />
+                  </div>
+                )}
+              </div>
+              <button 
+                type="submit"
+                disabled={isSearching || !searchSlots.trim()}
+                className="px-6 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-fuchsia-900/20 active:scale-95 transition-all"
+              >
+                Adicionar
+              </button>
+            </form>
+            {searchError && (
+              <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest ml-2 italic">
+                {searchError}
+              </p>
+            )}
           </div>
 
           {/* Pallet List */}

@@ -1445,6 +1445,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAddToShipmentSingle = async (pallet: SheetRow, shipmentId: string) => {
+    try {
+      // For single pallet search, we assume idx 0 as we usually split them or just use the first item's index
+      // But in this app, pallets in inventory are often grouped. 
+      // If found by slot, it might be a specific entry.
+      
+      const selection = { rowId: pallet.id, palletIdx: 0 }; // Default to 0 if not specified
+      await supabaseService.updateInventoryShipment([selection], shipmentId);
+      
+      // Refresh
+      const result = await supabaseService.getInventoryPaginated(0, data.length || PAGE_SIZE);
+      setData(result.data);
+      
+      fetchShipmentDetailPallets(shipmentId);
+      showNotification(`Pallet adicionado ao carregamento ${shipmentId}!`);
+    } catch (error: any) {
+      console.error('Error adding single pallet to shipment:', error);
+      showNotification(`Erro ao adicionar pallet: ${error.message}`, 'error');
+    }
+  };
+
   const handleRemoveFromShipment = async (palletId: string) => {
     try {
       const [rowId, palletIdx] = palletId.split('::');
@@ -2579,7 +2600,7 @@ const App: React.FC = () => {
                             type="text" 
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
-                            placeholder="Buscar por Vaga, ID, OP, Produto ou Lote..." 
+                            placeholder="Digite a VAGA (Ex: E.1.3), OP, Produto ou Lote..." 
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
@@ -2818,6 +2839,11 @@ const App: React.FC = () => {
           await handleRemoveFromShipment(palletId);
           if (shipmentDetailContext) {
             fetchShipmentDetailPallets(shipmentDetailContext.id);
+          }
+        }}
+        onAddPallet={async (pallet) => {
+          if (shipmentDetailContext) {
+            await handleAddToShipmentSingle(pallet, shipmentDetailContext.id);
           }
         }}
         onDelete={handleDeleteShipment}

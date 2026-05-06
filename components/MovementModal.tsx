@@ -130,6 +130,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [foundPallet, setFoundPallet] = useState<SheetRow | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Auto-select origin slot when transferId is entered
   useEffect(() => {
@@ -147,7 +148,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
           
           let item = null;
           if (isSlotPattern) {
-            item = await supabaseService.findPalletBySlot(upperId);
+            const results = await supabaseService.findPalletsBySlot(upperId);
+            if (results.length > 1) {
+              setError(`CONFLITO DE VAGA: Encontrados ${results.length} pallets na vaga ${upperId}. Solicite correção de estoque.`);
+              setFoundPallet(null);
+              setIsSearching(false);
+              return;
+            }
+            item = results[0] || null;
+            setError(null);
           }
           
           // If not found by slot or wasn't a slot pattern, try by ID
@@ -175,6 +184,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
         if (!initialPallet) {
           setFoundPallet(null);
           setFromSlot('');
+          setError(null);
         }
       }
     };
@@ -196,13 +206,22 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
       if (type === 'exit' && exitId.length >= 1) {
         setIsSearching(true);
+        setError(null);
         try {
           const upperId = exitId.trim().toUpperCase();
           const isSlotPattern = /^[A-F](\.\d+){0,2}$/.test(upperId);
           
           let item = null;
           if (isSlotPattern) {
-            item = await supabaseService.findPalletBySlot(upperId);
+            const results = await supabaseService.findPalletsBySlot(upperId);
+            if (results.length > 1) {
+              setError(`CONFLITO DE VAGA: Encontrados ${results.length} pallets na vaga ${upperId}. Solicite correção de estoque.`);
+              setFoundPallet(null);
+              setIsSearching(false);
+              return;
+            }
+            item = results[0] || null;
+            setError(null);
           }
           
           if (!item && exitId.length >= 3) {
@@ -224,6 +243,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
         // Only clear if not initialized
         if (!initialPallet) {
           setFoundPallet(null);
+          setError(null);
         }
       }
     };
@@ -715,16 +735,16 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                     <Search className="w-3 h-3 text-amber-500" />
-                    Vaga de Origem ou ID
+                    Vaga de Origem
                   </label>
-                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga (ex: E.1.1) ou ID do pallet</p>
+                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga exata (ex: E.1.1) ou ID técnico</p>
                   <div className="relative group">
                     <input 
                       type="text" 
                       value={transferId}
                       onChange={e => setTransferId(e.target.value.toUpperCase())}
                       placeholder="Ex: E.1.1 ou ABC123"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700"
+                      className={`w-full bg-slate-950 border ${error ? 'border-amber-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 text-amber-500">
@@ -732,6 +752,11 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       </div>
                     )}
                   </div>
+                  {error && (
+                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest ml-1 italic">
+                      {error}
+                    </p>
+                  )}
                 </div>
 
                 <AnimatePresence>
@@ -757,14 +782,18 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                              </span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-amber-500/10">
+                        <div className="grid grid-cols-4 gap-4 pt-4 border-t border-amber-500/10">
                           <div className="space-y-1">
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP}</p>
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Produto</p>
+                            <p className="text-[11px] font-mono text-white font-black truncate">{foundPallet.description.split(' ')[0]}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Lote</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.lot}</p>
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP/Lote</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Qtd</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.pallets} PL</p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Vaga Atual</p>
@@ -838,16 +867,16 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                     <Search className="w-3 h-3 text-red-500" />
-                    Vaga de Origem ou ID
+                    Vaga de Origem
                   </label>
-                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga (ex: E.1.1) ou ID do pallet</p>
+                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga exata (ex: E.1.1) ou ID técnico</p>
                   <div className="relative group">
                     <input 
                       type="text" 
                       value={exitId}
                       onChange={e => setExitId(e.target.value.toUpperCase())}
                       placeholder="Ex: E.1.1 ou ABC123"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700"
+                      className={`w-full bg-slate-950 border ${error ? 'border-red-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 text-red-500">
@@ -855,6 +884,11 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       </div>
                     )}
                   </div>
+                  {error && (
+                    <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest ml-1 italic">
+                      {error}
+                    </p>
+                  )}
                 </div>
 
                 <AnimatePresence>
@@ -880,14 +914,18 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                              </span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-red-500/10">
+                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-red-500/10">
                           <div className="space-y-1">
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP}</p>
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP/Lote</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Lote</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.lot}</p>
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Quantidade</p>
+                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.pallets} PL</p>
+                          </div>
+                          <div className="space-y-1 text-right">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Confirmar Saída?</p>
+                            <p className="text-[10px] font-black text-red-500 uppercase italic">Ação Irreversível</p>
                           </div>
                         </div>
                       </div>

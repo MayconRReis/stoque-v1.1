@@ -49,7 +49,13 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
       
       let result = null;
       if (isSlotPattern) {
-        result = await supabaseService.findPalletBySlot(term);
+        const results = await supabaseService.findPalletsBySlot(term);
+        if (results.length > 1) {
+          setError(`FALHA CRÍTICA: Encontrados ${results.length} pallets nesta vaga. Solicite correção ao gestor.`);
+          setIsSearching(false);
+          return;
+        }
+        result = results[0] || null;
       }
       
       if (!result) {
@@ -85,7 +91,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           <Search className="w-8 h-8 text-blue-500" /> Consulta Rápida
         </h2>
         <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
-          Busque por ID Final / Loading ID para ver detalhes e ações
+          Digite a vaga exata (Ex: E.1.3) ou ID do Pallet
         </p>
       </div>
 
@@ -98,7 +104,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="DIGITE OU ESCANEIE O ID..."
+          placeholder="DIGITE A VAGA (Ex: E.1.3) OU ID..."
           className="w-full bg-slate-900 border-2 border-slate-800 rounded-3xl py-5 pl-12 pr-32 text-white font-black text-lg placeholder:text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-2xl"
           autoFocus
         />

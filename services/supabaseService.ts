@@ -962,36 +962,33 @@ export const supabaseService = {
     } as SheetRow;
   },
 
-  async findPalletBySlot(slotId: string) {
+  async findPalletsBySlot(slotId: string) {
     if (!isSupabaseConfigured) {
       const all = localStorageHelper.get('inventory');
-      return all.find((row: any) => row.inspections?.some((i: any) => i.assignedSlot === slotId)) || null;
+      return all.filter((row: any) => row.inspections?.some((i: any) => i.assignedSlot === slotId));
     }
 
-    // Use containment operator to find pallet with this assignedSlot in history/current
     const { data, error } = await supabase
       .from('inventory')
       .select('*')
       .contains('inspections', [{ assignedSlot: slotId }])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
-    if (!data) return null;
+    if (!data || data.length === 0) return [];
 
-    return {
-      id: data.id,
-      loadingId: data.loading_id,
-      originOP: data.origin_op,
-      description: data.description,
-      lot: data.lot,
-      pallets: data.pallets,
-      date: data.date || data.created_at,
-      status: data.status as StockStatus,
-      operatorName: data.operator_name,
-      inspections: data.inspections || [],
-    } as SheetRow;
+    return data.map((item: any) => ({
+      id: item.id,
+      loadingId: item.loading_id,
+      originOP: item.origin_op,
+      description: item.description,
+      lot: item.lot,
+      pallets: item.pallets,
+      date: item.date || item.created_at,
+      status: item.status as StockStatus,
+      operatorName: item.operator_name,
+      inspections: item.inspections || [],
+    })) as SheetRow[];
   },
 
   async getEditRequests(): Promise<any[]> {
