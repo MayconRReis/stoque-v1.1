@@ -1126,7 +1126,9 @@ export const supabaseService = {
 
   broadcastNotification(payload: { user: string, message: string, type?: string }) {
     if (!isSupabaseConfigured) return;
-    supabase.channel('app-notifications').send({
+    // Use httpSend for explicit REST delivery to avoid deprecation warning
+    // when sending without a persistent websocket connection.
+    (supabase.channel('app-notifications') as any).httpSend({
       type: 'broadcast',
       event: 'pallet-change',
       payload
