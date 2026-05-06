@@ -223,10 +223,10 @@ export const supabaseService = {
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
       if (filters.typeFilter === 'CONTAINER') {
-        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]);
-        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]);
-        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]);
-        query = query.or(`inspections.cs.${sj},inspections.cs.${lp},inspections.cs.${cp}`);
+        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]).replace(/"/g, '""');
+        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]).replace(/"/g, '""');
+        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]).replace(/"/g, '""');
+        query = query.or(`inspections.cs."${sj}",inspections.cs."${lp}",inspections.cs."${cp}"`);
       } else {
         query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
       }
@@ -455,7 +455,10 @@ export const supabaseService = {
             .ilike('id', `${upperTerm}%`);
           
           if (slots && slots.length > 0) {
-            const slotClauses = slots.map(s => `inspections.cs.[{"assignedSlot":"${s.id}"}]`);
+            const slotClauses = slots.map(s => {
+              const json = JSON.stringify([{ assignedSlot: s.id }]).replace(/"/g, '""');
+              return `inspections.cs."${json}"`;
+            });
             orClause += `,${slotClauses.join(',')}`;
           }
         } catch (e) {
@@ -468,10 +471,10 @@ export const supabaseService = {
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
       if (filters.typeFilter === 'CONTAINER') {
-        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]);
-        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]);
-        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]);
-        query = query.or(`inspections.cs.${sj},inspections.cs.${lp},inspections.cs.${cp}`);
+        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]).replace(/"/g, '""');
+        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]).replace(/"/g, '""');
+        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]).replace(/"/g, '""');
+        query = query.or(`inspections.cs."${sj}",inspections.cs."${lp}",inspections.cs."${cp}"`);
       } else {
         query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
       }
@@ -968,16 +971,22 @@ export const supabaseService = {
       return all.filter((row: any) => row.inspections?.some((i: any) => i.assignedSlot === slotId));
     }
 
+    // Fetching and filtering in JS is safer against inconsistent JSONB structures (array vs object)
+    // that cause Postgrest syntax errors.
     const { data, error } = await supabase
       .from('inventory')
-      .select('*')
-      .contains('inspections', [{ assignedSlot: slotId }])
-      .order('created_at', { ascending: false });
+      .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) return [];
+    if (!data) return [];
 
-    return data.map((item: any) => ({
+    const matched = data.filter((item: any) => {
+      const insps = Array.isArray(item.inspections) ? item.inspections : 
+                   (item.inspections ? [item.inspections] : []);
+      return insps.some((i: any) => i.assignedSlot === slotId);
+    });
+
+    return matched.map((item: any) => ({
       id: item.id,
       loadingId: item.loading_id,
       originOP: item.origin_op,
