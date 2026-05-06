@@ -135,13 +135,30 @@ export const supabaseService = {
       const all = localStorageHelper.get('inventory');
       let filtered = [...all];
       if (filters?.searchTerm) {
-        const term = filters.searchTerm.toLowerCase();
-        filtered = filtered.filter(row => 
-          row.originOP.toLowerCase().includes(term) ||
-          row.description.toLowerCase().includes(term) ||
-          row.lot.toLowerCase().includes(term) ||
-          row.id.toLowerCase().includes(term)
-        );
+        const originalTerm = filters.searchTerm.trim();
+        const upperTerm = originalTerm.toUpperCase();
+        const term = originalTerm.toLowerCase();
+        const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+
+        filtered = filtered.filter(row => {
+          const matchesText = 
+            row.originOP.toLowerCase().includes(term) ||
+            row.description.toLowerCase().includes(term) ||
+            row.lot.toLowerCase().includes(term) ||
+            row.id.toLowerCase().includes(term) ||
+            row.loadingId?.toLowerCase().includes(term);
+          
+          if (matchesText) return true;
+          
+          if (isSlot) {
+            return row.inspections?.some((i: any) => {
+              const s = i.assignedSlot?.toUpperCase() || '';
+              return s === upperTerm || s.startsWith(upperTerm + '.');
+            });
+          }
+
+          return row.inspections?.some((i: any) => i.assignedSlot?.toLowerCase().includes(term));
+        });
       }
       if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
         filtered = filtered.filter(row => {
@@ -170,8 +187,35 @@ export const supabaseService = {
       .select('*', { count: 'exact' });
 
     if (filters?.searchTerm) {
-      const term = `%${filters.searchTerm}%`;
-      query = query.or(`origin_op.ilike.${term},description.ilike.${term},lot.ilike.${term},id.ilike.${term}`);
+      const originalTerm = filters.searchTerm.trim();
+      const upperTerm = originalTerm.toUpperCase();
+      const termFragment = `%${originalTerm}%`;
+      const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+      
+      console.log('[Busca] Termo pesquisado:', originalTerm);
+      console.log('[Busca] É padrão de vaga?', isSlot);
+
+      let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+
+      if (isSlot) {
+        try {
+          // Find all slot IDs that match the pattern
+          const { data: slots } = await supabase
+            .from('warehouse_slots')
+            .select('id')
+            .ilike('id', `${upperTerm}%`);
+          
+          if (slots && slots.length > 0) {
+            const slotClauses = slots.map(s => `inspections.cs.[{"assignedSlot":"${s.id}"}]`);
+            orClause += `,${slotClauses.join(',')}`;
+            console.log(`[Busca] Encontradas ${slots.length} vagas correspondentes para o filtro.`);
+          }
+        } catch (e) {
+          console.warn('Erro ao processar busca por vaga:', e);
+        }
+      }
+      
+      query = query.or(orClause);
     }
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
@@ -393,8 +437,30 @@ export const supabaseService = {
       .select('*');
 
     if (filters?.searchTerm) {
-      const term = `%${filters.searchTerm}%`;
-      query = query.or(`origin_op.ilike.${term},description.ilike.${term},lot.ilike.${term},id.ilike.${term}`);
+      const originalTerm = filters.searchTerm.trim();
+      const upperTerm = originalTerm.toUpperCase();
+      const termFragment = `%${originalTerm}%`;
+      const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+      
+      let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+
+      if (isSlot) {
+        try {
+          const { data: slots } = await supabase
+            .from('warehouse_slots')
+            .select('id')
+            .ilike('id', `${upperTerm}%`);
+          
+          if (slots && slots.length > 0) {
+            const slotClauses = slots.map(s => `inspections.cs.[{"assignedSlot":"${s.id}"}]`);
+            orClause += `,${slotClauses.join(',')}`;
+          }
+        } catch (e) {
+          console.warn('Erro ao processar busca por vaga (export):', e);
+        }
+      }
+      
+      query = query.or(orClause);
     }
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
@@ -859,6 +925,22 @@ export const supabaseService = {
       .select()
       .single();
     
+    if (error) throw error;
+    return data;
+  },
+
+  async findPalletByLoadingId(id: string) {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.find((row: any) => row.loadingId === id || row.id === id) || null;
+    }
+
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .or(`loading_id.eq."${id}",id.eq."${id}"`)
+      .maybeSingle();
+
     if (error) throw error;
     return data;
   },

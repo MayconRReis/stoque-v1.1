@@ -66,6 +66,7 @@ import { supabaseService } from './services/supabaseService';
 import { Login } from './components/Login';
 import { UserManager } from './components/UserManager';
 import ApprovalsPage from './components/ApprovalsPage';
+import QuickSearch from './components/QuickSearch';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
@@ -161,7 +162,7 @@ const App: React.FC = () => {
     openShipmentsCount: 0
   });
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
-  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals'>('dashboard');
+  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -2214,6 +2215,7 @@ const App: React.FC = () => {
 
           <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
             <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="quicksearch" icon={Search} label="Consulta Rápida" isActive={activeTab === 'quicksearch'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} isActive={activeTab === 'waiting'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" isActive={activeTab === 'movement'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="inventory" icon={Package} label="Estoque Geral" isActive={activeTab === 'inventory'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
@@ -2282,6 +2284,7 @@ const App: React.FC = () => {
               {isPublicView ? 'Dashboard Público' : (
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
+                  {activeTab === 'quicksearch' && 'Consulta Rápida'}
                   {activeTab === 'waiting' && 'Aguardando Vaga'}
                   {activeTab === 'movement' && 'Movimentação'}
                   {activeTab === 'inventory' && 'Estoque Geral'}
@@ -2528,6 +2531,20 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'quicksearch' && (
+            <div className="max-w-3xl mx-auto py-4">
+              <QuickSearch 
+                onShowDetail={(pallet) => handleShowDetail(pallet, pallet.inspections[0], 0)}
+                onTransfer={(pallet) => handleEditPallet(pallet, pallet.inspections[0], 0)}
+                onExit={(pallet) => handleDeletePallet(pallet.id, 0)}
+                onAddToShipment={(pallet) => {
+                  setSelectedPallets([`${pallet.id}::0`]);
+                  setIsShipmentModalOpen(true);
+                }}
+              />
+            </div>
+          )}
+
           {activeTab === 'inventory' && (
             <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
                 {/* Search and Filter Area */}
@@ -2538,7 +2555,7 @@ const App: React.FC = () => {
                             type="text" 
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
-                            placeholder="Buscar por ID, OP, Produto ou Lote..." 
+                            placeholder="Buscar por Vaga, ID, OP, Produto ou Lote..." 
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
