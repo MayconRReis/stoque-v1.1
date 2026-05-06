@@ -196,14 +196,13 @@ export const supabaseService = {
 
       if (isSlotSearch) {
         try {
-          // If it's a slot search, let's find the IDs of pallets in those slots
-          // This avoids complex JSONB containment queries in the main OR clause
-          const { data: matchedPallets } = await supabase
+          // If it's a slot search, find the IDs of pallets in those slots via JS filter (more reliable than or.cs for jsonb)
+          const { data: allWithInsps } = await supabase
             .from('inventory')
             .select('id, inspections');
 
-          if (matchedPallets) {
-            const palletsInTargetSlots = matchedPallets.filter(p => 
+          if (allWithInsps) {
+            const palletsInTargetSlots = allWithInsps.filter(p => 
               p.inspections?.some((insp: any) => 
                 insp.assignedSlot?.toUpperCase().startsWith(upperTerm)
               )
@@ -222,13 +221,24 @@ export const supabaseService = {
     }
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
-      if (filters.typeFilter === 'CONTAINER') {
-        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]).replace(/"/g, '""');
-        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]).replace(/"/g, '""');
-        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]).replace(/"/g, '""');
-        query = query.or(`inspections.cs."${sj}",inspections.cs."${lp}",inspections.cs."${cp}"`);
-      } else {
-        query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
+      const isContainerSearch = filters.typeFilter === 'CONTAINER';
+      const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, inspections');
+      
+      if (allWithInsps && !inspError) {
+        const matchingIds = allWithInsps.filter(item => 
+          item.inspections?.some((insp: any) => {
+            if (isContainerSearch) {
+              return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
+            }
+            return insp.contentType === filters.typeFilter;
+          })
+        ).map(i => i.id);
+        
+        if (matchingIds.length > 0) {
+          query = query.in('id', matchingIds);
+        } else {
+          query = query.eq('id', 'none_found_' + Date.now());
+        }
       }
     }
 
@@ -372,27 +382,20 @@ export const supabaseService = {
       return all.filter((r: any) => r.inspections?.some((i: any) => i.shipmentId === shipmentId || i.shipment_id === shipmentId));
     }
     
-    // We fetch using both camelCase and snake_case to ensure we catch all records
-    const [camelCaseRes, snakeCaseRes] = await Promise.all([
-      supabase
-        .from('inventory')
-        .select('*')
-        .filter('inspections', 'cs', JSON.stringify([{ shipmentId: shipmentId }])),
-      supabase
-        .from('inventory')
-        .select('*')
-        .filter('inspections', 'cs', JSON.stringify([{ shipment_id: shipmentId }]))
-    ]);
+    // Use the reliable fetch-and-filter approach for JSONB content
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*');
 
-    if (camelCaseRes.error) throw camelCaseRes.error;
-    if (snakeCaseRes.error) throw snakeCaseRes.error;
+    if (error) throw error;
 
-    // Merge results and remove duplicates (some items might have both or we might have fetched them twice)
-    const combinedData = [...(camelCaseRes.data || []), ...(snakeCaseRes.data || [])];
-    const uniqueMap = new Map<string, any>();
-    combinedData.forEach(item => uniqueMap.set(item.id, item));
+    const filtered = (data || []).filter(item => 
+      Array.isArray(item.inspections) && item.inspections.some((i: any) => 
+        i.shipmentId === shipmentId || i.shipment_id === shipmentId
+      )
+    );
     
-    return Array.from(uniqueMap.values()).map(item => ({
+    return filtered.map(item => ({
       id: item.id,
       loadingId: item.loading_id,
       originOP: item.origin_op,
@@ -449,17 +452,20 @@ export const supabaseService = {
 
       if (isSlot) {
         try {
-          const { data: slots } = await supabase
-            .from('warehouse_slots')
-            .select('id')
-            .ilike('id', `${upperTerm}%`);
+          const { data: allWithInsps } = await supabase
+            .from('inventory')
+            .select('id, inspections');
           
-          if (slots && slots.length > 0) {
-            const slotClauses = slots.map(s => {
-              const json = JSON.stringify([{ assignedSlot: s.id }]).replace(/"/g, '""');
-              return `inspections.cs."${json}"`;
-            });
-            orClause += `,${slotClauses.join(',')}`;
+          if (allWithInsps) {
+            const palletsInTargetSlots = allWithInsps.filter(p => 
+              p.inspections?.some((insp: any) => 
+                insp.assignedSlot?.toUpperCase().startsWith(upperTerm)
+              )
+            ).map(p => p.id);
+
+            if (palletsInTargetSlots.length > 0) {
+              orClause += `,id.in.(${palletsInTargetSlots.join(',')})`;
+            }
           }
         } catch (e) {
           console.warn('Erro ao processar busca por vaga (export):', e);
@@ -470,13 +476,24 @@ export const supabaseService = {
     }
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
-      if (filters.typeFilter === 'CONTAINER') {
-        const sj = JSON.stringify([{ contentType: SlotContent.CONTAINER_SJ }]).replace(/"/g, '""');
-        const lp = JSON.stringify([{ contentType: SlotContent.CONTAINER_LP }]).replace(/"/g, '""');
-        const cp = JSON.stringify([{ contentType: SlotContent.CONTAINER_CP }]).replace(/"/g, '""');
-        query = query.or(`inspections.cs."${sj}",inspections.cs."${lp}",inspections.cs."${cp}"`);
-      } else {
-        query = query.filter('inspections', 'cs', JSON.stringify([{ contentType: filters.typeFilter }]));
+      const isContainerSearch = filters.typeFilter === 'CONTAINER';
+      const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, inspections');
+      
+      if (allWithInsps && !inspError) {
+        const matchingIds = allWithInsps.filter(item => 
+          item.inspections?.some((insp: any) => {
+            if (isContainerSearch) {
+              return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
+            }
+            return insp.contentType === filters.typeFilter;
+          })
+        ).map(i => i.id);
+        
+        if (matchingIds.length > 0) {
+          query = query.in('id', matchingIds);
+        } else {
+          query = query.eq('id', 'none_found_export_' + Date.now());
+        }
       }
     }
 
