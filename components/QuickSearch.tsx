@@ -91,7 +91,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           <Search className="w-8 h-8 text-blue-500" /> Consulta Rápida
         </h2>
         <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
-          Digite a vaga exata (Ex: E.1.3) ou ID do Pallet
+          Digite a vaga exata para localizar o pallet.
         </p>
       </div>
 
@@ -104,7 +104,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="DIGITE A VAGA (Ex: E.1.3) OU ID..."
+          placeholder="DIGITE A VAGA. EX: E.1.3"
           className="w-full bg-slate-900 border-2 border-slate-800 rounded-3xl py-5 pl-12 pr-32 text-white font-black text-lg placeholder:text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-2xl"
           autoFocus
         />
@@ -116,6 +116,12 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           {isSearching ? 'Buscando...' : 'Buscar'}
         </button>
       </form>
+
+      <div className="text-center">
+        <p className="text-[9px] font-bold text-slate-700 uppercase tracking-[0.2em] italic">
+          ID técnico pode ser usado apenas em casos especiais.
+        </p>
+      </div>
 
       <AnimatePresence mode="wait">
         {error && (
@@ -147,7 +153,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                     </h3>
                     <div className="flex items-center gap-3">
                       <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] font-black text-blue-500 uppercase tracking-widest italic">
-                        ID: {pallet.loadingId || pallet.id}
+                        ID TÉCNICO: {pallet.loadingId || pallet.id}
                       </span>
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(pallet.status)}`}>
                         {pallet.status || 'STATUS DESCONHECIDO'}

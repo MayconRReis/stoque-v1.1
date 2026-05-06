@@ -66,7 +66,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
         <div className="p-8 space-y-8">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
-               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">ID Carregamento</p>
+               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">ID Técnico</p>
                <p className="text-sm font-black text-white font-mono">{row.loadingId}</p>
             </div>
             <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">

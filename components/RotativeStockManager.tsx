@@ -302,7 +302,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar no estoque rotativo..."
+            placeholder="Digite a VAGA (Ex: E.1.3), Produto ou Tipo..."
             className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl px-12 py-4 text-white font-bold text-sm focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-700"
           />
         </div>

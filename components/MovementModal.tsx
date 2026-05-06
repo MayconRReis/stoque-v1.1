@@ -737,13 +737,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <Search className="w-3 h-3 text-amber-500" />
                     Vaga de Origem
                   </label>
-                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga exata (ex: E.1.1) ou ID técnico</p>
+                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga onde o pallet está atualmente.</p>
                   <div className="relative group">
                     <input 
                       type="text" 
                       value={transferId}
                       onChange={e => setTransferId(e.target.value.toUpperCase())}
-                      placeholder="Ex: E.1.1 ou ABC123"
+                      placeholder="EX: E.1.3"
                       className={`w-full bg-slate-950 border ${error ? 'border-amber-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
@@ -775,7 +775,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           </div>
                           <div className="text-right">
                              <div className="px-2 py-1 bg-slate-950 rounded-lg border border-slate-800 text-[8px] font-black text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
-                               ID: {foundPallet.loadingId || foundPallet.id}
+                               ID TÉCNICO: {foundPallet.loadingId || foundPallet.id}
                              </div>
                              <span className="inline-block text-[8px] font-black text-white bg-amber-600/30 px-2.5 py-1 rounded-full border border-amber-500/30 uppercase tracking-wider">
                                {foundPallet.status}
@@ -815,7 +815,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div>
                       <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Atenção: Nenhum Item Encontrado</p>
                       <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed italic">
-                        Não localizamos pallets ativos na vaga ou com o ID <span className="text-white not-italic">{transferId}</span>. Verifique o código e tente novamente.
+                        Não localizamos pallets ativos na vaga <span className="text-white not-italic">{transferId}</span>. Verifique se a vaga está correta.
                       </p>
                     </div>
                   </motion.div>
@@ -869,13 +869,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <Search className="w-3 h-3 text-red-500" />
                     Vaga de Origem
                   </label>
-                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga exata (ex: E.1.1) ou ID técnico</p>
+                  <p className="text-[9px] text-slate-600 font-bold ml-1 -mt-1 italic">Digite a vaga do pallet que será retirado do estoque.</p>
                   <div className="relative group">
                     <input 
                       type="text" 
                       value={exitId}
                       onChange={e => setExitId(e.target.value.toUpperCase())}
-                      placeholder="Ex: E.1.1 ou ABC123"
+                      placeholder="EX: E.1.3"
                       className={`w-full bg-slate-950 border ${error ? 'border-red-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
@@ -907,7 +907,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           </div>
                           <div className="text-right">
                              <div className="px-2 py-1 bg-slate-950 rounded-lg border border-slate-800 text-[8px] font-black text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
-                               {foundPallet.loadingId || foundPallet.id}
+                               ID TÉCNICO: {foundPallet.loadingId || foundPallet.id}
                              </div>
                              <span className="inline-block text-[8px] font-black text-white bg-red-600/30 px-2.5 py-1 rounded-full border border-red-500/30 uppercase tracking-wider">
                                VAGA: {foundPallet.inspections?.[0]?.assignedSlot || '---'}
@@ -943,7 +943,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div>
                       <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Atenção: Nenhum Item Encontrado</p>
                       <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed italic">
-                        Não localizamos pallets ativos na vaga ou com o ID <span className="text-white not-italic">{exitId}</span>. Verifique o código e tente novamente.
+                        Não localizamos pallets ativos na vaga <span className="text-white not-italic">{exitId}</span>. Verifique se a vaga está correta.
                       </p>
                     </div>
                   </motion.div>
