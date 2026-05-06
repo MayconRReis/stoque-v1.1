@@ -176,6 +176,11 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
+  const [movementInitialContext, setMovementInitialContext] = useState<{
+    type: 'entry' | 'transfer' | 'exit';
+    id?: string;
+    pallet?: SheetRow | null;
+  } | null>(null);
   
   // Selection and Search State
   const [inventorySearch, setInventorySearch] = useState('');
@@ -2535,8 +2540,22 @@ const App: React.FC = () => {
             <div className="max-w-3xl mx-auto py-4">
               <QuickSearch 
                 onShowDetail={(pallet) => handleShowDetail(pallet, pallet.inspections[0], 0)}
-                onTransfer={(pallet) => handleEditPallet(pallet, pallet.inspections[0], 0)}
-                onExit={(pallet) => handleDeletePallet(pallet.id, 0)}
+                onTransfer={(pallet) => {
+                  setMovementInitialContext({
+                    type: 'transfer',
+                    id: pallet.loadingId || pallet.id,
+                    pallet: pallet
+                  });
+                  setIsMovementModalOpen(true);
+                }}
+                onExit={(pallet) => {
+                  setMovementInitialContext({
+                    type: 'exit',
+                    id: pallet.loadingId || pallet.id,
+                    pallet: pallet
+                  });
+                  setIsMovementModalOpen(true);
+                }}
                 onAddToShipment={(pallet) => {
                   setSelectedPallets([`${pallet.id}::0`]);
                   setIsShipmentModalOpen(true);
@@ -2801,7 +2820,10 @@ const App: React.FC = () => {
       
       <MovementModal 
         isOpen={isMovementModalOpen} 
-        onClose={() => setIsMovementModalOpen(false)}
+        onClose={() => {
+          setIsMovementModalOpen(false);
+          setMovementInitialContext(null);
+        }}
         onEntry={handleMovementEntry}
         onTransfer={handleMovementTransfer}
         onExit={handleMovementExit}
@@ -2809,6 +2831,9 @@ const App: React.FC = () => {
         occupiedSlots={slots.filter(s => s.status !== SlotContent.EMPTY)}
         inventoryData={data}
         history={history}
+        initialType={movementInitialContext?.type}
+        initialId={movementInitialContext?.id}
+        initialPallet={movementInitialContext?.pallet}
       />
     </div>
   );

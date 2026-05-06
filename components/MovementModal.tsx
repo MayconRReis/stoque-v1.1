@@ -15,6 +15,9 @@ interface MovementModalProps {
   occupiedSlots: WarehouseSlot[];
   inventoryData: SheetRow[];
   history: any[];
+  initialType?: 'entry' | 'transfer' | 'exit';
+  initialId?: string;
+  initialPallet?: SheetRow | null;
 }
 
 export const MovementModal: React.FC<MovementModalProps> = ({ 
@@ -26,9 +29,44 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   availableSlots,
   occupiedSlots,
   inventoryData,
-  history
+  history,
+  initialType,
+  initialId,
+  initialPallet
 }) => {
   const [type, setType] = useState<'entry' | 'transfer' | 'exit'>('entry');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialType) setType(initialType);
+      if (initialId) {
+        if (initialType === 'transfer') setTransferId(initialId);
+        if (initialType === 'exit') setExitId(initialId);
+      }
+      if (initialPallet) {
+        setFoundPallet(initialPallet);
+        if (initialType === 'transfer' && initialPallet.inspections?.[0]?.assignedSlot) {
+          setFromSlot(initialPallet.inspections[0].assignedSlot);
+        }
+        if (initialType === 'exit' && initialPallet.inspections?.[0]?.assignedSlot) {
+          // You might have internal state for exit slot too, check line 200+
+        }
+      }
+    } else {
+      // Clear states on close to avoid carrying over values
+      setOp('');
+      setName('');
+      setLot('');
+      setQuantity(1);
+      setSlotId('');
+      setTransferId('');
+      setFromSlot('');
+      setToSlot('');
+      setExitId('');
+      setExitReason('');
+      setFoundPallet(null);
+    }
+  }, [isOpen, initialType, initialId, initialPallet]);
 
   const sortedAvailableSlots = useMemo(() => {
     return [...availableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -80,10 +118,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   // Auto-select origin slot when transferId is entered
   useEffect(() => {
     const searchPallet = async () => {
+      // If we already have the pallet from initialPallet and the IDs match, skip searching
+      if (initialPallet && (initialPallet.loadingId === transferId || initialPallet.id === transferId) && type === 'transfer') {
+        return;
+      }
+
       if (type === 'transfer' && transferId.length >= 3) {
         setIsSearching(true);
         try {
-          const item = await supabaseService.getInventoryItemByLoadingId(transferId);
+          const item = await supabaseService.findPalletByLoadingId(transferId);
           if (item) {
             setFoundPallet(item);
             if (item.inspections && item.inspections[0]?.assignedSlot) {
@@ -99,9 +142,12 @@ export const MovementModal: React.FC<MovementModalProps> = ({
         } finally {
           setIsSearching(false);
         }
-      } else {
-        setFoundPallet(null);
-        setFromSlot('');
+      } else if (type === 'transfer') {
+        // Only clear if not initialized
+        if (!initialPallet) {
+          setFoundPallet(null);
+          setFromSlot('');
+        }
       }
     };
 
@@ -115,10 +161,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   // Auto-select origin slot when exitId is entered
   useEffect(() => {
     const searchPallet = async () => {
+      // If we already have the pallet from initialPallet and the IDs match, skip searching
+      if (initialPallet && (initialPallet.loadingId === exitId || initialPallet.id === exitId) && type === 'exit') {
+        return;
+      }
+
       if (type === 'exit' && exitId.length >= 3) {
         setIsSearching(true);
         try {
-          const item = await supabaseService.getInventoryItemByLoadingId(exitId);
+          const item = await supabaseService.findPalletByLoadingId(exitId);
           if (item) {
             setFoundPallet(item);
           } else {
@@ -131,7 +182,10 @@ export const MovementModal: React.FC<MovementModalProps> = ({
           setIsSearching(false);
         }
       } else if (type === 'exit') {
-        setFoundPallet(null);
+        // Only clear if not initialized
+        if (!initialPallet) {
+          setFoundPallet(null);
+        }
       }
     };
 

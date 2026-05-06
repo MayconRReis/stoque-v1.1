@@ -942,7 +942,21 @@ export const supabaseService = {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    if (!data) return null;
+
+    // Map to application standard
+    return {
+      id: data.id,
+      loadingId: data.loading_id,
+      originOP: data.origin_op,
+      description: data.description,
+      lot: data.lot,
+      pallets: data.pallets,
+      date: data.date || data.created_at,
+      status: data.status as StockStatus,
+      operatorName: data.operator_name,
+      inspections: data.inspections || [],
+    } as SheetRow;
   },
 
   async getEditRequests(): Promise<any[]> {
