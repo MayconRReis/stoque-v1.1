@@ -127,6 +127,12 @@ export interface DashboardStats {
   waitingPallets: number;
   finishedShipments24h: number;
   openShipmentsCount: number;
+  productDistribution: Record<string, number>;
+  // Container specific stats
+  containerTotalSlots: number;
+  containerOccupiedSlots: number;
+  containerFreeSlots: number;
+  containerOccupancyRate: number;
 }
 
 export const translateSlotContent = (content: SlotContent): string => {

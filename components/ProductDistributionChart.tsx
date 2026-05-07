@@ -3,33 +3,52 @@ import { motion } from 'motion/react';
 import { WarehouseSlot, SlotContent } from '../types';
 
 interface ProductDistributionChartProps {
-  slots: WarehouseSlot[];
+  productDistribution: Record<string, number>;
   occupiedSlots: number;
 }
 
-const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ slots, occupiedSlots }) => {
+const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ productDistribution, occupiedSlots }) => {
   const productData = useMemo(() => {
     const categories = [
+      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
       { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600' },
       { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600' },
-      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
+      { type: 'CONTAINERS', label: 'Containers', color: 'bg-indigo-600' },
       { type: SlotContent.RETURN, label: 'Retorno', color: 'bg-red-600' },
       { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600' },
       { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-purple-600' },
+      { type: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', color: 'bg-indigo-600' },
+      { type: SlotContent.MISCELLANEOUS, label: 'Diversos', color: 'bg-slate-500' },
+      { type: SlotContent.DISCARD, label: 'Descarte', color: 'bg-red-700' },
       { type: 'OTHER', label: 'Outros', color: 'bg-slate-600' }
     ];
 
+    // Total of all pallets in inventory might be different from occupied slots
+    const totalPallets = Object.values(productDistribution).reduce((a, b) => a + b, 0);
+
     return categories.map(item => {
-      const count = item.type === 'OTHER' 
-        ? slots.filter(s => s.status !== SlotContent.EMPTY && ![SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT, SlotContent.RETURN, SlotContent.REWORK, SlotContent.REPROCESS].includes(s.status)).length
-        : slots.filter(s => s.status === item.type).length;
+      let count = 0;
+      if (item.type === 'OTHER') {
+        const knownTypes = categories.filter(c => c.type !== 'OTHER' && c.type !== 'CONTAINERS').map(c => c.type);
+        const containerTypes = [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP];
+        count = Object.entries(productDistribution)
+          .filter(([type]) => !knownTypes.includes(type as any) && !containerTypes.includes(type as any))
+          .reduce((sum, [_, val]) => sum + val, 0);
+      } else if (item.type === 'CONTAINERS') {
+        const containerTypes = [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP];
+        count = Object.entries(productDistribution)
+          .filter(([type]) => containerTypes.includes(type as any))
+          .reduce((sum, [_, val]) => sum + val, 0);
+      } else {
+        count = productDistribution[item.type] || 0;
+      }
       
-      const totalOccupied = occupiedSlots || 1;
-      const rate = Math.round((count / totalOccupied) * 100);
+      const totalForRate = totalPallets || 1;
+      const rate = Math.round((count / totalForRate) * 100);
       
       return { ...item, count, rate };
-    });
-  }, [slots, occupiedSlots]);
+    }).filter(item => item.count > 0 || [SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT].includes(item.type as any));
+  }, [productDistribution]);
 
   return (
     <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">

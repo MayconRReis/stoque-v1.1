@@ -159,7 +159,12 @@ const App: React.FC = () => {
     totalBottles: 0,
     waitingPallets: 0,
     finishedShipments24h: 0,
-    openShipmentsCount: 0
+    openShipmentsCount: 0,
+    productDistribution: {},
+    containerTotalSlots: 0,
+    containerOccupiedSlots: 0,
+    containerFreeSlots: 0,
+    containerOccupancyRate: 0
   });
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
@@ -1274,11 +1279,10 @@ const App: React.FC = () => {
       }
 
       // Find slot occupied by this item
-      const occupiedSlot = slots.find(s => s.id === item.inspections?.[0]?.assignedSlot);
-      if (occupiedSlot) {
-        const updatedSlot: WarehouseSlot = { ...occupiedSlot, status: SlotContent.EMPTY, occupiedBy: undefined };
-        await supabaseService.updateSlot(updatedSlot);
-        setSlots(prev => prev.map(s => s.id === occupiedSlot.id ? updatedSlot : s));
+      const slotId = item.inspections?.[0]?.assignedSlot;
+      if (slotId && slotId !== 'AGUARDANDO') {
+        await supabaseService.freeSlot(slotId);
+        setSlots(prev => prev.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
       }
 
       // Delete Inventory
@@ -1296,7 +1300,7 @@ const App: React.FC = () => {
         lot: item.lot,
         palletNumber: 1,
         totalPallets: item.pallets,
-        slot: occupiedSlot?.id || 'N/A',
+        slot: slotId || 'N/A',
         details: `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`,
         operatorName: user?.name
       });
@@ -1307,7 +1311,7 @@ const App: React.FC = () => {
 
       // Auto-reorganize E/F stacks
       const finalData = data.filter(d => d.id !== item.id);
-      const finalSlots = occupiedSlot ? slots.map(s => s.id === occupiedSlot.id ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
+      const finalSlots = slotId ? slots.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
       performStackReorganization(finalData, finalSlots);
     } catch (error) {
       console.error('Exit error:', error);
@@ -1319,48 +1323,19 @@ const App: React.FC = () => {
     try {
       showNotification('Iniciando sincronização de vagas...', 'info');
       
-      // 1. Get current inventory and slots
-      const [invData, slotData] = await Promise.all([
-        supabaseService.getInventory(),
-        supabaseService.getSlots()
-      ]);
-
-      // 2. Map of occupied slots from inventory
-      const occupiedSlotsMap = new Map();
-      invData.forEach(item => {
-        if (item.inspections && item.inspections[0]?.assignedSlot) {
-          occupiedSlotsMap.set(item.inspections[0].assignedSlot, {
-            status: item.inspections[0].contentType,
-            occupiedBy: item.originOP || item.description
-          });
-        }
-      });
-
-      // 3. Prepare updated slots
-      const updatedSlots = slotData.map(slot => {
-        const inventoryInfo = occupiedSlotsMap.get(slot.id);
-        if (inventoryInfo) {
-          return {
-            ...slot,
-            status: inventoryInfo.status,
-            occupiedBy: inventoryInfo.occupiedBy
-          };
-        } else {
-          return {
-            ...slot,
-            status: SlotContent.EMPTY,
-            occupiedBy: undefined
-          };
-        }
-      });
-
-      // 4. Bulk update in Supabase
-      await supabaseService.bulkUpdateSlots(updatedSlots);
+      const result = await supabaseService.resyncSlots();
       
-      // 5. Update local state
-      setSlots(updatedSlots);
+      // Update local state with fresh data
+      const freshSlots = await supabaseService.getSlots();
+      setSlots(freshSlots);
       
-      showNotification('Vagas sincronizadas com sucesso!', 'info');
+      if (result.fixed > 0) {
+        showNotification(`${result.fixed} vagas presas foram liberadas com sucesso!`, 'success');
+      } else {
+        showNotification('Todas as vagas já estão sincronizadas com o inventário.', 'info');
+      }
+      
+      refreshCombinedData();
     } catch (error: any) {
       console.error('Resync error:', error);
       showNotification(`Erro ao sincronizar: ${error.message}`, 'error');
@@ -1536,12 +1511,10 @@ const App: React.FC = () => {
           const inspection = row.inspections![idx];
           
           // Update Slot
-          if (inspection.assignedSlot) {
-            const occupiedSlot = slots.find(s => s.id === inspection.assignedSlot);
-            if (occupiedSlot) {
-              const updatedSlot: WarehouseSlot = { ...occupiedSlot, status: SlotContent.EMPTY, occupiedBy: undefined };
-              await supabaseService.updateSlot(updatedSlot);
-            }
+          if (inspection.assignedSlot && inspection.assignedSlot !== 'AGUARDANDO') {
+            await supabaseService.freeSlot(inspection.assignedSlot);
+            // Updating local state too specifically for E/F reorganization logic that might run next
+            setSlots(prev => prev.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
           }
 
           // Add History
@@ -1751,13 +1724,9 @@ const App: React.FC = () => {
           const inspection = row.inspections[deleteContext.palletIdx];
           await addToHistory(createHistoryEntry(HistoryType.REMOVAL, row, 'Remoção de pallet', deleteContext.palletIdx + 1));
           
-          if (inspection.assignedSlot) {
-            const slot = slots.find(s => s.id === inspection.assignedSlot);
-            if (slot) {
-              const updatedSlot = { ...slot, status: SlotContent.EMPTY, occupiedBy: undefined };
-              await supabaseService.updateSlot(updatedSlot);
-              setSlots(prev => prev.map(s => s.id === inspection.assignedSlot ? updatedSlot : s));
-            }
+          if (inspection.assignedSlot && inspection.assignedSlot !== 'AGUARDANDO') {
+            await supabaseService.freeSlot(inspection.assignedSlot);
+            setSlots(prev => prev.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
           }
 
           const updatedInsps = row.inspections?.filter((_, i) => i !== deleteContext.palletIdx);
@@ -1801,13 +1770,9 @@ const App: React.FC = () => {
       const inspection = row.inspections[palletIdx];
       await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Enviado para Matriz', palletIdx + 1));
       
-      if (slotId) {
-        const slot = slots.find(s => s.id === slotId);
-        if (slot) {
-          const updatedSlot = { ...slot, status: SlotContent.EMPTY, occupiedBy: undefined };
-          await supabaseService.updateSlot(updatedSlot);
-          setSlots(prev => prev.map(s => s.id === slotId ? updatedSlot : s));
-        }
+      if (slotId && slotId !== 'AGUARDANDO') {
+        await supabaseService.freeSlot(slotId);
+        setSlots(prev => prev.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
       }
       
       const newInsps = row.inspections?.filter((_, i) => i !== palletIdx);
@@ -2405,47 +2370,82 @@ const App: React.FC = () => {
                     )}
                 </div>
 
-                {/* Occupancy Progress Bar */}
-                <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Utilização do Armazém G0</h4>
-                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade em tempo real</p>
+                {/* Occupancy Progress Bar Area */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* General Occupancy (A-D) */}
+                  <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Estoque Geral (A-D)</h4>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade Real Pallets</p>
+                      </div>
+                      <div className="text-right flex items-center gap-4">
+                        {!isPublicView && (
+                          <button 
+                            onClick={handleResyncSlots}
+                            className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
+                            title="Sincronizar Vagas"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
+                          </button>
+                        )}
+                        <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
+                      </div>
                     </div>
-                    <div className="text-right flex items-center gap-4">
-                      {!isPublicView && (
-                        <button 
-                          onClick={handleResyncSlots}
-                          className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
-                          title="Sincronizar Vagas"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
-                        </button>
+                    <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                        className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.2)] ${
+                          stats.occupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
+                          stats.occupancyRate > 80 ? 'bg-amber-500' : 
+                          'bg-blue-600'
+                        }`}
+                      />
+                      {stats.occupancyRate > 100 && (
+                        <div className="absolute inset-0 bg-red-600/10 pointer-events-none animate-pulse" />
                       )}
-                      <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
+                    </div>
+                    <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                      <span>Livre</span>
+                      <span className={stats.occupancyRate > 90 ? 'text-red-500' : 'text-slate-500'}>
+                        {stats.occupiedSlots} / {stats.totalSlots} Vagas
+                      </span>
+                      <span>Ocupado</span>
                     </div>
                   </div>
-                  <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
-                      transition={{ duration: 1.5, ease: "easeOut" }}
-                      className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.2)] ${
-                        stats.occupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
-                        stats.occupancyRate > 80 ? 'bg-amber-500' : 
-                        'bg-blue-600'
-                      }`}
-                    />
-                    {stats.occupancyRate > 100 && (
-                      <div className="absolute inset-0 bg-red-600/10 pointer-events-none animate-pulse" />
-                    )}
-                  </div>
-                  <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                    <span>Vazio</span>
-                    <span className={stats.occupancyRate > 90 ? 'text-red-500' : 'text-slate-500'}>
-                      {stats.occupiedSlots} / {stats.totalSlots} Vagas
-                    </span>
-                    <span>100%</span>
+
+                  {/* Container Occupancy (E-F) */}
+                  <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Área de Containers (E-F)</h4>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Posições Específicas</p>
+                      </div>
+                      <div className="text-right flex items-center gap-4">
+                        <span className="text-2xl font-black text-indigo-500 italic">{stats.containerOccupancyRate}%</span>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(stats.containerOccupancyRate, 100)}%` }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                        className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(99,102,241,0.2)] ${
+                          stats.containerOccupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
+                          stats.containerOccupancyRate > 80 ? 'bg-amber-500' : 
+                          'bg-indigo-600'
+                        }`}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                      <span>Livre</span>
+                      <span className="text-slate-500">
+                        Em uso: {stats.containerOccupiedSlots} / {stats.containerTotalSlots} unidades
+                      </span>
+                      <span>Ocupado</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2458,7 +2458,50 @@ const App: React.FC = () => {
                   <RackDistributionChart slots={slots} waitingPallets={stats.waitingPallets} />
 
                   {/* Product Distribution Card */}
-                  <ProductDistributionChart slots={slots} occupiedSlots={stats.occupiedSlots} />
+                  <div className="space-y-6">
+                    <ProductDistributionChart 
+                      productDistribution={stats.productDistribution} 
+                      occupiedSlots={stats.occupiedSlots} 
+                    />
+                    
+                    {(() => {
+                      const totalInv = Object.values(stats.productDistribution || {}).reduce((sum, val) => sum + val, 0);
+                      const totalOccupied = stats.occupiedSlots + (stats.containerOccupiedSlots || 0);
+                      const diff = totalInv - totalOccupied;
+                      
+                      if (diff !== 0) {
+                        return (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-amber-600/10 border border-amber-500/30 p-4 rounded-3xl flex items-center gap-4"
+                          >
+                            <div className="w-10 h-10 bg-amber-600/20 text-amber-500 rounded-xl flex items-center justify-center shrink-0">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Aviso de Sincronização</p>
+                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                                Existe uma divergência entre pallets no estoque ({totalInv}) e vagas ocupadas totais ({totalOccupied}). 
+                                {diff > 0 
+                                  ? ` Existem ${diff} pallet(s) sem vaga definitiva, possivelmente aguardando alocação, em carregamento ou área temporária.` 
+                                  : ` Existem ${Math.abs(diff)} vaga(s) marcada(s) como ocupada(s) sem pallet correspondente no inventário.`}
+                              </p>
+                              {diff < 0 && !isPublicView && (
+                                <button 
+                                  onClick={handleResyncSlots}
+                                  className="mt-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-500 px-3 py-1.5 rounded-lg border border-amber-500/30 hover:bg-amber-500/30 transition-all flex items-center gap-2"
+                                >
+                                  <RefreshCw className="w-3 h-3" /> Reparar Vagas Presas
+                                </button>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
             </div>
           )}

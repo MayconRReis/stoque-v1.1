@@ -528,13 +528,17 @@ export const supabaseService = {
         totalBottles: 0,
         waitingPallets: 0,
         finishedShipments24h: 0,
-        openShipmentsCount: 0
+        openShipmentsCount: 0,
+        productDistribution: {},
+        containerTotalSlots: 40,
+        containerOccupiedSlots: 10,
+        containerFreeSlots: 30,
+        containerOccupancyRate: 25
       };
     }
 
     const results = await Promise.all([
-      supabase.from('warehouse_slots').select('*', { count: 'exact', head: true }),
-      supabase.from('warehouse_slots').select('*', { count: 'exact', head: true }).neq('status', 'EMPTY'),
+      supabase.from('warehouse_slots').select('id, status'),
       supabase.from('inventory').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
       supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
       supabase.from('history').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
@@ -542,16 +546,26 @@ export const supabaseService = {
       supabase.from('inventory').select('inspections') 
     ]);
 
-    const totalSlotsCount = results[0].count || 0;
-    const occupiedSlotsCount = results[1].count || 0;
-    const pendingCount = results[2].count || 0;
-    const openShipments = results[3].count || 0;
-    const movements24h = results[4].count || 0;
-    const finishedShipments = results[5].count || 0;
-    const allInspections = results[6].data || [];
+    const allSlots = results[0].data || [];
+    const pendingCount = results[1].count || 0;
+    const openShipments = results[2].count || 0;
+    const movements24h = results[3].count || 0;
+    const finishedShipments = results[4].count || 0;
+    const allInspections = results[5].data || [];
+
+    // Filter slots by category
+    const generalSlots = allSlots.filter(s => s.id.startsWith('A') || s.id.startsWith('B') || s.id.startsWith('C') || s.id.startsWith('D'));
+    const containerSlots = allSlots.filter(s => s.id.startsWith('E') || s.id.startsWith('F'));
+
+    const totalGeneral = generalSlots.length;
+    const occupiedGeneral = generalSlots.filter(s => s.status !== 'EMPTY').length;
+    
+    const totalContainer = containerSlots.length;
+    const occupiedContainer = containerSlots.filter(s => s.status !== 'EMPTY').length;
 
     let totalBottles = 0;
     let waitingPallets = 0;
+    const productDistribution: Record<string, number> = {};
 
     allInspections.forEach(item => {
       (item.inspections || []).forEach((insp: any) => {
@@ -559,20 +573,31 @@ export const supabaseService = {
         if (insp.assignedSlot === 'AGUARDANDO') {
           waitingPallets += 1;
         }
+        
+        // Count content type distribution
+        const type = insp.contentType || 'OTHER';
+        productDistribution[type] = (productDistribution[type] || 0) + 1;
       });
     });
 
     return {
-      totalSlots: totalSlotsCount,
-      occupiedSlots: occupiedSlotsCount,
-      freeSlots: totalSlotsCount - occupiedSlotsCount,
-      occupancyRate: totalSlotsCount > 0 ? Math.round((occupiedSlotsCount / totalSlotsCount) * 100) : 0,
+      totalSlots: totalGeneral,
+      occupiedSlots: occupiedGeneral,
+      freeSlots: totalGeneral - occupiedGeneral,
+      occupancyRate: totalGeneral > 0 ? Math.round((occupiedGeneral / totalGeneral) * 100) : 0,
+      
+      containerTotalSlots: totalContainer,
+      containerOccupiedSlots: occupiedContainer,
+      containerFreeSlots: totalContainer - occupiedContainer,
+      containerOccupancyRate: totalContainer > 0 ? Math.round((occupiedContainer / totalContainer) * 100) : 0,
+
       pendingEntries: pendingCount,
       openShipmentsCount: openShipments,
       dailyMovements: movements24h,
       finishedShipments24h: finishedShipments,
       totalBottles,
-      waitingPallets
+      waitingPallets,
+      productDistribution
     };
   },
 
@@ -1324,6 +1349,87 @@ export const supabaseService = {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  },
+
+  async freeSlot(slotId: string) {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('warehouse_slots')
+        .update({
+          status: 'EMPTY',
+          occupied_by: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', slotId);
+      
+      if (error) {
+        console.error('Error freeing slot:', error);
+        throw error;
+      }
+    }
+    
+    // Update local storage too
+    const slots = localStorageHelper.get('warehouse_slots');
+    const index = slots.findIndex((s: any) => s.id === slotId);
+    if (index !== -1) {
+      slots[index].status = 'EMPTY';
+      slots[index].occupiedBy = null;
+      localStorageHelper.save('warehouse_slots', slots);
+    }
+  },
+
+  async resyncSlots() {
+    if (!isSupabaseConfigured) return { success: true, fixed: 0 };
+
+    try {
+      // 1. Get all occupied slots
+      const { data: occupiedSlots, error: slotsError } = await supabase
+        .from('warehouse_slots')
+        .select('id, status')
+        .neq('status', 'EMPTY');
+      
+      if (slotsError) throw slotsError;
+      if (!occupiedSlots || occupiedSlots.length === 0) return { success: true, fixed: 0 };
+
+      // 2. Get all inventory to check who is where
+      const { data: inventory, error: invError } = await supabase
+        .from('inventory')
+        .select('inspections');
+      
+      if (invError) throw invError;
+
+      // 3. Map inventory positions
+      const occupiedByPallets = new Set<string>();
+      inventory?.forEach(item => {
+        (item.inspections || []).forEach((insp: any) => {
+          if (insp.assignedSlot && insp.assignedSlot !== 'AGUARDANDO') {
+            occupiedByPallets.add(insp.assignedSlot);
+          }
+        });
+      });
+
+      // 4. Find orphaned slots (marked occupied in DB but no pallet found in inventory)
+      const orphanedSlots = occupiedSlots.filter(slot => !occupiedByPallets.has(slot.id));
+      
+      if (orphanedSlots.length === 0) return { success: true, fixed: 0 };
+
+      // 5. Release them
+      const { error: patchError } = await supabase
+        .from('warehouse_slots')
+        .update({
+          status: 'EMPTY',
+          occupied_by: null,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', orphanedSlots.map(s => s.id));
+      
+      if (patchError) throw patchError;
+
+      return { success: true, fixed: orphanedSlots.length };
+    } catch (error) {
+      console.error('Error resyncing slots:', error);
+      throw error;
+    }
   },
 
   subscribeToRotativeStock(callback: (payload: any) => void) {

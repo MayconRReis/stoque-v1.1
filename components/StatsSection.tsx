@@ -49,8 +49,8 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats, isPublicView, onNavi
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="text-right">
-              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Vagas Livres</h4>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Capacidade Disponível</p>
+              <h4 className="text-base font-black text-white uppercase italic tracking-tight">Vagas Livres (A-D)</h4>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Estoque Geral</p>
             </div>
           </div>
           <div className="flex items-baseline gap-4">
@@ -129,6 +129,39 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats, isPublicView, onNavi
           <div>
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Carreg. Abertos</p>
             <p className="text-xl font-black text-amber-500 tracking-tight leading-none">{stats.openShipmentsCount}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Container Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 hover:border-indigo-500/30 transition-all">
+          <div className="w-10 h-10 bg-indigo-600/10 text-indigo-500 rounded-xl flex items-center justify-center border border-indigo-500/20">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Capacidade Containers</p>
+            <p className="text-xl font-black text-white tracking-tight leading-none">{stats.containerTotalSlots}</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 hover:border-fuchsia-500/30 transition-all">
+          <div className="w-10 h-10 bg-fuchsia-600/10 text-fuchsia-500 rounded-xl flex items-center justify-center border border-fuchsia-500/20">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Containers Ocupados</p>
+            <p className="text-xl font-black text-fuchsia-500 tracking-tight leading-none">{stats.containerOccupiedSlots}</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800/50 shadow-xl flex items-center gap-4 hover:border-emerald-500/30 transition-all">
+          <div className="w-10 h-10 bg-emerald-600/10 text-emerald-500 rounded-xl flex items-center justify-center border border-emerald-500/20">
+            <Boxes className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Posições Livres (E-F)</p>
+            <p className="text-xl font-black text-emerald-500 tracking-tight leading-none">{stats.containerFreeSlots}</p>
           </div>
         </div>
       </div>
