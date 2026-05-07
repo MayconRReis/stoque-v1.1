@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic } from '../types';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -125,7 +125,7 @@ export const supabaseService = {
       status: item.status as StockStatus,
       inspections: item.inspections || [],
       operatorName: item.operator_name
-    }));
+    })).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
     localStorageHelper.save('inventory', inventory);
     return inventory;
   },
@@ -262,9 +262,9 @@ export const supabaseService = {
       status: item.status as StockStatus,
       inspections: item.inspections || [],
       operatorName: item.operator_name
-    }));
+    })).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
-    return { data: inventory, count: count || 0 };
+    return { data: inventory, count: inventory.length };
   },
 
   async getPendingInventory(): Promise<SheetRow[]> {
@@ -334,6 +334,10 @@ export const supabaseService = {
       throw error;
     }
 
+    if (!data.inspections || (Array.isArray(data.inspections) && data.inspections.length === 0)) {
+      return null;
+    }
+
     return {
       id: data.id,
       loadingId: data.loading_id,
@@ -361,6 +365,10 @@ export const supabaseService = {
     
     if (error) throw error;
     if (!data) return null;
+
+    if (!data.inspections || (Array.isArray(data.inspections) && data.inspections.length === 0)) {
+      return null;
+    }
 
     return {
       id: data.id,
@@ -421,18 +429,20 @@ export const supabaseService = {
     
     if (error) throw error;
 
-    return (data || []).map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    }));
+    return (data || [])
+      .map(item => ({
+        id: item.id,
+        loadingId: item.loading_id,
+        originOP: item.origin_op,
+        description: item.description,
+        lot: item.lot,
+        pallets: item.pallets,
+        date: item.date,
+        status: item.status as StockStatus,
+        inspections: item.inspections || [],
+        operatorName: item.operator_name
+      }))
+      .filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
   },
 
   async getAllInventoryForExport(filters?: { searchTerm?: string, typeFilter?: string }): Promise<SheetRow[]> {
@@ -551,7 +561,7 @@ export const supabaseService = {
     const openShipments = results[2].count || 0;
     const movements24h = results[3].count || 0;
     const finishedShipments = results[4].count || 0;
-    const allInspections = results[5].data || [];
+    const allInspections = (results[5].data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
     // Filter slots by category
     const generalSlots = allSlots.filter(s => s.id.startsWith('A') || s.id.startsWith('B') || s.id.startsWith('C') || s.id.startsWith('D'));
@@ -992,6 +1002,10 @@ export const supabaseService = {
     if (error) throw error;
     if (!data) return null;
 
+    if (!data.inspections || (Array.isArray(data.inspections) && data.inspections.length === 0)) {
+      if (data.status !== 'PENDING') return null;
+    }
+
     // Map to application standard (SheetRow)
     return {
       id: data.id,
@@ -1378,56 +1392,176 @@ export const supabaseService = {
     }
   },
 
-  async resyncSlots() {
-    if (!isSupabaseConfigured) return { success: true, fixed: 0 };
+  async getWarehouseDiagnostic(): Promise<WarehouseDiagnostic> {
+    if (!isSupabaseConfigured) {
+      return {
+        noDefinitiveSlot: 0,
+        slotConflicts: 0,
+        orphanedSlots: 0,
+        freeSlotsWithPallets: 0,
+        details: {
+          noDefinitiveSlotItems: [],
+          conflictSlots: [],
+          orphanedSlotIds: [],
+          freeSlotWithPalletIds: []
+        }
+      };
+    }
 
     try {
-      // 1. Get all occupied slots
-      const { data: occupiedSlots, error: slotsError } = await supabase
-        .from('warehouse_slots')
-        .select('id, status')
-        .neq('status', 'EMPTY');
-      
-      if (slotsError) throw slotsError;
-      if (!occupiedSlots || occupiedSlots.length === 0) return { success: true, fixed: 0 };
+      const [slotsRes, inventoryRes] = await Promise.all([
+        supabase.from('warehouse_slots').select('id, status, occupied_by'),
+        supabase.from('inventory').select('id, loading_id, inspections').neq('status', 'PENDING')
+      ]);
 
-      // 2. Get all inventory to check who is where
-      const { data: inventory, error: invError } = await supabase
-        .from('inventory')
-        .select('inspections');
-      
-      if (invError) throw invError;
+      const slots = slotsRes.data || [];
+      const inventory = inventoryRes.data || [];
 
-      // 3. Map inventory positions
-      const occupiedByPallets = new Set<string>();
-      inventory?.forEach(item => {
+      const noDefinitiveSlotItems: string[] = [];
+      const slotToPallets = new Map<string, string[]>();
+      
+      const placeholderValues = [null, '', 'AGUARDANDO', 'N/A', 'SEM VAGA'];
+
+      inventory.forEach(item => {
         (item.inspections || []).forEach((insp: any) => {
-          if (insp.assignedSlot && insp.assignedSlot !== 'AGUARDANDO') {
-            occupiedByPallets.add(insp.assignedSlot);
+          const slotId = insp.assignedSlot;
+          if (placeholderValues.includes(slotId)) {
+            noDefinitiveSlotItems.push(`${item.loading_id || item.id} (Palete ${insp.palletNumber || '?'})`);
+          } else {
+            const current = slotToPallets.get(slotId) || [];
+            current.push(`${item.loading_id || item.id}`);
+            slotToPallets.set(slotId, current);
           }
         });
       });
 
-      // 4. Find orphaned slots (marked occupied in DB but no pallet found in inventory)
-      const orphanedSlots = occupiedSlots.filter(slot => !occupiedByPallets.has(slot.id));
-      
-      if (orphanedSlots.length === 0) return { success: true, fixed: 0 };
+      const conflictSlots: string[] = [];
+      slotToPallets.forEach((pallets, slotId) => {
+        if (pallets.length > 1) {
+          conflictSlots.push(slotId);
+        }
+      });
 
-      // 5. Release them
-      const { error: patchError } = await supabase
-        .from('warehouse_slots')
-        .update({
-          status: 'EMPTY',
-          occupied_by: null,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', orphanedSlots.map(s => s.id));
-      
-      if (patchError) throw patchError;
+      const orphanedSlotIds: string[] = [];
+      const freeSlotWithPalletIds: string[] = [];
 
-      return { success: true, fixed: orphanedSlots.length };
+      slots.forEach(slot => {
+        const hasPallet = slotToPallets.has(slot.id);
+        const isOccupiedInDB = slot.status !== 'EMPTY';
+
+        if (isOccupiedInDB && !hasPallet) {
+          orphanedSlotIds.push(slot.id);
+        } else if (!isOccupiedInDB && hasPallet) {
+          freeSlotWithPalletIds.push(slot.id);
+        }
+      });
+
+      return {
+        noDefinitiveSlot: noDefinitiveSlotItems.length,
+        slotConflicts: conflictSlots.length,
+        orphanedSlots: orphanedSlotIds.length,
+        freeSlotsWithPallets: freeSlotWithPalletIds.length,
+        details: {
+          noDefinitiveSlotItems,
+          conflictSlots,
+          orphanedSlotIds,
+          freeSlotWithPalletIds
+        }
+      };
+    } catch (error) {
+      console.error('Error getting warehouse diagnostic:', error);
+      throw error;
+    }
+  },
+
+  async resyncSlots() {
+    if (!isSupabaseConfigured) return { success: true, fixed: 0 };
+
+    try {
+      const diagnostic = await this.getWarehouseDiagnostic();
+      let fixedCount = 0;
+
+      // 1. Repair orphaned slots (Safe to release)
+      if (diagnostic.details.orphanedSlotIds.length > 0) {
+        const { error } = await supabase
+          .from('warehouse_slots')
+          .update({
+            status: 'EMPTY',
+            occupied_by: null,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', diagnostic.details.orphanedSlotIds);
+        
+        if (error) throw error;
+        fixedCount += diagnostic.details.orphanedSlotIds.length;
+      }
+
+      // 2. Repair free slots that have pallets (Safe ONLY if no conflict)
+      const safeToMarkOccupied = diagnostic.details.freeSlotWithPalletIds.filter(
+        slotId => !diagnostic.details.conflictSlots.includes(slotId)
+      );
+
+      if (safeToMarkOccupied.length > 0) {
+        // We need to fetch the inventory again to get the content type for these slots
+        const inventory = await this.getInventory();
+        
+        for (const slotId of safeToMarkOccupied) {
+          const itemWithSlot = inventory.find(item => 
+            item.inspections?.some(insp => insp.assignedSlot === slotId)
+          );
+          
+          if (itemWithSlot) {
+            const inspection = itemWithSlot.inspections?.find(insp => insp.assignedSlot === slotId);
+            const { error } = await supabase
+              .from('warehouse_slots')
+              .update({
+                status: inspection?.contentType || 'OTHER',
+                occupied_by: itemWithSlot.originOP || itemWithSlot.loadingId,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', slotId);
+            
+            if (!error) fixedCount++;
+          }
+        }
+      }
+
+      return { success: true, fixed: fixedCount };
     } catch (error) {
       console.error('Error resyncing slots:', error);
+      throw error;
+    }
+  },
+
+  async cleanupGhostPallets() {
+    if (!isSupabaseConfigured) return { success: true, removed: 0 };
+
+    try {
+      // Find all items with status NOT PENDING (as pending items don't have inspections yet)
+      // and check if inspections is empty
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('id, inspections')
+        .neq('status', 'PENDING');
+      
+      if (error) throw error;
+      
+      const ghostIds = (data || [])
+        .filter(item => !item.inspections || (Array.isArray(item.inspections) && item.inspections.length === 0))
+        .map(item => item.id);
+      
+      if (ghostIds.length === 0) return { success: true, removed: 0 };
+
+      const { error: deleteError } = await supabase
+        .from('inventory')
+        .delete()
+        .in('id', ghostIds);
+      
+      if (deleteError) throw deleteError;
+
+      return { success: true, removed: ghostIds.length };
+    } catch (error) {
+      console.error('Error cleaning ghost pallets:', error);
       throw error;
     }
   },

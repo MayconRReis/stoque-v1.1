@@ -17,6 +17,7 @@ import {
   Boxes, 
   CheckCircle2, 
   AlertCircle,
+  HelpCircle,
   Share2,
   Download,
   ArrowRight,
@@ -54,7 +55,8 @@ import {
   getContentTypeColor,
   Shipment,
   ShipmentType,
-  ShipmentStatus
+  ShipmentStatus,
+  WarehouseDiagnostic
 } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
@@ -166,6 +168,8 @@ const App: React.FC = () => {
     containerFreeSlots: 0,
     containerOccupancyRate: 0
   });
+  const [warehouseDiagnostic, setWarehouseDiagnostic] = useState<WarehouseDiagnostic | null>(null);
+  const [isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen] = useState(false);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
@@ -411,7 +415,7 @@ const App: React.FC = () => {
   const refreshCombinedData = useCallback(async () => {
     // Refresh current page of inventory, global stats, pending and waiting rows
     try {
-      const [invResult, globalStats, pendingRes, waitingRes, countsData] = await Promise.all([
+      const [invResult, globalStats, pendingRes, waitingRes, countsData, diagnostic] = await Promise.all([
         supabaseService.getInventoryPaginated(0, (inventoryPage + 1) * PAGE_SIZE, { 
           searchTerm: inventorySearch, 
           typeFilter: inventoryTypeFilter 
@@ -419,13 +423,15 @@ const App: React.FC = () => {
         supabaseService.getGlobalStats(),
         supabaseService.getPendingInventory(),
         supabaseService.getWaitingInventory(),
-        supabaseService.getShipmentPalletCounts()
+        supabaseService.getShipmentPalletCounts(),
+        supabaseService.getWarehouseDiagnostic()
       ]);
       setData(invResult.data);
       setStats(globalStats);
       setPendingRows(pendingRes);
       setWaitingRows(waitingRes);
       setShipmentCounts(countsData);
+      setWarehouseDiagnostic(diagnostic);
       setHasMoreInventory(invResult.data.length < invResult.count);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -1321,18 +1327,24 @@ const App: React.FC = () => {
 
   const handleResyncSlots = async () => {
     try {
-      showNotification('Iniciando sincronização de vagas...', 'info');
+      showNotification('Iniciando sincronização de vagas e limpeza...', 'info');
       
-      const result = await supabaseService.resyncSlots();
+      const [slotResult, ghostResult] = await Promise.all([
+        supabaseService.resyncSlots(),
+        supabaseService.cleanupGhostPallets()
+      ]);
       
       // Update local state with fresh data
       const freshSlots = await supabaseService.getSlots();
       setSlots(freshSlots);
       
-      if (result.fixed > 0) {
-        showNotification(`${result.fixed} vagas presas foram liberadas com sucesso!`, 'success');
+      if (slotResult.fixed > 0 || ghostResult.removed > 0) {
+        showNotification(
+          `${slotResult.fixed > 0 ? `${slotResult.fixed} vaga(s) liberada(s). ` : ''}${ghostResult.removed > 0 ? `${ghostResult.removed} pallet(s) fantasma removido(s).` : ''}`, 
+          'success'
+        );
       } else {
-        showNotification('Todas as vagas já estão sincronizadas com o inventário.', 'info');
+        showNotification('Todas as vagas e inventário já estão sincronizados.', 'info');
       }
       
       refreshCombinedData();
@@ -2464,43 +2476,83 @@ const App: React.FC = () => {
                       occupiedSlots={stats.occupiedSlots} 
                     />
                     
-                    {(() => {
-                      const totalInv = Object.values(stats.productDistribution || {}).reduce((sum, val) => sum + val, 0);
-                      const totalOccupied = stats.occupiedSlots + (stats.containerOccupiedSlots || 0);
-                      const diff = totalInv - totalOccupied;
-                      
-                      if (diff !== 0) {
-                        return (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-amber-600/10 border border-amber-500/30 p-4 rounded-3xl flex items-center gap-4"
-                          >
+                    {warehouseDiagnostic && (warehouseDiagnostic.noDefinitiveSlot > 0 || warehouseDiagnostic.slotConflicts > 0 || warehouseDiagnostic.orphanedSlots > 0 || warehouseDiagnostic.freeSlotsWithPallets > 0) && (
+                      <div className="space-y-4">
+                        {warehouseDiagnostic.noDefinitiveSlot > 0 && (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-amber-600/10 border border-amber-500/30 p-4 rounded-3xl flex items-center gap-4">
                             <div className="w-10 h-10 bg-amber-600/20 text-amber-500 rounded-xl flex items-center justify-center shrink-0">
                               <AlertCircle className="w-6 h-6" />
                             </div>
-                            <div>
-                              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Aviso de Sincronização</p>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Pendente de Alocação</p>
                               <p className="text-[11px] font-medium text-slate-300 leading-tight">
-                                Existe uma divergência entre pallets no estoque ({totalInv}) e vagas ocupadas totais ({totalOccupied}). 
-                                {diff > 0 
-                                  ? ` Existem ${diff} pallet(s) sem vaga definitiva, possivelmente aguardando alocação, em carregamento ou área temporária.` 
-                                  : ` Existem ${Math.abs(diff)} vaga(s) marcada(s) como ocupada(s) sem pallet correspondente no inventário.`}
+                                Existem {warehouseDiagnostic.noDefinitiveSlot} pallets cadastrados sem vaga definitiva.
                               </p>
-                              {diff < 0 && !isPublicView && (
-                                <button 
-                                  onClick={handleResyncSlots}
-                                  className="mt-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-500 px-3 py-1.5 rounded-lg border border-amber-500/30 hover:bg-amber-500/30 transition-all flex items-center gap-2"
-                                >
-                                  <RefreshCw className="w-3 h-3" /> Reparar Vagas Presas
+                            </div>
+                            <button onClick={() => setIsDiagnosticDetailsOpen(true)} className="text-[9px] font-black uppercase tracking-widest text-amber-500 hover:underline px-2">Ver detalhes</button>
+                          </motion.div>
+                        )}
+
+                        {warehouseDiagnostic.slotConflicts > 0 && (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-rose-600/10 border border-rose-500/30 p-4 rounded-3xl flex items-center gap-4">
+                            <div className="w-10 h-10 bg-rose-600/20 text-rose-500 rounded-xl flex items-center justify-center shrink-0">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest italic">Conflito de Vagas</p>
+                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                                Existem {warehouseDiagnostic.slotConflicts} vagas com conflito, onde mais de um pallet está registrado na mesma posição. Esses casos exigem conferência manual.
+                              </p>
+                            </div>
+                            <button onClick={() => setIsDiagnosticDetailsOpen(true)} className="text-[9px] font-black uppercase tracking-widest text-rose-500 hover:underline px-2">Ver detalhes</button>
+                          </motion.div>
+                        )}
+
+                        {warehouseDiagnostic.orphanedSlots > 0 && (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-indigo-600/10 border border-indigo-500/30 p-4 rounded-3xl flex items-center gap-4">
+                            <div className="w-10 h-10 bg-indigo-600/20 text-indigo-500 rounded-xl flex items-center justify-center shrink-0">
+                              <HelpCircle className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">Vagas Órfãs</p>
+                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                                Existem {warehouseDiagnostic.orphanedSlots} vagas marcadas como ocupadas no mapa, mas sem pallet correspondente no inventário.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setIsDiagnosticDetailsOpen(true)} className="text-[9px] font-black uppercase tracking-widest text-indigo-500 hover:underline px-2">Ver detalhes</button>
+                              {!isPublicView && (
+                                <button onClick={handleResyncSlots} className="bg-indigo-500/20 text-indigo-500 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-indigo-500/30 transition-all">
+                                  <RefreshCw className="w-3 h-3" /> Reparar
                                 </button>
                               )}
                             </div>
                           </motion.div>
-                        );
-                      }
-                      return null;
-                    })()}
+                        )}
+
+                        {warehouseDiagnostic.freeSlotsWithPallets > 0 && (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-emerald-600/10 border border-emerald-500/30 p-4 rounded-3xl flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-600/20 text-emerald-500 rounded-xl flex items-center justify-center shrink-0">
+                              <CheckCircle2 className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Vagas Não Marcadas</p>
+                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                                Foram encontradas {warehouseDiagnostic.freeSlotsWithPallets} vagas marcadas como livres no mapa, mas que possuem pallets registrados no inventário.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setIsDiagnosticDetailsOpen(true)} className="text-[9px] font-black uppercase tracking-widest text-emerald-500 hover:underline px-2">Ver detalhes</button>
+                              {!isPublicView && (
+                                <button onClick={handleResyncSlots} className="bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-emerald-500/30 transition-all">
+                                  <RefreshCw className="w-3 h-3" /> Reparar
+                                </button>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
             </div>
@@ -2788,6 +2840,117 @@ const App: React.FC = () => {
       </main>
 
       {/* Modals & Dialogs */}
+
+      {isDiagnosticDetailsOpen && warehouseDiagnostic && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]"
+          >
+            <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <div>
+                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Diagnóstico do Armazém</h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Conferência de integridade de dados</p>
+              </div>
+              <button onClick={() => setIsDiagnosticDetailsOpen(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto space-y-8">
+              {warehouseDiagnostic.details.noDefinitiveSlotItems.length > 0 && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2 italic">
+                    <AlertCircle className="w-3 h-3" /> Pallets sem vaga definitiva
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {warehouseDiagnostic.details.noDefinitiveSlotItems.map((item, i) => (
+                      <div key={i} className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 text-[10px] font-bold text-slate-300">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {warehouseDiagnostic.details.conflictSlots.length > 0 && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2 italic">
+                    <AlertCircle className="w-3 h-3" /> Vagas em conflito (Múltiplos pallets)
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {warehouseDiagnostic.details.conflictSlots.map((slotId, i) => (
+                      <div key={i} className="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 text-[10px] font-black text-rose-500 text-center uppercase tracking-widest">
+                        {slotId}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {warehouseDiagnostic.details.orphanedSlotIds.length > 0 && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 italic">
+                    <HelpCircle className="w-3 h-3" /> Vagas Órfãs (Fixação Segura)
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {warehouseDiagnostic.details.orphanedSlotIds.map((slotId, i) => (
+                      <div key={i} className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 text-[10px] font-black text-indigo-500 text-center uppercase tracking-widest">
+                        {slotId}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {warehouseDiagnostic.details.freeSlotWithPalletIds.length > 0 && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2 italic">
+                    <CheckCircle2 className="w-3 h-3" /> Vagas Livres com Pallets (Fixação Segura)
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {warehouseDiagnostic.details.freeSlotWithPalletIds.map((slotId, i) => (
+                      <div key={i} className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-[10px] font-black text-emerald-500 text-center uppercase tracking-widest">
+                        {slotId}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {(!warehouseDiagnostic || (warehouseDiagnostic.noDefinitiveSlot === 0 && warehouseDiagnostic.slotConflicts === 0 && warehouseDiagnostic.orphanedSlots === 0 && warehouseDiagnostic.freeSlotsWithPallets === 0)) && (
+                <div className="py-12 text-center space-y-4">
+                  <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white tracking-tight uppercase tracking-widest">Nenhuma divergência encontrada</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">O armazém está em conformidade total.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-4">
+              <button 
+                onClick={() => setIsDiagnosticDetailsOpen(false)}
+                className="px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:bg-slate-800 transition-all font-black"
+              >
+                Fechar
+              </button>
+              {!isPublicView && (warehouseDiagnostic.orphanedSlots > 0 || warehouseDiagnostic.freeSlotsWithPallets > 0) && (
+                <button 
+                  onClick={handleResyncSlots}
+                  className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" /> Reparar Vagas
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
       
       {isBulkConfirmOpen && (
         <InventoryBulkConfirmModal 

@@ -135,6 +135,19 @@ export interface DashboardStats {
   containerOccupancyRate: number;
 }
 
+export interface WarehouseDiagnostic {
+  noDefinitiveSlot: number; // Pallets without assignedSlot or with placeholder values
+  slotConflicts: number;   // Multiple pallets pointing to the same slot
+  orphanedSlots: number;   // Slot occupied in warehouse_slots but no pallet in inventory
+  freeSlotsWithPallets: number; // Slot EMPTY in warehouse_slots but has pallet in inventory
+  details: {
+    noDefinitiveSlotItems: string[]; // List of pallet IDs mapping to no slot
+    conflictSlots: string[];       // List of slot IDs with multiple pallets
+    orphanedSlotIds: string[];     // List of slot IDs marked occupied but empty
+    freeSlotWithPalletIds: string[]; // List of slot IDs marked free but occupied
+  };
+}
+
 export const translateSlotContent = (content: SlotContent): string => {
   const translations: Record<SlotContent, string> = {
     [SlotContent.EMPTY]: 'Vazio',
