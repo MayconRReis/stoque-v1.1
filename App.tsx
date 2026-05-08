@@ -40,8 +40,7 @@ import {
   Layers,
   MapPin,
   Hash,
-  Users,
-  Bell
+  Users
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -73,7 +72,6 @@ import QuickSearch from './components/QuickSearch';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
-import { NotificationCenter } from './components/NotificationCenter';
 import { RotativeStockManager } from './components/RotativeStockManager';
 import { WaitingSlotsView } from './components/WaitingSlotsView';
 import HistoryItem from './components/HistoryItem';
@@ -174,8 +172,6 @@ const App: React.FC = () => {
   const [isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen] = useState(false);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
-  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -415,33 +411,6 @@ const App: React.FC = () => {
       console.error('Error loading global stats:', error);
     }
   }, []);
-
-  useEffect(() => {
-    if (user && isSupabaseConfigured) {
-      const fetchUnreadCount = async () => {
-        const notifs = await supabaseService.getNotifications(user.id, user.role);
-        setUnreadNotifications(notifs.filter(n => !n.read).length);
-      };
-      fetchUnreadCount();
-
-      const sub = supabaseService.subscribeToNotifications(user.id, user.role, (payload) => {
-        setUnreadNotifications(prev => prev + 1);
-        // We could also show a small toast here if we want, 
-        // but NotificationCenter handles the list.
-        if (payload.new.type === 'success') {
-          showNotification(payload.new.title, 'success');
-        } else if (payload.new.type === 'error') {
-          showNotification(payload.new.title, 'error');
-        } else {
-          showNotification(payload.new.title, 'info');
-        }
-      });
-
-      return () => {
-        sub.unsubscribe();
-      };
-    }
-  }, [user]);
 
   const refreshCombinedData = useCallback(async () => {
     // Refresh current page of inventory, global stats, pending and waiting rows
@@ -2372,20 +2341,6 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
-             {!isPublicView && (
-               <button 
-                 onClick={() => setIsNotificationCenterOpen(true)}
-                 className="relative p-2.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800/50 transition-all active:scale-95"
-               >
-                 <Bell className="w-4.5 h-4.5" />
-                 {unreadNotifications > 0 && (
-                   <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-slate-950 animate-bounce">
-                     {unreadNotifications > 9 ? '+9' : unreadNotifications}
-                   </span>
-                 )}
-               </button>
-             )}
-             <div className="h-6 w-[1px] bg-slate-900 mx-1" />
              {isPublicView && (
                <button 
                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
@@ -3100,13 +3055,6 @@ const App: React.FC = () => {
           userRole={user?.role}
         />
       )}
-
-      <NotificationCenter 
-        userId={user?.id}
-        userRole={user?.role}
-        isOpen={isNotificationCenterOpen}
-        onClose={() => setIsNotificationCenterOpen(false)}
-      />
 
       <ShipmentModal 
         isOpen={isShipmentModalOpen}

@@ -89,44 +89,6 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
  * 
- * CREATE TABLE notifications (
- *   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
- *   role_target TEXT DEFAULT 'all', -- 'admin', 'operator', 'all'
- *   title TEXT NOT NULL,
- *   message TEXT NOT NULL,
- *   type TEXT DEFAULT 'info', -- 'info', 'warning', 'error', 'success'
- *   related_entity_type TEXT,
- *   related_entity_id TEXT,
- *   read BOOLEAN DEFAULT false,
- *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
- * );
- * 
- * CREATE TABLE push_subscriptions (
- *   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
- *   endpoint TEXT NOT NULL UNIQUE,
- *   p256dh TEXT NOT NULL,
- *   auth TEXT NOT NULL,
- *   user_agent TEXT,
- *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
- *   active BOOLEAN DEFAULT true
- * );
- * 
- * CREATE TABLE inventory_edit_requests (
- *   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- *   inventory_id TEXT REFERENCES inventory(id) ON DELETE CASCADE,
- *   requested_by UUID REFERENCES auth.users(id),
- *   requested_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
- *   before_data JSONB NOT NULL,
- *   after_data JSONB NOT NULL,
- *   reason TEXT,
- *   status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
- *   reviewed_by UUID REFERENCES auth.users(id),
- *   reviewed_at TIMESTAMP WITH TIME ZONE,
- *   admin_comment TEXT
- * );
- * 
  * ALTER TABLE inventory ADD COLUMN shipment_id TEXT REFERENCES shipments(id);
  * 
  * -- 2. Disable RLS (or add policies)
@@ -1010,33 +972,21 @@ export const supabaseService = {
   },
 
   // Edit Requests
-  async createEditRequest(request: any) {
-    if (!isSupabaseConfigured) return;
+  async createEditRequest(request: {
+    inventory_id: string,
+    requested_by: string,
+    before_data: any,
+    after_data: any,
+    reason: string
+  }) {
+    if (!isSupabaseConfigured) throw new Error('O Supabase não está configurado.');
     const { data, error } = await supabase
       .from('inventory_edit_requests')
-      .insert({
-        inventory_id: request.inventory_id,
-        requested_by: request.requested_by,
-        before_data: request.before_data,
-        after_data: request.after_data,
-        reason: request.reason,
-        status: 'pending'
-      })
+      .insert(request)
       .select()
       .single();
-
+    
     if (error) throw error;
-
-    // Notify ALL admins
-    await this.createNotification({
-      role_target: 'admin',
-      title: 'Solicitação de Alteração',
-      message: `Nova solicitação para o pallet ${request.inventory_id}.`,
-      type: 'warning',
-      related_entity_type: 'request',
-      related_entity_id: data.id
-    });
-
     return data;
   },
 
@@ -1108,7 +1058,6 @@ export const supabaseService = {
       inspections: item.inspections || [],
     })) as SheetRow[];
   },
-
 
   async getEditRequests(): Promise<any[]> {
     if (!isSupabaseConfigured) return [];
@@ -1189,18 +1138,6 @@ export const supabaseService = {
       .eq('id', requestId);
     
     if (statusError) throw statusError;
-    
-    // 4. Notify the operator
-    await this.createNotification({
-      user_id: request.requested_by,
-      title: status === 'approved' ? 'Solicitação Aprovada' : 'Solicitação Rejeitada',
-      message: status === 'approved' 
-        ? `Sua alteração no pallet ${request.inventory_id} foi aplicada.`
-        : `Sua alteração no pallet ${request.inventory_id} foi recusada.${adminComment ? ` Motivo: ${adminComment}` : ''}`,
-      type: status === 'approved' ? 'success' : 'error',
-      related_entity_type: 'request',
-      related_entity_id: requestId
-    });
   },
 
   // Real-time Subscriptions
@@ -1218,6 +1155,15 @@ export const supabaseService = {
       .channel('slot-changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warehouse_slots' }, callback)
       .subscribe();
+  },
+
+  subscribeToNotifications(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    const channel = supabase.channel('app-notifications');
+    channel
+      .on('broadcast', { event: 'pallet-change' }, ({ payload }) => callback(payload))
+      .subscribe();
+    return channel;
   },
 
   broadcastNotification(payload: { user: string, message: string, type?: string }) {
@@ -1506,17 +1452,6 @@ export const supabaseService = {
         }
       });
 
-      if (conflictSlots.length > 0) {
-        await this.createNotification({
-          role_target: 'admin',
-          title: 'Conflito de Vagas Detectado',
-          message: `O sistema identificou conflitos de ocupação em ${conflictSlots.length} vaga(s) (${conflictSlots.slice(0, 3).join(', ')}${conflictSlots.length > 3 ? '...' : ''}).`,
-          type: 'error',
-          related_entity_type: 'diagnostic',
-          related_entity_id: 'conflicts'
-        });
-      }
-
       const orphanedSlotIds: string[] = [];
       const freeSlotWithPalletIds: string[] = [];
 
@@ -1652,162 +1587,6 @@ export const supabaseService = {
     return supabase
       .channel('shipment-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
-      .subscribe();
-  },
-
-  // Notifications
-  async getNotifications(userId?: string, role?: string): Promise<AppNotification[]> {
-    if (!isSupabaseConfigured) return [];
-    
-    let query = supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    // Filter by role or userId
-    if (userId && role) {
-      query = query.or(`user_id.eq.${userId},role_target.eq.${role},role_target.eq.all`);
-    } else if (role) {
-      query = query.or(`role_target.eq.${role},role_target.eq.all`);
-    }
-
-    const { data, error } = await query.limit(50);
-    if (error) throw error;
-    
-    return data.map(n => ({
-      id: n.id,
-      user_id: n.user_id,
-      role_target: n.role_target,
-      title: n.title,
-      message: n.message,
-      type: n.type,
-      related_entity_type: n.related_entity_type,
-      related_entity_id: n.related_entity_id,
-      read: n.read,
-      created_at: n.created_at
-    }));
-  },
-
-  async markNotificationAsRead(id: string) {
-    if (!isSupabaseConfigured) return;
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', id);
-    if (error) throw error;
-  },
-
-  async createNotification(notification: any) {
-    if (!isSupabaseConfigured) return;
-    
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: notification.user_id || null,
-        role_target: notification.role_target || 'all',
-        title: notification.title,
-        message: notification.message,
-        type: notification.type || 'info',
-        related_entity_type: notification.related_entity_type,
-        related_entity_id: notification.related_entity_id
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Trigger push notification for targets
-    await this.triggerPushNotification(data);
-    
-    return data;
-  },
-
-  async savePushSubscription(userId: string, subscription: PushSubscription) {
-    if (!isSupabaseConfigured) return;
-    
-    const subData = subscription.toJSON();
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({
-        user_id: userId,
-        endpoint: subData.endpoint,
-        p256dh: subData.keys?.p256dh,
-        auth: subData.keys?.auth,
-        user_agent: navigator.userAgent,
-        active: true,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'endpoint' });
-
-    if (error) throw error;
-  },
-
-  async triggerPushNotification(notificationData: any) {
-    if (!isSupabaseConfigured) return;
-
-    // Get active subscriptions for the target
-    let query = supabase
-      .from('push_subscriptions')
-      .select('*')
-      .eq('active', true);
-
-    if (notificationData.user_id) {
-      query = query.eq('user_id', notificationData.user_id);
-    } else if (notificationData.role_target !== 'all') {
-      // Get all users with this role
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', notificationData.role_target);
-      
-      const userIds = users?.map(u => u.id) || [];
-      if (userIds.length > 0) {
-        query = query.in('user_id', userIds);
-      } else {
-        return; // No users for this role
-      }
-    }
-
-    const { data: subscriptions, error } = await query;
-    if (error || !subscriptions) return;
-
-    // Call our internal API to send the push
-    for (const sub of subscriptions) {
-      try {
-        await fetch('/api/notifications/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription: {
-              endpoint: sub.endpoint,
-              keys: {
-                p256dh: sub.p256dh,
-                auth: sub.auth
-              }
-            },
-            title: notificationData.title,
-            message: notificationData.message,
-            url: notificationData.related_entity_type === 'request' ? '/approvals' : '/'
-          })
-        });
-      } catch (e) {
-        console.error('Failed to send push to subscription', sub.id, e);
-      }
-    }
-  },
-
-  subscribeToNotifications(userId: string, role: string, callback: (payload: any) => void) {
-    return supabase
-      .channel('notification-changes')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'notifications' 
-      }, (payload) => {
-        const newNotif = payload.new;
-        if (newNotif.user_id === userId || newNotif.role_target === role || newNotif.role_target === 'all') {
-          callback(payload);
-        }
-      })
       .subscribe();
   }
 };

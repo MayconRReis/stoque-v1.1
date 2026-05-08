@@ -215,27 +215,3 @@ export interface InventoryEditRequest {
   reviewer_name?: string;
   product_description?: string;
 }
-
-export interface AppNotification {
-  id: string;
-  user_id: string | null;
-  role_target: 'admin' | 'operator' | 'all';
-  title: string;
-  message: string;
-  type: 'info' | 'warning' | 'error' | 'success';
-  related_entity_type?: string;
-  related_entity_id?: string;
-  read: boolean;
-  created_at: string;
-}
-
-export interface PushSubscriptionData {
-  id: string;
-  user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  user_agent: string;
-  created_at: string;
-  active: boolean;
-}
