@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { SheetRow, InspectionData, SlotContent, WarehouseSlot } from '../types';
+import { SheetRow, InspectionData, SlotContent, WarehouseSlot, SHAREABLE_SLOT_TYPES } from '../types';
 import { 
   Pencil, 
   X, 
@@ -72,14 +72,6 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [reason, setReason] = useState('');
 
-  const shareableSlotTypes = [
-    SlotContent.RETURN,
-    SlotContent.REWORK,
-    SlotContent.REPROCESS,
-    SlotContent.USE_CONSUMPTION,
-    SlotContent.MISCELLANEOUS
-  ];
-
   // Logic to determine available slots
   const computedAvailableSlots = React.useMemo(() => {
     return allSlots.filter(s => {
@@ -89,7 +81,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       if (s.status === SlotContent.EMPTY) return true;
       
       // If the current slot is occupied by a shareable type AND the item we are entering is shareable
-      if (shareableSlotTypes.includes(contentType) && shareableSlotTypes.includes(s.status)) {
+      if (SHAREABLE_SLOT_TYPES.includes(contentType) && SHAREABLE_SLOT_TYPES.includes(s.status)) {
         return true;
       }
       

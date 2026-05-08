@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { SlotContent, WarehouseSlot, HistoryType, SheetRow } from '../types';
+import { SlotContent, WarehouseSlot, HistoryType, SheetRow, SHAREABLE_SLOT_TYPES } from '../types';
 import { Truck, ArrowLeftRight, LogOut, Plus, X, Box, FlaskConical, Package, Info, Check, ClipboardCheck, Warehouse, Search, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -37,6 +37,36 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   initialPallet
 }) => {
   const [type, setType] = useState<'entry' | 'transfer' | 'exit'>('entry');
+  
+  // Entry Fields
+  const [op, setOp] = useState('');
+  const [name, setName] = useState('');
+  const [lot, setLot] = useState('');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [contentType, setContentType] = useState<SlotContent>(SlotContent.BOTTLES);
+  const [slotId, setSlotId] = useState('');
+
+  // Supply Specific Fields
+  const [others, setOthers] = useState<{ id: string, name: string, quantity: number }[]>([]);
+  const [bottlesCount, setBottlesCount] = useState<number>(0);
+  const [capsCount, setCapsCount] = useState<number>(0);
+  const [boxesCount, setBoxesCount] = useState<number>(0);
+  const [cradlesCount, setCradlesCount] = useState<number>(0);
+
+  // Transfer Fields
+  const [transferId, setTransferId] = useState('');
+  const [fromSlot, setFromSlot] = useState('');
+  const [toSlot, setToSlot] = useState('');
+
+  // Exit Fields
+  const [exitId, setExitId] = useState('');
+  const [exitReason, setExitReason] = useState('');
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [foundPallet, setFoundPallet] = useState<SheetRow | null>(null);
+  const [multipleFoundPallets, setMultipleFoundPallets] = useState<SheetRow[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSharedSlotWarning, setIsSharedSlotWarning] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -86,21 +116,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   // Remove the old reset useEffect (previously at line 286-308)
 
 
-  const shareableSlotTypes = [
-    SlotContent.RETURN,
-    SlotContent.REWORK,
-    SlotContent.REPROCESS,
-    SlotContent.USE_CONSUMPTION,
-    SlotContent.MISCELLANEOUS
-  ];
-
   // Logic to determine available slots for Entry
   const computedAvailableSlots = useMemo(() => {
     return allSlots.filter(s => {
       if (s.status === SlotContent.EMPTY) return true;
       
       // If the current slot is occupied by a shareable type AND the item we are entering is shareable
-      if (shareableSlotTypes.includes(contentType) && shareableSlotTypes.includes(s.status)) {
+      if (SHAREABLE_SLOT_TYPES.includes(contentType) && SHAREABLE_SLOT_TYPES.includes(s.status)) {
         return true;
       }
       
@@ -115,21 +137,6 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const sortedOccupiedSlots = useMemo(() => {
     return [...occupiedSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
   }, [occupiedSlots]);
-  
-  // Entry Fields
-  const [op, setOp] = useState('');
-  const [name, setName] = useState('');
-  const [lot, setLot] = useState('');
-  const [quantity, setQuantity] = useState<number>(1);
-  const [contentType, setContentType] = useState<SlotContent>(SlotContent.BOTTLES);
-  const [slotId, setSlotId] = useState('');
-
-  // Supply Specific Fields
-  const [others, setOthers] = useState<{ id: string, name: string, quantity: number }[]>([]);
-  const [bottlesCount, setBottlesCount] = useState<number>(0);
-  const [capsCount, setCapsCount] = useState<number>(0);
-  const [boxesCount, setBoxesCount] = useState<number>(0);
-  const [cradlesCount, setCradlesCount] = useState<number>(0);
 
   const addOther = () => {
     setOthers(prev => [...prev, { id: Math.random().toString(36).substring(2, 9), name: '', quantity: 0 }]);
@@ -142,23 +149,6 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const removeOther = (id: string) => {
     setOthers(prev => prev.filter(o => o.id !== id));
   };
-
-  // Transfer Fields
-  const [transferId, setTransferId] = useState('');
-  const [fromSlot, setFromSlot] = useState('');
-  const [toSlot, setToSlot] = useState('');
-
-  // Exit Fields
-  const [exitId, setExitId] = useState('');
-  const [exitReason, setExitReason] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
-  const [foundPallet, setFoundPallet] = useState<SheetRow | null>(null);
-  const [multipleFoundPallets, setMultipleFoundPallets] = useState<SheetRow[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSharedSlotWarning, setIsSharedSlotWarning] = useState(false);
-
-  // Handle slot selection warning
   useEffect(() => {
     if (type === 'entry' && slotId) {
       const selectedSlot = allSlots.find(s => s.id === slotId);

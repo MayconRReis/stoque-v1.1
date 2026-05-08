@@ -56,7 +56,8 @@ import {
   Shipment,
   ShipmentType,
   ShipmentStatus,
-  WarehouseDiagnostic
+  WarehouseDiagnostic,
+  SHAREABLE_SLOT_TYPES
 } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
