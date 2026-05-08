@@ -40,7 +40,8 @@ import {
   Layers,
   MapPin,
   Hash,
-  Users
+  Users,
+  Bell
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -72,6 +73,7 @@ import QuickSearch from './components/QuickSearch';
 import { MovementModal } from './components/MovementModal';
 import { ImportPage } from './components/ImportPage';
 import { AnalysisPage } from './components/AnalysisPage';
+import { NotificationCenter } from './components/NotificationCenter';
 import { RotativeStockManager } from './components/RotativeStockManager';
 import { WaitingSlotsView } from './components/WaitingSlotsView';
 import HistoryItem from './components/HistoryItem';
@@ -172,6 +174,8 @@ const App: React.FC = () => {
   const [isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen] = useState(false);
   const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -411,6 +415,33 @@ const App: React.FC = () => {
       console.error('Error loading global stats:', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (user && isSupabaseConfigured) {
+      const fetchUnreadCount = async () => {
+        const notifs = await supabaseService.getNotifications(user.id, user.role);
+        setUnreadNotifications(notifs.filter(n => !n.read).length);
+      };
+      fetchUnreadCount();
+
+      const sub = supabaseService.subscribeToNotifications(user.id, user.role, (payload) => {
+        setUnreadNotifications(prev => prev + 1);
+        // We could also show a small toast here if we want, 
+        // but NotificationCenter handles the list.
+        if (payload.new.type === 'success') {
+          showNotification(payload.new.title, 'success');
+        } else if (payload.new.type === 'error') {
+          showNotification(payload.new.title, 'error');
+        } else {
+          showNotification(payload.new.title, 'info');
+        }
+      });
+
+      return () => {
+        sub.unsubscribe();
+      };
+    }
+  }, [user]);
 
   const refreshCombinedData = useCallback(async () => {
     // Refresh current page of inventory, global stats, pending and waiting rows
@@ -900,14 +931,20 @@ const App: React.FC = () => {
 
   const handleMovementEntry = async (entryData: any) => {
     try {
-      // 1. Pre-validation: check if slot is still free
+      // 1. Pre-validation: check if slot is still free or shareable
       const isWaiting = entryData.slotId === 'AGUARDANDO';
       if (!isWaiting) {
         const currentSlot = await supabaseService.getSlotById(entryData.slotId);
         if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
-          showNotification(`A vaga ${entryData.slotId} acabou de ser ocupada por outro operador (${currentSlot.occupiedBy}). Escolha outra vaga.`, 'error');
-          refreshCombinedData();
-          return;
+          // If the slot is occupied, check if both the occupying item and new item are shareable
+          const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(currentSlot.status);
+          const isNewItemShareable = SHAREABLE_SLOT_TYPES.includes(entryData.contentType);
+          
+          if (!isOccupantShareable || !isNewItemShareable) {
+            showNotification(`A vaga ${entryData.slotId} já está ocupada por um item que não permite compartilhamento.`, 'error');
+            refreshCombinedData();
+            return;
+          }
         }
       }
 
@@ -1087,14 +1124,19 @@ const App: React.FC = () => {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
 
-      // 1. Pre-validation: check if slot is still free
+      // 1. Pre-validation: check if slot is still free or shareable
       const isWaiting = slotId === 'AGUARDANDO';
       if (!isWaiting) {
         const currentSlot = await supabaseService.getSlotById(slotId);
         if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
-          showNotification(`A vaga ${slotId} acabou de ser ocupada por outro operador (${currentSlot.occupiedBy}). Escolha outra vaga.`, 'error');
-          refreshCombinedData();
-          return;
+          const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(currentSlot.status);
+          const isNewItemShareable = row.inspections?.[0]?.contentType ? SHAREABLE_SLOT_TYPES.includes(row.inspections[0].contentType) : false;
+
+          if (!isOccupantShareable || !isNewItemShareable) {
+            showNotification(`A vaga ${slotId} já está ocupada por um item que não permite compartilhamento.`, 'error');
+            refreshCombinedData();
+            return;
+          }
         }
       }
 
@@ -1186,14 +1228,19 @@ const App: React.FC = () => {
         return;
       }
 
-      // 2. Pre-validation: check if destination is still free
+      // 2. Pre-validation: check if destination is still free or shareable
       const isWaitingDestination = transferData.toSlot === 'AGUARDANDO';
       if (!isWaitingDestination) {
         const targetSlotStatus = await supabaseService.getSlotById(transferData.toSlot);
         if (targetSlotStatus && targetSlotStatus.status !== SlotContent.EMPTY) {
-          showNotification(`A vaga de destino ${transferData.toSlot} acabou de ser ocupada por outro operador (${targetSlotStatus.occupiedBy}).`, 'error');
-          refreshCombinedData();
-          return;
+          const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(targetSlotStatus.status);
+          const isNewItemShareable = item.inspections?.[0]?.contentType ? SHAREABLE_SLOT_TYPES.includes(item.inspections[0].contentType) : false;
+
+          if (!isOccupantShareable || !isNewItemShareable) {
+            showNotification(`A vaga de destino ${transferData.toSlot} já está ocupada por um item que não permite compartilhamento.`, 'error');
+            refreshCombinedData();
+            return;
+          }
         }
       }
 
@@ -1208,13 +1255,17 @@ const App: React.FC = () => {
         return;
       }
 
-      // 4. Update From Slot (Free it up)
+      // 4. Update From Slot (Free it up ONLY if it's the only item there)
       if (actualOrigin && actualOrigin !== 'AGUARDANDO') {
-        const fromSlotObj = slots.find(s => s.id === actualOrigin);
-        if (fromSlotObj) {
-          const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
-          await supabaseService.updateSlot(updatedFrom);
-          setSlots(prev => prev.map(s => s.id === actualOrigin ? updatedFrom : s));
+        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(actualOrigin);
+        // Only free the slot if this item is the ONLY one there
+        if (otherPalletsInSlot.length <= 1) {
+          const fromSlotObj = slots.find(s => s.id === actualOrigin);
+          if (fromSlotObj) {
+            const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
+            await supabaseService.updateSlot(updatedFrom);
+            setSlots(prev => prev.map(s => s.id === actualOrigin ? updatedFrom : s));
+          }
         }
       }
 
@@ -1287,8 +1338,12 @@ const App: React.FC = () => {
       // Find slot occupied by this item
       const slotId = item.inspections?.[0]?.assignedSlot;
       if (slotId && slotId !== 'AGUARDANDO') {
-        await supabaseService.freeSlot(slotId);
-        setSlots(prev => prev.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(slotId);
+        // Only free the slot if this item is the ONLY one there
+        if (otherPalletsInSlot.length <= 1) {
+          await supabaseService.freeSlot(slotId);
+          setSlots(prev => prev.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+        }
       }
 
       // Delete Inventory
@@ -2317,6 +2372,20 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
+             {!isPublicView && (
+               <button 
+                 onClick={() => setIsNotificationCenterOpen(true)}
+                 className="relative p-2.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800/50 transition-all active:scale-95"
+               >
+                 <Bell className="w-4.5 h-4.5" />
+                 {unreadNotifications > 0 && (
+                   <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-slate-950 animate-bounce">
+                     {unreadNotifications > 9 ? '+9' : unreadNotifications}
+                   </span>
+                 )}
+               </button>
+             )}
+             <div className="h-6 w-[1px] bg-slate-900 mx-1" />
              {isPublicView && (
                <button 
                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
@@ -2586,6 +2655,7 @@ const App: React.FC = () => {
             <AnalysisPage 
               pendingItems={pendingRows}
               availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
+              allSlots={slots}
               onConfirm={handleConfirmAnalysis}
               onReject={handleRejectAnalysis}
               onEdit={(item) => {
@@ -3025,10 +3095,18 @@ const App: React.FC = () => {
           onSave={handleUpdatePallet}
           history={history}
           availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
+          allSlots={slots}
           mode={editPalletMode}
           userRole={user?.role}
         />
       )}
+
+      <NotificationCenter 
+        userId={user?.id}
+        userRole={user?.role}
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+      />
 
       <ShipmentModal 
         isOpen={isShipmentModalOpen}
@@ -3073,6 +3151,7 @@ const App: React.FC = () => {
         onExit={handleMovementExit}
         availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
         occupiedSlots={slots.filter(s => s.status !== SlotContent.EMPTY)}
+        allSlots={slots}
         inventoryData={data}
         history={history}
         initialType={movementInitialContext?.type}

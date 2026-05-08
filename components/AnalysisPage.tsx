@@ -7,16 +7,44 @@ import { motion, AnimatePresence } from 'motion/react';
 interface AnalysisPageProps {
   pendingItems: SheetRow[];
   availableSlots: WarehouseSlot[];
+  allSlots: WarehouseSlot[];
   onConfirm: (rowId: string, slotId: string, finalId: string) => Promise<void>;
   onReject: (rowId: string) => Promise<void>;
   onEdit: (item: SheetRow) => void;
 }
 
-export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, onConfirm, onReject, onEdit }) => {
+export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, allSlots, onConfirm, onReject, onEdit }) => {
   const [selectedItem, setSelectedItem] = useState<SheetRow | null>(null);
   const [slotId, setSlotId] = useState('');
   const [finalId, setFinalId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const shareableSlotTypes = [
+    SlotContent.RETURN,
+    SlotContent.REWORK,
+    SlotContent.REPROCESS,
+    SlotContent.USE_CONSUMPTION,
+    SlotContent.MISCELLANEOUS
+  ];
+
+  const computedAvailableSlots = React.useMemo(() => {
+    const currentContentType = selectedItem?.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+    
+    return allSlots.filter(s => {
+      if (s.status === SlotContent.EMPTY) return true;
+      
+      // If the current slot is occupied by a shareable type AND the item we are entering is shareable
+      if (shareableSlotTypes.includes(currentContentType) && shareableSlotTypes.includes(s.status)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [allSlots, selectedItem]);
+
+  const sortedAvailableSlots = React.useMemo(() => {
+    return [...computedAvailableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [computedAvailableSlots]);
 
   const handleStartAnalysis = (item: SheetRow) => {
     setSelectedItem(item);
@@ -26,16 +54,16 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     const contentType = item.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
     let suggestedSlot: string | undefined;
     if (contentType === SlotContent.BOTTLES) {
-      suggestedSlot = availableSlots.find(s => s.rack === 'A' && s.position <= 16)?.id;
+      suggestedSlot = computedAvailableSlots.find(s => s.rack === 'A' && s.position <= 16)?.id;
     } else if (contentType === SlotContent.SUPPLIES) {
-      suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16)?.id;
+      suggestedSlot = computedAvailableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16)?.id;
     } else if (contentType === SlotContent.FINISHED_PRODUCT) {
-      suggestedSlot = availableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
+      suggestedSlot = computedAvailableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
     } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
       // Disabled by user request: "remover função de substituição de vaga automática dos containers"
       suggestedSlot = undefined;
     }
-    setSlotId(suggestedSlot || (availableSlots.length > 0 ? availableSlots[0].id : ''));
+    setSlotId(suggestedSlot || (computedAvailableSlots.length > 0 ? computedAvailableSlots[0].id : ''));
   };
 
   const handleConfirm = async () => {
@@ -218,7 +246,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     >
                       <option value="">Selecionar</option>
                       <option value="AGUARDANDO" className="text-amber-500 font-bold">Aguardando Vaga</option>
-                      {availableSlots.map(s => (
+                      {sortedAvailableSlots.map(s => (
                         <option key={s.id} value={s.id}>{s.id} ({s.rack})</option>
                       ))}
                     </select>

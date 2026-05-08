@@ -47,6 +47,7 @@ interface EditPalletModalProps {
   pallet: { row: SheetRow; inspection: InspectionData; idx: number } | null;
   history: any[];
   availableSlots: WarehouseSlot[];
+  allSlots: WarehouseSlot[];
   mode?: 'edit' | 'assign';
   userRole?: 'admin' | 'operator';
 }
@@ -58,6 +59,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   pallet, 
   history, 
   availableSlots,
+  allSlots,
   mode = 'edit',
   userRole = 'admin'
 }) => {
@@ -69,6 +71,31 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const [assignedSlot, setAssignedSlot] = useState<string>('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [reason, setReason] = useState('');
+
+  const shareableSlotTypes = [
+    SlotContent.RETURN,
+    SlotContent.REWORK,
+    SlotContent.REPROCESS,
+    SlotContent.USE_CONSUMPTION,
+    SlotContent.MISCELLANEOUS
+  ];
+
+  // Logic to determine available slots
+  const computedAvailableSlots = React.useMemo(() => {
+    return allSlots.filter(s => {
+      // If it's already assigned specifically to this pallet index in the DB, it's available for this modal's "edit"
+      if (s.id === pallet?.inspection.assignedSlot) return true;
+      
+      if (s.status === SlotContent.EMPTY) return true;
+      
+      // If the current slot is occupied by a shareable type AND the item we are entering is shareable
+      if (shareableSlotTypes.includes(contentType) && shareableSlotTypes.includes(s.status)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [allSlots, contentType, pallet]);
   
   // Supply Details State
   const [bottles, setBottles] = useState(0);
@@ -223,8 +250,8 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-[10px] uppercase focus:border-purple-600 outline-none appearance-none transition-all"
                 >
                   <option value="AGUARDANDO">MANTER AGUARDANDO VAGA</option>
-                  {availableSlots
-                    .sort((a, b) => a.id.localeCompare(b.id))
+                  {computedAvailableSlots
+                    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
                     .map(slot => (
                       <option key={slot.id} value={slot.id}>
                         VAGA {slot.id} ({slot.rack}.{slot.level}.{slot.position})

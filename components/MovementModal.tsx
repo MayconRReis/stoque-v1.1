@@ -13,6 +13,7 @@ interface MovementModalProps {
   onExit: (data: any) => void;
   availableSlots: WarehouseSlot[];
   occupiedSlots: WarehouseSlot[];
+  allSlots: WarehouseSlot[];
   inventoryData: SheetRow[];
   history: any[];
   initialType?: 'entry' | 'transfer' | 'exit';
@@ -28,6 +29,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   onExit,
   availableSlots,
   occupiedSlots,
+  allSlots,
   inventoryData,
   history,
   initialType,
@@ -84,9 +86,31 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   // Remove the old reset useEffect (previously at line 286-308)
 
 
+  const shareableSlotTypes = [
+    SlotContent.RETURN,
+    SlotContent.REWORK,
+    SlotContent.REPROCESS,
+    SlotContent.USE_CONSUMPTION,
+    SlotContent.MISCELLANEOUS
+  ];
+
+  // Logic to determine available slots for Entry
+  const computedAvailableSlots = useMemo(() => {
+    return allSlots.filter(s => {
+      if (s.status === SlotContent.EMPTY) return true;
+      
+      // If the current slot is occupied by a shareable type AND the item we are entering is shareable
+      if (shareableSlotTypes.includes(contentType) && shareableSlotTypes.includes(s.status)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [allSlots, contentType]);
+
   const sortedAvailableSlots = useMemo(() => {
-    return [...availableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-  }, [availableSlots]);
+    return [...computedAvailableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [computedAvailableSlots]);
 
   const sortedOccupiedSlots = useMemo(() => {
     return [...occupiedSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -129,8 +153,24 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const [exitReason, setExitReason] = useState('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [foundPallet, setFoundPallet] = useState<SheetRow | null>(null);
+  const [multipleFoundPallets, setMultipleFoundPallets] = useState<SheetRow[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSharedSlotWarning, setIsSharedSlotWarning] = useState(false);
+
+  // Handle slot selection warning
+  useEffect(() => {
+    if (type === 'entry' && slotId) {
+      const selectedSlot = allSlots.find(s => s.id === slotId);
+      if (selectedSlot && selectedSlot.status !== SlotContent.EMPTY) {
+        setIsSharedSlotWarning(true);
+      } else {
+        setIsSharedSlotWarning(false);
+      }
+    } else {
+      setIsSharedSlotWarning(false);
+    }
+  }, [slotId, allSlots, type]);
 
   // Auto-select origin slot when transferId is entered
   useEffect(() => {
@@ -150,18 +190,21 @@ export const MovementModal: React.FC<MovementModalProps> = ({
           if (isSlotPattern) {
             const results = await supabaseService.findPalletsBySlot(upperId);
             if (results.length > 1) {
-              setError(`CONFLITO DE VAGA: Encontrados ${results.length} pallets na vaga ${upperId}. Solicite correção de estoque.`);
+              setMultipleFoundPallets(results);
               setFoundPallet(null);
+              setError(null);
               setIsSearching(false);
               return;
             }
             item = results[0] || null;
+            setMultipleFoundPallets([]);
             setError(null);
           }
           
           // If not found by slot or wasn't a slot pattern, try by ID
           if (!item && transferId.length >= 3) {
             item = await supabaseService.findPalletByLoadingId(transferId);
+            setMultipleFoundPallets([]);
           }
 
           if (item) {
@@ -215,17 +258,20 @@ export const MovementModal: React.FC<MovementModalProps> = ({
           if (isSlotPattern) {
             const results = await supabaseService.findPalletsBySlot(upperId);
             if (results.length > 1) {
-              setError(`CONFLITO DE VAGA: Encontrados ${results.length} pallets na vaga ${upperId}. Solicite correção de estoque.`);
+              setMultipleFoundPallets(results);
               setFoundPallet(null);
+              setError(null);
               setIsSearching(false);
               return;
             }
             item = results[0] || null;
+            setMultipleFoundPallets([]);
             setError(null);
           }
           
           if (!item && exitId.length >= 3) {
             item = await supabaseService.findPalletByLoadingId(exitId);
+            setMultipleFoundPallets([]);
           }
 
           if (item) {
@@ -609,6 +655,17 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         <Plus className="w-4 h-4 rotate-45" />
                       </div>
                     </div>
+                    {isSharedSlotWarning && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-600/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-2 mt-2"
+                      >
+                        <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-tight leading-relaxed italic">
+                          Esta vaga já possui outros itens cadastrados. Ela será tratada como vaga compartilhada.
+                        </p>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 
@@ -760,6 +817,36 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 </div>
 
                 <AnimatePresence>
+                  {multipleFoundPallets.length > 0 && type === 'transfer' && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-3 mb-4">
+                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1 italic">Selecione o pallet para transferir:</p>
+                      <div className="space-y-2">
+                        {multipleFoundPallets.map((p, idx) => (
+                          <button 
+                            key={p.id + idx}
+                            onClick={() => {
+                              setFoundPallet(p);
+                              setFromSlot(p.inspections?.[0]?.assignedSlot || '');
+                              setMultipleFoundPallets([]);
+                            }}
+                            className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between hover:border-amber-600/50 transition-all group"
+                          >
+                            <div className="text-left">
+                              <p className="text-[11px] font-black text-white uppercase italic">{p.description}</p>
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">LOTE: {p.lot} | OP: {p.originOP} | ID: {p.loadingId || p.id}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{p.pallets} PL</span>
+                              <div className="w-8 h-8 bg-amber-600/10 border border-amber-500/20 rounded-lg flex items-center justify-center text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Check className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
                   {foundPallet && type === 'transfer' && (
                     <motion.div 
                       initial={{ opacity: 0, height: 0 }}
@@ -892,6 +979,35 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 </div>
 
                 <AnimatePresence>
+                  {multipleFoundPallets.length > 0 && type === 'exit' && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-3 mb-4">
+                      <p className="text-[10px] font-black text-red-500 uppercase tracking-widest ml-1 italic">Selecione o pallet para retirar:</p>
+                      <div className="space-y-2">
+                        {multipleFoundPallets.map((p, idx) => (
+                          <button 
+                            key={p.id + idx}
+                            onClick={() => {
+                              setFoundPallet(p);
+                              setMultipleFoundPallets([]);
+                            }}
+                            className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between hover:border-red-600/50 transition-all group"
+                          >
+                            <div className="text-left">
+                              <p className="text-[11px] font-black text-white uppercase italic">{p.description}</p>
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">LOTE: {p.lot} | OP: {p.originOP} | ID: {p.loadingId || p.id}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">{p.pallets} PL</span>
+                              <div className="w-8 h-8 bg-red-600/10 border border-red-500/20 rounded-lg flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Check className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
                   {foundPallet && type === 'exit' && (
                     <motion.div 
                       initial={{ opacity: 0, height: 0 }}
