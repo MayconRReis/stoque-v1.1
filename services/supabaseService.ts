@@ -1157,26 +1157,6 @@ export const supabaseService = {
       .subscribe();
   },
 
-  subscribeToNotifications(callback: (payload: any) => void) {
-    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    const channel = supabase.channel('app-notifications');
-    channel
-      .on('broadcast', { event: 'pallet-change' }, ({ payload }) => callback(payload))
-      .subscribe();
-    return channel;
-  },
-
-  broadcastNotification(payload: { user: string, message: string, type?: string }) {
-    if (!isSupabaseConfigured) return;
-    // Use httpSend for explicit REST delivery to avoid deprecation warning
-    // when sending without a persistent websocket connection.
-    (supabase.channel('app-notifications') as any).httpSend({
-      type: 'broadcast',
-      event: 'pallet-change',
-      payload
-    });
-  },
-
   // Shipments
   async getShipments(): Promise<Shipment[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('shipments');

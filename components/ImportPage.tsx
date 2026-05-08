@@ -41,19 +41,19 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
           const quantidade = row.quantidade || row.QUANTIDADE || '1';
           const tipo = (row.tipo || row.TIPO || '').toUpperCase();
 
-          let contentType = SlotContent.SUPPLIES;
-          if (tipo.includes('FRASCO')) contentType = SlotContent.BOTTLES;
-          else if (tipo.includes('ACABADO')) contentType = SlotContent.FINISHED_PRODUCT;
-          else if (tipo.includes('INSUMO')) contentType = SlotContent.SUPPLIES;
-          else if (tipo.includes('RETRABALHO')) contentType = SlotContent.REWORK;
-          else if (tipo.includes('REPROCESSO')) contentType = SlotContent.REPROCESS;
-          else if (tipo.includes('DIVERSOS')) contentType = SlotContent.MISCELLANEOUS;
-          else if (tipo.includes('DESCARTE')) contentType = SlotContent.DISCARD;
-          else if (tipo.includes('OUTRO')) contentType = SlotContent.OTHER;
+          let inferredContentType = SlotContent.SUPPLIES;
+          if (tipo.includes('FRASCO')) inferredContentType = SlotContent.BOTTLES;
+          else if (tipo.includes('ACABADO')) inferredContentType = SlotContent.FINISHED_PRODUCT;
+          else if (tipo.includes('INSUMO')) inferredContentType = SlotContent.SUPPLIES;
+          else if (tipo.includes('RETRABALHO')) inferredContentType = SlotContent.REWORK;
+          else if (tipo.includes('REPROCESSO')) inferredContentType = SlotContent.REPROCESS;
+          else if (tipo.includes('DIVERSOS')) inferredContentType = SlotContent.MISCELLANEOUS;
+          else if (tipo.includes('DESCARTE')) inferredContentType = SlotContent.DISCARD;
+          else if (tipo.includes('OUTRO')) inferredContentType = SlotContent.OTHER;
           else if (tipo.includes('CONTAINER')) {
-            if (tipo.includes('SJ')) contentType = SlotContent.CONTAINER_SJ;
-            else if (tipo.includes('LP')) contentType = SlotContent.CONTAINER_LP;
-            else contentType = SlotContent.CONTAINER_CP;
+            if (tipo.includes('SJ')) inferredContentType = SlotContent.CONTAINER_SJ;
+            else if (tipo.includes('LP')) inferredContentType = SlotContent.CONTAINER_LP;
+            else inferredContentType = SlotContent.CONTAINER_CP;
           }
 
           return {
@@ -63,7 +63,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
             quantidade,
             tipo,
             selected: true,
-            contentType
+            contentType: inferredContentType
           };
         });
 

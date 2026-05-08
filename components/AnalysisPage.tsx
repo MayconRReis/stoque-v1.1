@@ -51,15 +51,15 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     const generated = Math.random().toString(36).substring(2, 8).toUpperCase();
     setFinalId(generated);
     
-    const contentType = item.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+    const itemContentType = item.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
     let suggestedSlot: string | undefined;
-    if (contentType === SlotContent.BOTTLES) {
+    if (itemContentType === SlotContent.BOTTLES) {
       suggestedSlot = computedAvailableSlots.find(s => s.rack === 'A' && s.position <= 16)?.id;
-    } else if (contentType === SlotContent.SUPPLIES) {
+    } else if (itemContentType === SlotContent.SUPPLIES) {
       suggestedSlot = computedAvailableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level >= 2 && s.position <= 16)?.id;
-    } else if (contentType === SlotContent.FINISHED_PRODUCT) {
+    } else if (itemContentType === SlotContent.FINISHED_PRODUCT) {
       suggestedSlot = computedAvailableSlots.find(s => (s.rack === 'B' || s.rack === 'C') && s.level === 1 && s.position <= 14)?.id;
-    } else if (contentType === SlotContent.CONTAINER_SJ || contentType === SlotContent.CONTAINER_LP || contentType === SlotContent.CONTAINER_CP) {
+    } else if (itemContentType === SlotContent.CONTAINER_SJ || itemContentType === SlotContent.CONTAINER_LP || itemContentType === SlotContent.CONTAINER_CP) {
       // Disabled by user request: "remover função de substituição de vaga automática dos containers"
       suggestedSlot = undefined;
     }

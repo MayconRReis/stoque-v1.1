@@ -12,16 +12,11 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
     "@tailwindcss/vite": "^4.2.2",
-    "@tanstack/react-virtual": "^3.13.24",
-    "@types/react-virtualized-auto-sizer": "^1.0.4",
-    "@types/react-window": "^1.8.8",
     "lucide-react": "^1.8.0",
     "motion": "^12.38.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-virtualized-auto-sizer": "^2.0.3",
-    "react-window": "^2.2.7",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

@@ -366,11 +366,7 @@ const App: React.FC = () => {
       
       // Broadcast to all users
       if (user && !silent) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: entry.details,
-          type: 'info'
-        });
+        // Broadcast logic removed as notifications are disabled
       }
     } catch (error) {
       console.error('Error adding history entry:', error);
@@ -631,12 +627,6 @@ const App: React.FC = () => {
       }
     });
 
-    const notificationsChannel = supabaseService.subscribeToNotifications((payload) => {
-      if (payload.user !== user?.id) {
-        showNotification(payload.message, payload.type || 'info');
-      }
-    });
-
     const shipmentsChannel = supabaseService.subscribeToShipments(() => {
       supabaseService.getShipments().then(setShipments);
     });
@@ -644,7 +634,6 @@ const App: React.FC = () => {
     return () => {
       inventoryChannel.unsubscribe();
       slotsChannel.unsubscribe();
-      notificationsChannel.unsubscribe();
       shipmentsChannel.unsubscribe();
     };
   }, [user, isPublicView]);
@@ -840,14 +829,6 @@ const App: React.FC = () => {
       showNotification(`Vaga ${slot.id} dedicada ao Estoque Rotativo`);
       setSelectedMappingSlot(null);
       
-      // Notify all users
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} dedicou a vaga ${slot.id} ao Estoque Rotativo`,
-          type: 'info'
-        });
-      }
     } catch (error) {
       console.error('Error dedicating slot:', error);
       showNotification('Erro ao dedicar vaga', 'error');
@@ -873,15 +854,7 @@ const App: React.FC = () => {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
       showNotification(`Vaga ${slot.id} liberada do Estoque Rotativo`);
       setSelectedMappingSlot(null);
-
-      // Notify all users
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} liberou a vaga ${slot.id} do Estoque Rotativo`,
-          type: 'info'
-        });
-      }
+      
     } catch (error) {
       console.error('Error releasing slot:', error);
       showNotification('Erro ao liberar vaga', 'error');
@@ -957,12 +930,6 @@ const App: React.FC = () => {
       // Save Inventory
       await supabaseService.saveInventoryItem(newEntry);
       setData(prev => [newEntry, ...prev]);
-
-      supabaseService.broadcastNotification({
-        user: user?.id || '',
-        message: `Nova entrada registrada: ${entryData.name}`,
-        type: 'info'
-      });
 
       // Add History
       await addToHistory({
@@ -1069,13 +1036,6 @@ const App: React.FC = () => {
 
       showNotification(`${entries.length} pallets importados com sucesso!`);
       
-      // Notify other users
-      supabaseService.broadcastNotification({
-        user: user.id,
-        message: `${user.name} importou ${entries.length} novos pallets para análise.`,
-        type: 'info'
-      });
-
       // If they were imported as PENDING, go to analysis
       if (entries[0]?.row.status === StockStatus.PENDING) {
         navigateToTab('analysis');
@@ -1399,26 +1359,6 @@ const App: React.FC = () => {
       await supabaseService.updateInventoryShipment(selections, newShipment.id);
       
       // Update local state immediately
-      setShipments(prev => {
-        const exists = prev.find(s => s.id === newShipment.id);
-        if (exists) return prev;
-        return [newShipment, ...prev];
-      });
-      
-      // Force refresh of the state to ensure consistency across tabs
-      const [invDataResult, shipmentsData] = await Promise.all([
-        supabaseService.getInventoryPaginated(0, data.length || PAGE_SIZE),
-        supabaseService.getShipments()
-      ]);
-      
-      setData(invDataResult.data);
-      setShipments(shipmentsData);
-      
-      supabaseService.broadcastNotification({
-        user: user?.id || '',
-        message: `Novo carregamento criado: ${newShipment.id}`,
-        type: 'info'
-      });
 
       showNotification(`Carregamento ${newShipment.id} criado com sucesso!`);
       setSelectedPallets([]);
@@ -1443,16 +1383,7 @@ const App: React.FC = () => {
       setData(result.data);
       
       showNotification(`Pallets adicionados ao carregamento ${shipmentId}!`);
-
-      // Broadcast to others
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} adicionou ${selections.length} pallets ao carregamento ${shipmentId}`,
-          type: 'info'
-        });
-      }
-
+      
       setSelectedPallets([]);
       refreshCombinedData();
     } catch (error: any) {
@@ -1488,15 +1419,7 @@ const App: React.FC = () => {
       const [rowId, palletIdx] = palletId.split('::');
       await supabaseService.updateInventoryShipment([{ rowId, palletIdx: parseInt(palletIdx) }], null);
       showNotification('Pallet removido do carregamento.');
-
-      // Broadcast to others
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} removeu um pallet do carregamento`,
-          type: 'info'
-        });
-      }
+      
       refreshCombinedData();
     } catch (error: any) {
       console.error('Error removing from shipment:', error);
@@ -1587,15 +1510,6 @@ const App: React.FC = () => {
 
       showNotification(`Carregamento ${shipmentId} finalizado com sucesso!`);
       refreshCombinedData();
-
-      // Broadcast summary
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} finalizou o carregamento ${shipmentId}`,
-          type: 'info'
-        });
-      }
       
       // Auto-reorganize E/F stacks as many pallets might have left
       // We need to fetch latest state or at least calculate what happened.
@@ -1622,15 +1536,6 @@ const App: React.FC = () => {
       
       showNotification('Carregamento excluído com sucesso.');
       refreshCombinedData();
-
-      // Broadcast to others
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} excluiu o carregamento ${shipmentId}`,
-          type: 'info'
-        });
-      }
     } catch (error: any) {
       console.error('Error deleting shipment:', error);
       showNotification(`Erro ao excluir carregamento: ${error.message}`, 'error');
@@ -1911,15 +1816,6 @@ const App: React.FC = () => {
 
       showNotification(`${selectedPallets.length} pallets enviados com sucesso`);
       
-      // Broadcast summary to others
-      if (user) {
-        supabaseService.broadcastNotification({
-          user: user.id,
-          message: `${user.name} realizou saída em massa de ${selectedPallets.length} pallets`,
-          type: 'info'
-        });
-      }
-
       setSelectedPallets([]);
       setIsBulkConfirmOpen(false);
       refreshCombinedData();
