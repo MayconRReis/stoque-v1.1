@@ -205,7 +205,7 @@ const App: React.FC = () => {
       const fetchSelectedData = async () => {
         const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
         try {
-          const items = await supabaseService.getInventoryItemsByIds(rowIds);
+          const items = await supabaseService.getInventoryItemsByIds(rowIds as string[]);
           const mapped = selectedPallets.map(key => {
             const parts = key.split('::');
             const rowId = parts.slice(0, parts.length - 1).join('::');
@@ -1753,7 +1753,7 @@ const App: React.FC = () => {
       const updatedSlots: WarehouseSlot[] = [...slots];
       
       const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
-      const itemsToProcess = await supabaseService.getInventoryItemsByIds(rowIds);
+      const itemsToProcess = await supabaseService.getInventoryItemsByIds(rowIds as string[]);
       const rowsToUpdate: Map<string, SheetRow> = new Map();
 
       for (const key of selectedPallets) {

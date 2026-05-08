@@ -101,16 +101,17 @@ const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ currentUser }) => {
           </div>
         ) : (
           pendingRequests.map(request => (
-            <RequestCard 
-              key={request.id}
-              request={request}
-              isExpanded={expandedId === request.id}
-              onToggle={() => setExpandedId(expandedId === request.id ? null : request.id)}
-              onProcess={handleProcessRequest}
-              adminComment={adminComment}
-              setAdminComment={setAdminComment}
-              isProcessing={isProcessing === request.id}
-            />
+            <div key={request.id}>
+              <RequestCard 
+                request={request}
+                isExpanded={expandedId === request.id}
+                onToggle={() => setExpandedId(expandedId === request.id ? null : request.id)}
+                onProcess={handleProcessRequest}
+                adminComment={adminComment}
+                setAdminComment={setAdminComment}
+                isProcessing={isProcessing === request.id}
+              />
+            </div>
           ))
         )}
       </div>
@@ -124,7 +125,9 @@ const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ currentUser }) => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {historyRequests.map(request => (
-              <HistoryCard key={request.id} request={request} />
+              <div key={request.id}>
+                <HistoryCard request={request} />
+              </div>
             ))}
           </div>
         </div>

@@ -24,7 +24,7 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
     ];
 
     // Total of all pallets in inventory might be different from occupied slots
-    const totalPallets = Object.values(productDistribution).reduce((a, b) => a + b, 0);
+    const totalPallets = (Object.values(productDistribution) as number[]).reduce((a, b) => a + b, 0);
 
     return categories.map(item => {
       let count = 0;
@@ -33,14 +33,14 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
         const containerTypes = [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP];
         count = Object.entries(productDistribution)
           .filter(([type]) => !knownTypes.includes(type as any) && !containerTypes.includes(type as any))
-          .reduce((sum, [_, val]) => sum + val, 0);
+          .reduce((sum, [_, val]) => sum + (val as number), 0);
       } else if (item.type === 'CONTAINERS') {
         const containerTypes = [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP];
         count = Object.entries(productDistribution)
           .filter(([type]) => containerTypes.includes(type as any))
-          .reduce((sum, [_, val]) => sum + val, 0);
+          .reduce((sum, [_, val]) => sum + (val as number), 0);
       } else {
-        count = productDistribution[item.type] || 0;
+        count = (productDistribution[item.type] as number) || 0;
       }
       
       const totalForRate = totalPallets || 1;

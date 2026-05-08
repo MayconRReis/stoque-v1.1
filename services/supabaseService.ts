@@ -95,7 +95,6 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  * ALTER TABLE inventory DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE warehouse_slots DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE history DISABLE ROW LEVEL SECURITY;
- * ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE shipments DISABLE ROW LEVEL SECURITY;
  * ALTER TABLE rotative_stock DISABLE ROW LEVEL SECURITY;
  */
