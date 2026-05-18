@@ -13,7 +13,7 @@ import { DashboardStats } from '../types';
 interface StatsSectionProps {
  stats: DashboardStats;
  isPublicView: boolean;
- onNavigate: (tab: any) => void;
+ onNavigate: (tab: any, subtab?: any) => void;
 }
 
 const StatsSection: React.FC<StatsSectionProps> = ({ stats, isPublicView, onNavigate }) => {
@@ -82,7 +82,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats, isPublicView, onNavi
  {/* Aguardando Análise */}
  <div 
  className="bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl flex items-center gap-4 group hover:border-red-500/30 transition-all cursor-pointer" 
- onClick={() => !isPublicView && onNavigate('analysis')}
+ onClick={() => !isPublicView && onNavigate('operations', 'analysis')}
  >
  <div className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-105 transition-transform">
  <ClipboardCheck className="w-5 h-5" />

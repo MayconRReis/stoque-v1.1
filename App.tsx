@@ -179,7 +179,7 @@ const App: React.FC = () => {
  const stockTabs = [
  { id: 'general', label: 'Estoque Geral' },
  { id: 'quicksearch', label: 'Consulta Rápida' },
- { id: 'rotative', label: 'Estoque Rotativo' },
+ { id: 'rotative', label: 'Rotativo' },
  { id: 'containers', label: 'Containers' }
  ];
 
@@ -1111,9 +1111,9 @@ const App: React.FC = () => {
  
  // If they were imported as PENDING, go to analysis
  if (entries[0]?.row.status === StockStatus.PENDING) {
- navigateToTab('analysis');
+ navigateToTab('operations', 'analysis');
  } else {
- navigateToTab('inventory');
+ navigateToTab('stock', 'general');
  }
  refreshCombinedData();
  } catch (error: any) {
