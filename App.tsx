@@ -2046,7 +2046,7 @@ const App: React.FC = () => {
 
  const filteredInventory = useMemo(() => {
  // Only calculate if we are on the inventory tab or shipments or needed for bulk
- if (activeTab !== 'inventory' && activeTab !== 'shipments' && !isBulkConfirmOpen) return [];
+ if (activeTab !== 'stock' && activeTab !== 'shipments' && !isBulkConfirmOpen) return [];
  
  const start = performance.now();
  const term = inventorySearch.toLowerCase().trim();

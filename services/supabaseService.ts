@@ -203,8 +203,13 @@ export const supabaseService = {
 
  if (filters?.searchTerm) {
  const originalTerm = filters.searchTerm.trim();
+ 
+ // Se searchTerm está vazio após trim, não aplica filtro
+ if (originalTerm) {
  const upperTerm = originalTerm.toUpperCase();
- const termFragment = `%${originalTerm}%`;
+ // Escapar caracteres especiais para LIKE query
+ const escapedTerm = originalTerm.replace(/[%_\\]/g, '\\$&');
+ const termFragment = `%${escapedTerm}%`;
  const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
  
  let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
@@ -233,6 +238,7 @@ export const supabaseService = {
  }
  
  query = query.or(orClause);
+ }
  }
 
  if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
