@@ -88,9 +88,7 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
  initial={{ opacity: 0 }}
  animate={{ opacity: 1 }}
  className={`group bg-slate-900 backdrop-blur-md p-6 rounded-[2rem] border border-slate-800 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full ${
- isSelected 
- ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50' 
- : `hover:border-${baseColor}-500/30`
+ isSelected ? 'border-purple-500 bg-purple-900/10' : `hover:border-${baseColor}-500/30`
  }`}
  >
  {/* Background Icon Accent - Reduced size for better perf */}
@@ -99,13 +97,10 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
  </div>
 
  <div className="relative z-10 flex flex-col h-full">
- {/* Selection Indicator */}
- <div className={`absolute -top-1 -left-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-400 text-zinc-50 shadow-lg shadow-purple-500/20' : 'bg-slate-950 border-slate-800 text-transparent'}`}>
- <CheckCircle2 className="w-3.5 h-3.5" />
- </div>
+ 
 
  {/* Header Info */}
- <div className="flex justify-between items-start mb-5 pl-5">
+ <div className="flex justify-between items-start mb-5">
  <div className={`w-12 h-12 bg-${baseColor}-500/10 text-${baseColor}-400 rounded-xl flex items-center justify-center border border-${baseColor}-500/20 shadow-lg shadow-${baseColor}-950/10 group-hover:scale-105 transition-transform`}>
  <ContentIcon className="w-6 h-6" />
  </div>

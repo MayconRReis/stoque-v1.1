@@ -1124,7 +1124,7 @@ const App: React.FC = () => {
 
  const handleConfirmAnalysis = useCallback(async (rowId: string, slotId: string, finalId: string) => {
  try {
- const row = data.find(r => r.id === rowId);
+ const row = data.find(r => r.id === rowId) || pendingRows.find(r => r.id === rowId);
  if (!row) return;
 
  // 1. Pre-validation: check if slot is still free or shareable
@@ -1208,7 +1208,7 @@ const App: React.FC = () => {
  console.error('Analysis confirmation error:', error);
  showNotification(`Erro ao confirmar análise: ${error.message}`, 'error');
  }
- }, [data, slots, user, addToHistory]);
+ }, [data, pendingRows, slots, user, addToHistory]);
 
  const handleRejectAnalysis = async (rowId: string) => {
  try {
@@ -2224,7 +2224,7 @@ const App: React.FC = () => {
 
  <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
  <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
- <NavItem tab="operations" icon={ArrowLeftRight} label="Operações" badge={(stats.waitingPallets || 0) + data.filter(r => r.status === StockStatus.PENDING).length} isActive={activeTab === 'operations'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+ <NavItem tab="operations" icon={ArrowLeftRight} label="Operações" badge={(stats.waitingPallets || 0) + pendingRows.length} isActive={activeTab === 'operations'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
  <NavItem tab="stock" icon={Package} label="Estoque" isActive={activeTab === 'stock'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
  <NavItem tab="shipments" icon={Truck} label="Carregamentos" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
  <NavItem tab="returns" icon={RefreshCw} label="Retornos" isActive={activeTab === 'returns'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
