@@ -1277,15 +1277,31 @@ export const supabaseService = {
   },
 
   async getShipmentPalletCounts(): Promise<Record<string, number>> {
-    if (!isSupabaseConfigured) return {};
-    const { data, error } = await supabase
+    const counts: Record<string, number> = {};
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      all.forEach((r: any) => r.inspections?.forEach((i: any) => {
+        if (i.shipmentId) counts[i.shipmentId] = (counts[i.shipmentId] || 0) + 1;
+      }));
+      const hist = localStorageHelper.get('history');
+      hist.forEach((h: any) => {
+        if (h.details && h.details.includes('Finalização de Carregamento')) {
+          const match = h.details.match(/Finalização de Carregamento (.+)/);
+          if (match && match[1]) {
+            counts[match[1]] = (counts[match[1]] || 0) + 1;
+          }
+        }
+      });
+      return counts;
+    }
+
+    const { data: invData, error: invError } = await supabase
       .from('inventory')
       .select('inspections');
     
-    if (error) throw error;
+    if (invError) throw invError;
     
-    const counts: Record<string, number> = {};
-    data?.forEach(row => {
+    invData?.forEach(row => {
       row.inspections?.forEach((insp: any) => {
         const sId = insp.shipmentId || insp.shipment_id;
         if (sId) {
@@ -1293,6 +1309,25 @@ export const supabaseService = {
         }
       });
     });
+
+    // Also count finalized ones from history
+    const { data: histData, error: histError } = await supabase
+      .from('history')
+      .select('details')
+      .like('details', '%Finalização de Carregamento%');
+
+    if (!histError && histData) {
+      histData.forEach(row => {
+        if (row.details) {
+          const match = row.details.match(/Finalização de Carregamento (.+)/);
+          if (match && match[1]) {
+            const sId = match[1];
+            counts[sId] = (counts[sId] || 0) + 1;
+          }
+        }
+      });
+    }
+
     return counts;
   },
 

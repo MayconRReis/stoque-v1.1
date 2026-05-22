@@ -31,7 +31,11 @@ export const ShipmentModal: React.FC<ShipmentModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'choice' | 'create' | 'existing'>('choice');
   const [type, setType] = useState<ShipmentType>(ShipmentType.THIRD_PARTY);
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledDate, setScheduledDate] = useState(() => {
+    const today = new Date();
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    return today.toISOString().split('T')[0];
+  });
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
