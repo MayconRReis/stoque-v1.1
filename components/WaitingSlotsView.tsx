@@ -111,6 +111,9 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
                     <h4 className={`text-lg font-black uppercase tracking-tighter italic leading-[1.1] line-clamp-2 min-h-[2.5rem] transition-colors ${isSelected ? 'text-fuchsia-100' : 'text-white group-hover:text-amber-300'}`}>
                       {row.description}
                     </h4>
+                    {row.operatorName && (
+                      <p className="text-[7px] text-slate-500 font-black uppercase tracking-[0.2em] mt-2">Operador: {row.operatorName}</p>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">
