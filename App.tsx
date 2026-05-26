@@ -2532,6 +2532,9 @@ const App: React.FC = () => {
                 setEditPalletMode('assign');
                 setEditPalletContext({ row, inspection: row.inspections![idx], idx });
               }}
+              selectedPallets={selectedPallets}
+              onToggleSelection={togglePalletSelection}
+              onSendToShipment={() => setIsBulkConfirmOpen(true)}
             />
           )}
 
