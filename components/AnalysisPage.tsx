@@ -8,9 +8,8 @@ interface AnalysisPageProps {
   pendingItems: SheetRow[];
   availableSlots: WarehouseSlot[];
   allSlots: WarehouseSlot[];
-  onConfirm: (rowId: string, slotId: string, finalId: string) => Promise<void>;
+  onConfirm: (rowId: string, slotId: string, finalId: string, updatedFields?: any, updatedInspection?: any) => Promise<void>;
   onReject: (rowId: string) => Promise<void>;
-  onEdit: (item: SheetRow) => void;
 }
 
 export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, allSlots, onConfirm, onReject, onEdit }) => {
@@ -18,6 +17,28 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   const [slotId, setSlotId] = useState('');
   const [finalId, setFinalId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const [description, setDescription] = useState('');
+  const [op, setOp] = useState('');
+  const [lot, setLot] = useState('');
+  const [contentType, setContentType] = useState<SlotContent>(SlotContent.SUPPLIES);
+  const [bottles, setBottles] = useState(0);
+  const [caps, setCaps] = useState(0);
+  const [boxes, setBoxes] = useState(0);
+  const [cradles, setCradles] = useState(0);
+  const [others, setOthers] = useState<{ id: string; name: string; quantity: number }[]>([]);
+
+  const addOther = () => {
+    setOthers([...others, { id: Math.random().toString(), name: '', quantity: 0 }]);
+  };
+
+  const removeOther = (id: string) => {
+    setOthers(others.filter(o => o.id !== id));
+  };
+
+  const updateOther = (id: string, field: 'name' | 'quantity', value: any) => {
+    setOthers(others.map(o => o.id === id ? { ...o, [field]: value } : o));
+  };
 
   const shareableSlotTypes = [
     SlotContent.RETURN,
@@ -28,7 +49,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   ];
 
   const computedAvailableSlots = React.useMemo(() => {
-    const currentContentType = selectedItem?.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+    const currentContentType = contentType || SlotContent.SUPPLIES;
     
     return allSlots.filter(s => {
       if (s.status === SlotContent.EMPTY) return true;
@@ -40,7 +61,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
       
       return false;
     });
-  }, [allSlots, selectedItem]);
+  }, [allSlots, contentType]);
 
   const sortedAvailableSlots = React.useMemo(() => {
     return [...computedAvailableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -50,8 +71,23 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     setSelectedItem(item);
     const generated = Math.random().toString(36).substring(2, 8).toUpperCase();
     setFinalId(generated);
+
+    setDescription(item.description || '');
+    setOp(item.originOP || '');
+    setLot(item.lot || '');
     
     const itemContentType = item.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+    setContentType(itemContentType);
+    setBottles(item.inspections?.[0]?.bottles || 0);
+    setCaps(item.inspections?.[0]?.caps || 0);
+    setBoxes(item.inspections?.[0]?.boxes || 0);
+    setCradles(item.inspections?.[0]?.cradles || 0);
+    if (item.inspections?.[0]?.others) {
+      setOthers(item.inspections[0].others.map(o => ({ ...o, id: Math.random().toString() })));
+    } else {
+      setOthers([]);
+    }
+    
     let suggestedSlot: string | undefined;
     if (itemContentType === SlotContent.BOTTLES) {
       suggestedSlot = computedAvailableSlots.find(s => s.rack === 'A' && s.position <= 16)?.id;
@@ -70,10 +106,36 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     if (!selectedItem || !slotId || !finalId) return;
     setIsProcessing(true);
     try {
-      await onConfirm(selectedItem.id, slotId, finalId.toUpperCase());
+      await onConfirm(
+        selectedItem.id, 
+        slotId, 
+        finalId.toUpperCase(),
+        {
+          description: description.toUpperCase(),
+          originOP: op.toUpperCase(),
+          lot: lot.toUpperCase()
+        },
+        {
+          contentType,
+          bottles,
+          caps,
+          boxes,
+          cradles,
+          others: others.map(o => ({ name: o.name.toUpperCase(), quantity: o.quantity }))
+        }
+      );
       setSelectedItem(null);
       setSlotId('');
       setFinalId('');
+      setDescription('');
+      setOp('');
+      setLot('');
+      setContentType(SlotContent.SUPPLIES);
+      setBottles(0);
+      setCaps(0);
+      setBoxes(0);
+      setCradles(0);
+      setOthers([]);
     } catch (error) {
       console.error('Analysis confirmation error:', error);
     } finally {
@@ -166,14 +228,8 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
 
               <div className="flex gap-2">
                 <button 
-                  onClick={() => onEdit(item)}
-                  className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 text-slate-400 font-bold text-[10px] uppercase tracking-widest border border-slate-800 rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <Info className="w-3.5 h-3.5" /> Editar
-                </button>
-                <button 
                   onClick={() => handleStartAnalysis(item)}
-                  className="flex-[2] py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" /> Analisar
                 </button>
@@ -209,33 +265,49 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
               </div>
 
               <div className="p-6 space-y-6">
-                <div className="bg-slate-950/50 p-5 rounded-2xl border border-slate-800/50 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Produto</span>
-                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">OP {selectedItem.originOP}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">OP Origem</label>
+                    <input 
+                      type="text" 
+                      value={op}
+                      onChange={e => setOp(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                    />
                   </div>
-                  <h4 className="text-sm text-white font-bold uppercase leading-tight">{selectedItem.description}</h4>
-                  <div className="flex gap-4 pt-3 border-t border-slate-800/50">
-                    <div>
-                      <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Lote</p>
-                      <p className="text-[10px] font-black text-white font-mono">{selectedItem.lot}</p>
-                    </div>
-                    <div>
-                      <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Tipo</p>
-                      <p className="text-[10px] font-black text-white uppercase">{selectedItem.inspections?.[0] ? translateSlotContent(selectedItem.inspections[0].contentType) : '-'}</p>
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Lote</label>
+                    <input 
+                      type="text" 
+                      value={lot}
+                      onChange={e => setLot(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                    />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Produto / Descrição</label>
+                  <input 
+                    type="text" 
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">ID Final</label>
-                    <input 
-                      type="text" 
-                      value={finalId}
-                      onChange={e => setFinalId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all font-mono uppercase"
-                    />
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tipo</label>
+                    <select 
+                      value={contentType}
+                      onChange={e => setContentType(e.target.value as SlotContent)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+                    >
+                      {Object.values(SlotContent).map(type => (
+                        <option key={type} value={type}>{translateSlotContent(type)}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Vaga</label>
@@ -250,6 +322,99 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                         <option key={s.id} value={s.id}>{s.id} ({s.rack})</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                {(contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Frascos</label>
+                        <input 
+                          type="number" min="0" value={bottles} onChange={e => setBottles(parseInt(e.target.value) || 0)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                        />
+                      </div>
+                      {contentType === SlotContent.SUPPLIES && (
+                        <>
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tampas</label>
+                            <input 
+                              type="number" min="0" value={caps} onChange={e => setCaps(parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Caixas</label>
+                            <input 
+                              type="number" min="0" value={boxes} onChange={e => setBoxes(parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Berços</label>
+                            <input 
+                              type="number" min="0" value={cradles} onChange={e => setCradles(parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] font-bold text-slate-600 uppercase tracking-widest ml-1">Outros Itens</label>
+                        <button 
+                          onClick={addOther}
+                          className="text-[8px] font-bold text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-all"
+                        >
+                          + Adicionar Outro
+                        </button>
+                      </div>
+
+                      {others.map((other) => (
+                        <div key={other.id} className="flex gap-3 items-end">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-[7px] font-bold text-slate-700 uppercase tracking-widest ml-1">Item</label>
+                            <input 
+                              type="text" 
+                              value={other.name}
+                              onChange={e => updateOther(other.id, 'name', e.target.value)}
+                              placeholder="Nome do item..."
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-[10px] focus:border-blue-600 outline-none uppercase"
+                            />
+                          </div>
+                          <div className="w-24 space-y-1.5">
+                            <label className="text-[7px] font-bold text-slate-700 uppercase tracking-widest ml-1">Qtd</label>
+                            <input 
+                              type="number" min="0"
+                              value={other.quantity || ''}
+                              onChange={e => updateOther(other.id, 'quantity', parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-[10px] focus:border-blue-600 outline-none text-center"
+                            />
+                          </div>
+                          <button 
+                            onClick={() => removeOther(other.id)}
+                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-950 text-slate-500 hover:text-red-400 border border-slate-800 hover:border-red-900/50 hover:bg-red-950/30 transition-all mb-[1px]"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 pt-4 border-t border-slate-800/50">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">ID Final</label>
+                    <input 
+                      type="text" 
+                      value={finalId}
+                      onChange={e => setFinalId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all font-mono uppercase"
+                    />
                   </div>
                 </div>
 

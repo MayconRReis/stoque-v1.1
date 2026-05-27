@@ -1081,7 +1081,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConfirmAnalysis = useCallback(async (rowId: string, slotId: string, finalId: string) => {
+  const handleConfirmAnalysis = useCallback(async (
+    rowId: string, 
+    slotId: string, 
+    finalId: string, 
+    updatedFields?: Partial<SheetRow>, 
+    updatedInspection?: Partial<InspectionData>
+  ) => {
     try {
       const row = data.find(r => r.id === rowId);
       if (!row) return;
@@ -1092,7 +1098,9 @@ const App: React.FC = () => {
         const currentSlot = await supabaseService.getSlotById(slotId);
         if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
           const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(currentSlot.status);
-          const isNewItemShareable = row.inspections?.[0]?.contentType ? SHAREABLE_SLOT_TYPES.includes(row.inspections[0].contentType) : false;
+          const isNewItemShareable = updatedInspection?.contentType 
+            ? SHAREABLE_SLOT_TYPES.includes(updatedInspection.contentType as SlotContent) 
+            : (row.inspections?.[0]?.contentType ? SHAREABLE_SLOT_TYPES.includes(row.inspections[0].contentType) : false);
 
           if (!isOccupantShareable || !isNewItemShareable) {
             showNotification(`A vaga ${slotId} já está ocupada por um item que não permite compartilhamento.`, 'error');
@@ -1104,10 +1112,15 @@ const App: React.FC = () => {
 
       const updatedRow: SheetRow = {
         ...row,
+        ...updatedFields,
         loadingId: finalId,
         status: StockStatus.INSPECTED,
         operatorName: user?.name,
-        inspections: row.inspections?.map(insp => ({ ...insp, assignedSlot: slotId }))
+        inspections: row.inspections?.map(insp => ({ 
+          ...insp, 
+          ...updatedInspection, 
+          assignedSlot: slotId 
+        }))
       };
 
       let updatedSlot: WarehouseSlot | null = null;
@@ -1118,8 +1131,8 @@ const App: React.FC = () => {
 
         updatedSlot = {
           ...targetSlot,
-          status: row.inspections?.[0]?.contentType || SlotContent.SUPPLIES,
-          occupiedBy: row.originOP || row.description
+          status: updatedInspection?.contentType || row.inspections?.[0]?.contentType || SlotContent.SUPPLIES,
+          occupiedBy: updatedFields?.originOP || updatedFields?.description || row.originOP || row.description
         };
       }
 
@@ -1128,9 +1141,9 @@ const App: React.FC = () => {
         type: HistoryType.ENTRY,
         timestamp: new Date().toLocaleString(),
         loadingId: finalId,
-        description: row.description,
-        op: row.originOP,
-        lot: row.lot,
+        description: updatedFields?.description || row.description,
+        op: updatedFields?.originOP || row.originOP,
+        lot: updatedFields?.lot || row.lot,
         palletNumber: 1,
         totalPallets: 1,
         slot: isWaiting ? 'AGUARDANDO' : slotId,
@@ -2545,10 +2558,6 @@ const App: React.FC = () => {
               allSlots={slots}
               onConfirm={handleConfirmAnalysis}
               onReject={handleRejectAnalysis}
-              onEdit={(item) => {
-                setEditPalletMode('edit');
-                setEditPalletContext({ row: item, inspection: item.inspections?.[0] || { contentType: SlotContent.SUPPLIES, bottles: 0, caps: 0, boxes: 0, cradles: 0 }, idx: 0 });
-              }}
             />
           )}
 
