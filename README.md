@@ -2,9 +2,9 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# StoQue+
 
-This contains everything you need to run your app locally.
+App de controle de estoque criado com React, Vite e Supabase.
 
 View your app in AI Studio: https://ai.studio/apps/77cfbf43-846b-4d18-bb4b-866a77772745
 
@@ -12,9 +12,12 @@ View your app in AI Studio: https://ai.studio/apps/77cfbf43-846b-4d18-bb4b-866a7
 
 **Prerequisites:**  Node.js
 
-
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Create a `.env.local` file with your Supabase credentials:
+   `VITE_SUPABASE_URL=your-project-url`
+   `VITE_SUPABASE_ANON_KEY=your-anon-key`
+3. Run the app locally:
    `npm run dev`
+
+If the Supabase variables are not configured, the app runs in offline mode using LocalStorage.
