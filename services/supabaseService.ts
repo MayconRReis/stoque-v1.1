@@ -1077,11 +1077,11 @@ export const supabaseService = {
       ...requests.map(r => r.reviewed_by).filter(Boolean)
     ])];
     
-    const inventoryIds = [...new Set(requests.map(r => r.inventory_id))];
+    const inventoryIds = [...new Set(requests.map(r => r.inventory_id).filter(Boolean))];
 
     const [profilesRes, inventoryRes] = await Promise.all([
       supabase.from('profiles').select('id, name').in('id', userIds),
-      supabase.from('inventory').select('id, description').in('id', inventoryIds)
+      inventoryIds.length > 0 ? supabase.from('inventory').select('id, description').in('id', inventoryIds) : Promise.resolve({ data: [] })
     ]);
 
     const profilesMap = new Map((profilesRes.data || []).map(p => [p.id, p.name]));
@@ -1091,7 +1091,7 @@ export const supabaseService = {
       ...r,
       requester_name: profilesMap.get(r.requested_by) || 'Desconhecido',
       reviewer_name: r.reviewed_by ? profilesMap.get(r.reviewed_by) : undefined,
-      product_description: inventoryMap.get(r.inventory_id) || 'Produto não encontrado'
+      product_description: r.after_data?._isRecovery ? `RECUPERAÇÃO: ${r.after_data.description || 'Produto'}` : (inventoryMap.get(r.inventory_id) || 'Produto não encontrado')
     }));
   },
 
@@ -1109,20 +1109,83 @@ export const supabaseService = {
 
     // 2. If approved, apply changes to inventory
     if (status === 'approved') {
-      const { error: updateError } = await supabase
-        .from('inventory')
-        .update({
+      const isRecovery = request.after_data._isRecovery;
+      
+      if (isRecovery) {
+        // Find if slot is occupied
+        let targetSlot = request.after_data.inspections?.[0]?.assignedSlot;
+        let requiresAguardando = false;
+        
+        if (targetSlot && targetSlot !== 'AGUARDANDO') {
+          const { data: slotData } = await supabase.from('slots').select('status').eq('id', targetSlot).single();
+          if (slotData && slotData.status !== 'VAZIO' && slotData.status !== request.after_data.inspections[0].contentType) {
+             requiresAguardando = true;
+          }
+        }
+        
+        const payloadToInsert = {
+          id: request.after_data.id,
           loading_id: request.after_data.loadingId,
           origin_op: request.after_data.originOP,
           description: request.after_data.description,
           lot: request.after_data.lot,
           pallets: request.after_data.pallets,
           status: request.after_data.status,
-          inspections: request.after_data.inspections
-        })
-        .eq('id', request.inventory_id);
-      
-      if (updateError) throw updateError;
+          date: request.after_data.date || new Date().toISOString(),
+          inspections: request.after_data.inspections.map((i: any) => ({
+            ...i,
+            assignedSlot: requiresAguardando ? 'AGUARDANDO' : i.assignedSlot
+          }))
+        };
+
+        const { error: insertError } = await supabase.from('inventory').insert(payloadToInsert);
+        if (insertError && insertError.code !== '23505') throw insertError; // Ignore if somehow it exists already
+        
+        // If not AGUARDANDO, update the slot status
+        if (!requiresAguardando && targetSlot && targetSlot !== 'AGUARDANDO') {
+          await supabase.from('slots').update({
+             status: request.after_data.inspections[0].contentType,
+             occupied_by: request.after_data.description
+          }).eq('id', targetSlot);
+        }
+
+        // Add History entry for recovery
+        const { data: adminProfile } = await supabase.from('profiles').select('name').eq('id', adminId).single();
+        const adminName = adminProfile?.name || 'Administrador';
+        
+        const { data: operatorProfile } = await supabase.from('profiles').select('name').eq('id', request.requested_by).single();
+        const operatorName = operatorProfile?.name || 'Operador';
+        
+        await supabase.from('history').insert({
+          id: request.after_data.id + '-' + Math.random().toString(36).substring(2, 5),
+          type: 'ENTRY', // Changed to ENTRY as it's recreating
+          timestamp: new Date().toISOString(),
+          loading_id: request.after_data.loadingId,
+          description: request.after_data.description,
+          op: request.after_data.originOP || '',
+          lot: request.after_data.lot || '',
+          pallet_number: 1,
+          total_pallets: request.after_data.pallets,
+          slot: requiresAguardando ? 'AGUARDANDO' : (targetSlot || 'AGUARDANDO'),
+          details: `PALLET RECUPERADO. SOLICITADO POR: ${operatorName.toUpperCase()} APROVADO POR: ${adminName.toUpperCase()} - Motivo: ${request.reason}`,
+          operator_name: adminName
+        });
+      } else {
+        const { error: updateError } = await supabase
+          .from('inventory')
+          .update({
+            loading_id: request.after_data.loadingId,
+            origin_op: request.after_data.originOP,
+            description: request.after_data.description,
+            lot: request.after_data.lot,
+            pallets: request.after_data.pallets,
+            status: request.after_data.status,
+            inspections: request.after_data.inspections
+          })
+          .eq('id', request.inventory_id);
+        
+        if (updateError) throw updateError;
+      }
     }
 
     // 3. Update the request status

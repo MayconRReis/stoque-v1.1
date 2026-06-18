@@ -114,6 +114,7 @@ export interface SheetRow {
   inspections?: InspectionData[];
   loadingId: string; // ID extraído da célula B1
   operatorName?: string;
+  _isRecovery?: boolean;
 }
 
 export interface DashboardStats {

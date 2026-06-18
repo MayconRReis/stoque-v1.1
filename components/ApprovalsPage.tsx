@@ -173,7 +173,7 @@ const RequestCard = ({
                   <Calendar className="w-3 h-3" /> {new Date(request.requested_at).toLocaleString('pt-BR')}
                 </span>
                 <span className="flex items-center gap-1.5 text-[9px] font-black text-amber-500 uppercase tracking-widest italic">
-                  ID: {request.inventory_id}
+                  ID: {request.inventory_id || <span className="text-red-400">RECUPERAÇÃO</span>}
                 </span>
               </div>
             </div>
@@ -210,7 +210,16 @@ const RequestCard = ({
                   <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-slate-700" /> Estado Atual
                   </h5>
-                  <DataPreview data={request.before_data} baseColor="slate" />
+                  {!request.after_data?._isRecovery ? (
+                    <DataPreview data={request.before_data} baseColor="slate" />
+                  ) : (
+                    <div className="p-5 rounded-3xl bg-slate-950/40 border border-slate-800/40 flex items-center justify-center">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest italic flex items-center gap-2">
+                        <AlertCircle className="w-3 h-3 text-red-500" />
+                        PALLET DELETADO (RECUPERAÇÃO)
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* After Data */}
@@ -218,7 +227,15 @@ const RequestCard = ({
                   <h5 className="text-[10px] font-black text-purple-500 uppercase tracking-widest flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-500" /> Mudanças Solicitadas
                   </h5>
-                  <DataPreview data={request.after_data} baseColor="purple" isChanged comparison={request.before_data} />
+                  {request.after_data?._isRecovery && (
+                    <div className="mb-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                      <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest italic flex items-center gap-2">
+                        <Info className="w-3 h-3" />
+                         Ao aprovar, o pallet será recriado no inventário físico. Se a vaga original estiver ocupada, ele ficará no status AGUARDANDO.
+                      </p>
+                    </div>
+                  )}
+                  <DataPreview data={request.after_data} baseColor="purple" isChanged={!request.after_data?._isRecovery} comparison={request.before_data} />
                 </div>
               </div>
 

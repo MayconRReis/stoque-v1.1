@@ -81,7 +81,14 @@ import WarehouseMap from './components/WarehouseMap';
 import RackDistributionChart from './components/RackDistributionChart';
 import ProductDistributionChart from './components/ProductDistributionChart';
 import InventoryCard from './components/InventoryCard';
+import { RecoveryModal } from './components/RecoveryModal';
 import { User as AppUser } from './types';
+
+const RECOVERY_DATA_MARKER = '__PALLET_RECOVERY_DATA__';
+
+const hasRecoveryPayload = (details: string) => details.includes(RECOVERY_DATA_MARKER);
+
+const stripRecoveryPayload = (details: string) => details.split(RECOVERY_DATA_MARKER)[0].trim();
 
 const generateSlots = (): WarehouseSlot[] => {
   const slots: WarehouseSlot[] = [];
@@ -242,6 +249,8 @@ const App: React.FC = () => {
   const [shipmentDetailContext, setShipmentDetailContext] = useState<Shipment | null>(null);
   const [shipmentDetailPallets, setShipmentDetailPallets] = useState<SheetRow[]>([]);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [recoveryContext, setRecoveryContext] = useState<HistoryEntry | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const fetchShipmentDetailPallets = async (shipmentId: string) => {
     setIsDetailLoading(true);
@@ -420,6 +429,21 @@ const App: React.FC = () => {
     details,
     operatorName: user?.name
   }), [user]);
+
+  const createRecoverableExitEntry = useCallback((row: SheetRow, inspection: InspectionData, details: string, palletNum: number = 1, fullRow: boolean = false): HistoryEntry => ({
+    ...createHistoryEntry(HistoryType.EXIT, row, details, palletNum),
+    slot: inspection.assignedSlot || 'N/A',
+    details: `${details}\n${RECOVERY_DATA_MARKER}${JSON.stringify({
+      row: {
+        ...row,
+        inspections: fullRow ? row.inspections : undefined,
+        pallets: row.pallets,
+        status: fullRow ? row.status : StockStatus.INSPECTED
+      },
+      inspection,
+      fullRow
+    })}`
+  }), [createHistoryEntry]);
 
   const navigateToTab = useCallback((tab: typeof activeTab) => {
     if (isPublicView) return;
@@ -1325,21 +1349,14 @@ const App: React.FC = () => {
       await supabaseService.deleteInventoryItem(item.id);
       setData(prev => prev.filter(d => d.id !== item.id));
 
-      // Add History
-      await addToHistory({
-        id: Math.random().toString(36).substring(2, 9),
-        type: HistoryType.EXIT,
-        timestamp: new Date().toLocaleString(),
-        loadingId: item.loadingId || item.id,
-        description: item.description,
-        op: item.originOP,
-        lot: item.lot,
-        palletNumber: 1,
-        totalPallets: item.pallets,
-        slot: slotId || 'N/A',
-        details: `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`,
-        operatorName: user?.name
-      });
+      // Add History (recoverable — allows operator to request restoration)
+      await addToHistory(createRecoverableExitEntry(
+        item,
+        item.inspections?.[0] || { contentType: SlotContent.OTHER, assignedSlot: slotId },
+        `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`,
+        1,
+        true
+      ));
 
       showNotification('Saída registrada com sucesso.');
       setIsMovementModalOpen(false);
@@ -1352,6 +1369,55 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Exit error:', error);
       showNotification('Erro ao registrar saída.', 'error');
+    }
+  };
+
+  const handleRecoverPallet = async (entry: HistoryEntry) => {
+    if (!user) return;
+    
+    // We assume the payload is there if the button shows
+    const rawDetails = entry.details || '';
+    if (!rawDetails.includes(RECOVERY_DATA_MARKER)) {
+      showNotification('Este registro não suporta recuperação automática ou está corrompido.', 'error');
+      return;
+    }
+
+    setRecoveryContext(entry);
+  };
+
+  const confirmRecovery = async (reason: string) => {
+    if (!user || !recoveryContext) return;
+    
+    setIsRecovering(true);
+    try {
+      const payloadStr = recoveryContext.details!.split(RECOVERY_DATA_MARKER)[1];
+      const payload = JSON.parse(payloadStr);
+
+      const recoveryData = {
+        ...payload.row,
+        pallets: recoveryContext.totalPallets ?? payload.row.pallets,
+        inspections: payload.fullRow ? payload.row.inspections : [{ ...payload.inspection }]
+      };
+
+      // Create an approval request since "a recuperação vira uma solicitação e só o admin aprova"
+      await supabaseService.createEditRequest({
+        inventory_id: null as unknown as string, // Might be nullable. If it fails, we will try something else.
+        requested_by: user.id,
+        before_data: {}, // Supabase does not allow null for this column
+        after_data: {
+          ...recoveryData,
+          _isRecovery: true // Custom flag for processEditRequest
+        },
+        reason: `Recuperação de Pallet (ID: ${payload.row.loadingId || recoveryData.id}) - Motivo: ${reason}`
+      });
+
+      showNotification('Solicitação de recuperação enviada para aprovação do administrador.', 'info');
+      setRecoveryContext(null);
+    } catch (error) {
+      console.error('Error recovering pallet:', error);
+      showNotification('Erro ao criar solicitação de recuperação.', 'error');
+    } finally {
+      setIsRecovering(false);
     }
   };
 
@@ -1547,8 +1613,7 @@ const App: React.FC = () => {
           const updatedRow = { 
             ...row, 
             inspections: remainingInspections, 
-            pallets: remainingInspections.length 
-          };
+            };
           await supabaseService.saveInventoryItem(updatedRow);
         }
       }
@@ -1724,7 +1789,7 @@ const App: React.FC = () => {
             const updatedRow = { 
               ...row, 
               inspections: updatedInsps, 
-              pallets: updatedInsps?.length || 0,
+              
               status: row.status 
             };
             await supabaseService.saveInventoryItem(updatedRow);
@@ -1734,7 +1799,7 @@ const App: React.FC = () => {
           // Auto-reorganize E/F stacks
           const finalData = (updatedInsps?.length === 0) 
             ? data.filter(r => r.id !== row.id)
-            : data.map(r => r.id === deleteContext.rowId ? { ...row, inspections: updatedInsps, pallets: updatedInsps?.length || 0 } : r);
+            : data.map(r => r.id === deleteContext.rowId ? { ...row, inspections: updatedInsps, } : r);
           const finalSlots = inspection.assignedSlot ? slots.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
           performStackReorganization(finalData, finalSlots);
         }
@@ -1755,7 +1820,7 @@ const App: React.FC = () => {
 
     try {
       const inspection = row.inspections[palletIdx];
-      await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Enviado para Matriz', palletIdx + 1));
+      await addToHistory(createRecoverableExitEntry(row, inspection, 'Enviado para Matriz', palletIdx + 1));
       
       if (slotId && slotId !== 'AGUARDANDO') {
         await supabaseService.freeSlot(slotId);
@@ -1770,7 +1835,7 @@ const App: React.FC = () => {
         const updatedRow = { 
           ...row, 
           inspections: newInsps, 
-          pallets: newInsps?.length || 0,
+          
           status: row.status 
         };
         await supabaseService.saveInventoryItem(updatedRow);
@@ -1784,7 +1849,7 @@ const App: React.FC = () => {
       // Auto-reorganize E/F stacks
       const finalData = (newInsps?.length === 0) 
         ? data.filter(r => r.id !== rowId)
-        : data.map(r => r.id === rowId ? { ...row, inspections: newInsps, pallets: newInsps?.length || 0 } : r);
+        : data.map(r => r.id === rowId ? { ...row, inspections: newInsps, } : r);
       const finalSlots = slotId ? slots.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
       performStackReorganization(finalData, finalSlots);
     } catch (error) {
@@ -1811,7 +1876,7 @@ const App: React.FC = () => {
           const inspection = row.inspections[palletIdx];
           if (!inspection) continue;
 
-          await addToHistory(createHistoryEntry(HistoryType.EXIT, row, 'Saída em massa', palletIdx + 1), true);
+          await addToHistory(createRecoverableExitEntry(row, inspection, 'Saída em massa', palletIdx + 1), true);
           
           if (inspection.assignedSlot) {
             const slotIdx = updatedSlots.findIndex(s => s.id === inspection.assignedSlot);
@@ -2594,7 +2659,7 @@ const App: React.FC = () => {
                         </div>
                     ) : (
                         filteredHistory.map(entry => (
-                          <HistoryItem key={entry.id} entry={entry} />
+                          <HistoryItem key={entry.id} entry={entry} onRecover={handleRecoverPallet} />
                         )))}
                 </div>
             </div>
@@ -3046,6 +3111,12 @@ const App: React.FC = () => {
         initialType={movementInitialContext?.type}
         initialId={movementInitialContext?.id}
         initialPallet={movementInitialContext?.pallet}
+      />
+      <RecoveryModal 
+        isOpen={!!recoveryContext}
+        onClose={() => setRecoveryContext(null)}
+        onConfirm={confirmRecovery}
+        isLoading={isRecovering}
       />
     </div>
   );

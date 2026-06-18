@@ -1,11 +1,21 @@
 import React, { memo } from 'react';
 import { HistoryEntry, HistoryType } from '../types';
+import { RotateCcw } from 'lucide-react';
+
+const RECOVERY_DATA_MARKER = '__PALLET_RECOVERY_DATA__';
 
 interface HistoryItemProps {
   entry: HistoryEntry;
+  onRecover?: (entry: HistoryEntry) => void;
 }
 
-const HistoryItem: React.FC<HistoryItemProps> = ({ entry }) => {
+const hasRecoveryPayload = (details: string) => details.includes(RECOVERY_DATA_MARKER);
+const stripRecoveryPayload = (details: string) => details.split(RECOVERY_DATA_MARKER)[0].trim();
+
+const HistoryItem: React.FC<HistoryItemProps> = ({ entry, onRecover }) => {
+  const isRecoverable = entry.type === HistoryType.EXIT && entry.details && hasRecoveryPayload(entry.details);
+  const displayDetails = entry.details ? stripRecoveryPayload(entry.details) : '';
+
   return (
     <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:border-slate-700 transition-all group">
       <div className="flex flex-col items-start min-w-[120px]">
@@ -41,8 +51,20 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ entry }) => {
             )}
           </div>
       </div>
-      <div className="bg-slate-950/50 px-4 py-2.5 rounded-xl border border-slate-800/50 min-w-[140px] text-center">
-        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{entry.details}</p>
+      <div className="flex flex-col gap-2 items-end">
+        <div className="bg-slate-950/50 px-4 py-2.5 rounded-xl border border-slate-800/50 min-w-[140px] text-center">
+          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{displayDetails}</p>
+        </div>
+        
+        {isRecoverable && onRecover && (
+          <button 
+            onClick={() => onRecover(entry)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg border border-indigo-500/30 transition-all"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="text-[10px] uppercase font-black tracking-widest">Recuperar</span>
+          </button>
+        )}
       </div>
     </div>
   );
