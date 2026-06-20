@@ -40,7 +40,9 @@ import {
   Layers,
   MapPin,
   Hash,
-  Users
+  Users,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -154,7 +156,23 @@ const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, act
 
 const App: React.FC = () => {
   const [user, setUser] = useState<AppUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isPublicView, setIsPublicView] = useState(false);
   const [data, setData] = useState<SheetRow[]>([]);
   const [pendingRows, setPendingRows] = useState<SheetRow[]>([]);
@@ -2347,7 +2365,15 @@ const App: React.FC = () => {
             </h2>
           </div>
           
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            <button
+              onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+              className="flex items-center justify-center w-10 h-6 bg-slate-900/50 hover:bg-slate-800/80 border border-slate-800/50 rounded-full text-slate-500 hover:text-slate-300 transition-all active:scale-95 group"
+              title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
+            >
+              {theme === 'dark' ? <Sun className="w-3 h-3 group-hover:rotate-90 transition-transform duration-500" /> : <Moon className="w-3 h-3 group-hover:-rotate-12 transition-transform duration-500" />}
+            </button>
+
              {isPublicView && (
                <button 
                  onClick={() => window.location.href = window.location.origin + window.location.pathname}

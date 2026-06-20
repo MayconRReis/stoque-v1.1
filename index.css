@@ -6,9 +6,45 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+:root {
+  --bg-main: var(--color-slate-950);
+  --text-main: var(--color-slate-100);
+}
+
+html.light {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* Fix shadows in light theme by making them white (so they invert cleanly to dark shadows) */
+html.light .shadow-2xl {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 25px 50px -12px rgba(255, 255, 255, 0.5);
+}
+
+html.light .shadow-xl {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 20px 25px -5px rgba(255, 255, 255, 0.4), 0 8px 10px -6px rgba(255, 255, 255, 0.3);
+}
+
+html.light .shadow-lg {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 10px 15px -3px rgba(255, 255, 255, 0.4), 0 4px 6px -4px rgba(255, 255, 255, 0.3);
+}
+
+html.light .shadow-md {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 4px 6px -1px rgba(255, 255, 255, 0.4), 0 2px 4px -2px rgba(255, 255, 255, 0.2);
+}
+
+html.light .shadow {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 1px 3px 0 rgba(255, 255, 255, 0.4), 0 1px 2px -1px rgba(255, 255, 255, 0.2);
+}
+
+/* Ensure background color is set on HTML to allow filter to work on entire canvas */
+html {
+  background-color: #020617;
+  transition: filter 0.5s ease-in-out;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background-color: #020617; /* slate-950 */
-  color: #f1f5f9; /* slate-100 */
+  background-color: transparent;
+  color: #f1f5f9;
 }
