@@ -12,39 +12,53 @@
 }
 
 html.light {
-  filter: invert(0.9) hue-rotate(180deg);
+  /* Flipped slate palette for light mode */
+  --color-slate-50: #020617;
+  --color-slate-100: #0f172a;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-600: #94a3b8;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;  /* Soft light gray instead of harsh white */
+  --color-slate-950: #f8fafc;  /* Very soft light gray for main canvas */
+  
+  /* Make standard white and black flip */
+  --color-white: #0f172a;
+  --color-black: #f8fafc;
+  
+  color-scheme: light;
 }
 
-/* Fix shadows in light theme by making them white (so they invert cleanly to dark shadows) */
-html.light .shadow-2xl {
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 25px 50px -12px rgba(255, 255, 255, 0.5);
+/* Protect white text inside primary colored elements so they stay legible in light mode! */
+html.light [class*="bg-blue-"],
+html.light [class*="bg-indigo-"],
+html.light [class*="bg-purple-"],
+html.light [class*="bg-fuchsia-"],
+html.light [class*="bg-amber-"],
+html.light [class*="bg-red-"],
+html.light [class*="bg-green-"],
+html.light [class*="bg-pink-"] {
+  --color-white: #ffffff;
 }
 
-html.light .shadow-xl {
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 20px 25px -5px rgba(255, 255, 255, 0.4), 0 8px 10px -6px rgba(255, 255, 255, 0.3);
-}
-
-html.light .shadow-lg {
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 10px 15px -3px rgba(255, 255, 255, 0.4), 0 4px 6px -4px rgba(255, 255, 255, 0.3);
-}
-
-html.light .shadow-md {
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 4px 6px -1px rgba(255, 255, 255, 0.4), 0 2px 4px -2px rgba(255, 255, 255, 0.2);
-}
-
-html.light .shadow {
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 1px 3px 0 rgba(255, 255, 255, 0.4), 0 1px 2px -1px rgba(255, 255, 255, 0.2);
-}
-
-/* Ensure background color is set on HTML to allow filter to work on entire canvas */
 html {
-  background-color: #020617;
-  transition: filter 0.5s ease-in-out;
+  background-color: var(--color-slate-950);
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
   padding: 0;
   background-color: transparent;
-  color: #f1f5f9;
+  color: var(--color-slate-100);
+}
+
+/* Add smooth transitions to all elements to satisfy requirement #5 */
+*, ::before, ::after {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
 }
