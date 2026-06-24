@@ -1,64 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-:root {
-  --bg-main: var(--color-slate-950);
-  --text-main: var(--color-slate-100);
-}
-
-html.light {
-  /* Flipped slate palette for light mode */
-  --color-slate-50: #020617;
-  --color-slate-100: #0f172a;
-  --color-slate-200: #1e293b;
-  --color-slate-300: #334155;
-  --color-slate-400: #475569;
-  --color-slate-500: #64748b;
-  --color-slate-600: #94a3b8;
-  --color-slate-700: #cbd5e1;
-  --color-slate-800: #e2e8f0;
-  --color-slate-900: #f1f5f9;  /* Soft light gray instead of harsh white */
-  --color-slate-950: #f8fafc;  /* Very soft light gray for main canvas */
-  
-  /* Make standard white and black flip */
-  --color-white: #0f172a;
-  --color-black: #f8fafc;
-  
-  color-scheme: light;
-}
-
-/* Protect white text inside primary colored elements so they stay legible in light mode! */
-html.light [class*="bg-blue-"],
-html.light [class*="bg-indigo-"],
-html.light [class*="bg-purple-"],
-html.light [class*="bg-fuchsia-"],
-html.light [class*="bg-amber-"],
-html.light [class*="bg-red-"],
-html.light [class*="bg-green-"],
-html.light [class*="bg-pink-"] {
-  --color-white: #ffffff;
-}
-
 html {
-  background-color: var(--color-slate-950);
+  background-color: var(--color-slate-50);
+  color-scheme: light;
+  color: var(--color-slate-900);
+}
+
+html.dark {
+  background-color: #020617; /* Slate-950 */
   color-scheme: dark;
+  color: var(--color-slate-100);
 }
 
 body {
   margin: 0;
   padding: 0;
   background-color: transparent;
-  color: var(--color-slate-100);
 }
 
-/* Add smooth transitions to all elements to satisfy requirement #5 */
+/* Global transitions for theme switching */
 *, ::before, ::after {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-property: background-color, border-color, color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
+  transition-duration: 300ms;
 }
+
+/* Smooth charts and svgs */
+path {
+  transition: all 0.3s ease-in-out;
+}
+

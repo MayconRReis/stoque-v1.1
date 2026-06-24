@@ -101,6 +101,7 @@ export interface InspectionData {
   supplyDescription?: string; // Descrição do insumo
   others?: { name: string; quantity: number }[];
   shipmentId?: string;
+  withoutSeal?: boolean;
 }
 
 export interface SheetRow {

@@ -120,13 +120,13 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
   return (
     <div className="flex items-center gap-2">
       <div className={`${isSm ? 'w-8 h-8' : 'w-10 h-10'} bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20`}>
-        <Warehouse className={`${isSm ? 'w-5 h-5' : 'w-6 h-6'} text-white`} />
+        <Warehouse className={`${isSm ? 'w-5 h-5' : 'w-6 h-6'} text-slate-900 dark:text-white`} />
       </div>
       <div>
-        <h1 className={`${isSm ? 'text-lg' : 'text-2xl'} font-black tracking-tighter text-white flex items-center leading-none`}>
+        <h1 className={`${isSm ? 'text-lg' : 'text-2xl'} font-black tracking-tighter text-slate-900 dark:text-white flex items-center leading-none`}>
           Stoque<span className="text-blue-500">+</span>
         </h1>
-        {!isSm && <p className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5">Ybera Paris</p>}
+        {!isSm && <p className="text-[8px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5">Ybera Paris</p>}
       </div>
     </div>
   );
@@ -135,9 +135,9 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
 const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, activeTab }: { tab: string, icon: React.ElementType, label: string, badge?: number, isActive: boolean, onNavigate: (tab: any) => void, activeTab: string }) => (
   <button 
     onClick={() => onNavigate(tab)} 
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'}`}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-200 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200'}`}
   >
-    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+    <Icon className={`w-4 h-4 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-slate-700 dark:text-slate-300'}`} />
     <span className="font-semibold text-sm">{label}</span>
     {badge ? (
       <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-950 text-blue-400 border border-blue-900/30">
@@ -1991,7 +1991,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     };
 
     return (
-      <div className="bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-800/50 shadow-2xl overflow-hidden mb-6">
+      <div className="bg-slate-100 dark:bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-300 dark:border-slate-800/50 shadow-2xl overflow-hidden mb-6">
         <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
              <div className={`w-1.5 h-8 rounded-full ${
@@ -2001,22 +2001,22 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                'bg-amber-600'
              }`}></div>
              <div className="flex flex-col">
-                <h4 className="text-lg font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                  Porta Pallet {rack} <span className="text-slate-500 font-medium text-sm">/ {rackTitles[rack]}</span>
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter flex items-center gap-2">
+                  Porta Pallet {rack} <span className="text-slate-600 dark:text-slate-500 font-medium text-sm">/ {rackTitles[rack]}</span>
                 </h4>
                 <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Topografia Interna</p>
              </div>
           </div>
           
-          <div className="bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-800/50 flex items-center gap-6">
+          <div className="bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800/50 flex items-center gap-6">
             <div className="flex flex-col items-center">
               <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Livres</span>
               <span className="text-sm font-black text-blue-500">{freeCount}</span>
             </div>
-            <div className="w-px h-6 bg-slate-800/50"></div>
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800/50"></div>
             <div className="flex flex-col items-center">
               <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Total</span>
-              <span className="text-sm font-black text-white">{totalCount}</span>
+              <span className="text-sm font-black text-slate-900 dark:text-white">{totalCount}</span>
             </div>
           </div>
         </div>
@@ -2045,7 +2045,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   setSelectedMappingSlot(slot);
                 }}
                 className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative cursor-pointer ${
-                slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
+                slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-300 dark:border-slate-800/50 hover:border-slate-700' : 
                 slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
                 slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
                 isContainer ? 'bg-slate-300/10 border-slate-100/30' :
@@ -2064,15 +2064,15 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     'text-green-500'
                   }`} />
                 ) : (
-                  <div className="w-1 h-1 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
+                  <div className="w-1 h-1 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
                 )}
                 
                 {isRotative && (
                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-slate-950 z-20 shadow-lg"></div>
                 )}
                 {slot.occupiedBy && (
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 transition-opacity border border-slate-700 p-1">
-                    <span className="text-[7px] font-bold text-white text-center leading-tight line-clamp-3">{slot.occupiedBy}</span>
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-100 dark:bg-slate-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 transition-opacity border border-slate-700 p-1">
+                    <span className="text-[7px] font-bold text-slate-900 dark:text-white text-center leading-tight line-clamp-3">{slot.occupiedBy}</span>
                   </div>
                 )}
               </div>
@@ -2155,7 +2155,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Carregando Stoque+</p>
+          <p className="text-[10px] font-black text-slate-600 dark:text-slate-500 uppercase tracking-[0.3em]">Carregando Stoque+</p>
         </div>
       </div>
     );
@@ -2169,7 +2169,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col lg:flex-row font-sans selection:bg-blue-600/30 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col lg:flex-row font-sans selection:bg-blue-600/30 overflow-x-hidden">
       
       {/* Slot Actions Modal */}
       <AnimatePresence>
@@ -2186,14 +2186,14 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Ações da Vaga</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Vaga {selectedMappingSlot.id}</p>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Ações da Vaga</h3>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest mt-1">Vaga {selectedMappingSlot.id}</p>
                 </div>
-                <button onClick={() => setSelectedMappingSlot(null)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
+                <button onClick={() => setSelectedMappingSlot(null)} className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-xl transition-colors">
                   <X className="w-5 h-5 text-slate-600" />
                 </button>
               </div>
@@ -2221,7 +2221,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     </button>
                     <button 
                       onClick={() => handleReleaseSlot(selectedMappingSlot)}
-                      className="w-full px-6 py-4 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-500 border border-slate-800 hover:border-red-500/30 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                      className="w-full px-6 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-red-600/20 text-slate-500 dark:text-slate-400 hover:text-red-500 border border-slate-200 dark:border-slate-800 hover:border-red-500/30 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
                     >
                       <Trash2 className="w-4 h-4" /> Remover Dedicação
                     </button>
@@ -2229,16 +2229,16 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 )}
 
                 {![SlotContent.EMPTY, SlotContent.ROTATIVE].includes(selectedMappingSlot.status as any) && (
-                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
                     <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-2 text-center">Ocupado por</p>
-                    <p className="text-white font-black uppercase text-center text-sm">{selectedMappingSlot.occupiedBy || 'N/A'}</p>
+                    <p className="text-slate-900 dark:text-white font-black uppercase text-center text-sm">{selectedMappingSlot.occupiedBy || 'N/A'}</p>
                   </div>
                 )}
               </div>
 
               <button 
                 onClick={() => setSelectedMappingSlot(null)}
-                className="w-full px-6 py-4 bg-slate-800 hover:bg-slate-750 text-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
+                className="w-full px-6 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-750 text-slate-600 dark:text-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
               >
                 Voltar ao Mapa
               </button>
@@ -2250,7 +2250,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 md:top-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-[90%] md:max-w-sm">
         {notifications.map(n => (
-          <div key={n.id} className={`bg-slate-900 border ${n.type === 'error' ? 'border-red-500/30' : 'border-green-500/30'} text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-300 pointer-events-auto`}>
+          <div key={n.id} className={`bg-white dark:bg-slate-900 border ${n.type === 'error' ? 'border-red-500/30' : 'border-green-500/30'} text-slate-900 dark:text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-300 pointer-events-auto`}>
             <div className={`w-8 h-8 md:w-10 md:h-10 ${n.type === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'} rounded-xl flex items-center justify-center border shrink-0`}>
               {n.type === 'error' ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
             </div>
@@ -2269,10 +2269,10 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
       {/* Sidebar Navigation */}
       {!isPublicView && (
-        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
-          <div className="p-8 border-b border-slate-800/60 flex justify-between items-center">
+        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-slate-100 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
+          <div className="p-8 border-b border-slate-300 dark:border-slate-800/60 flex justify-between items-center">
             <Logo />
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition-colors">
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -2298,15 +2298,15 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           </nav>
 
           <div className="p-4 space-y-3">
-            <div className="p-5 bg-slate-900/40 border border-slate-800 rounded-2xl">
+            <div className="p-5 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-blue-600/10 flex items-center justify-center text-[10px] font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-[11px] font-black text-white uppercase tracking-tight">{user?.name}</p>
-                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">{user?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
+                    <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{user?.name}</p>
+                    <p className="text-[8px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">{user?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
                   </div>
                 </div>
                 <button 
@@ -2318,11 +2318,11 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 </button>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                <div className="flex justify-between text-[8px] font-black text-slate-600 dark:text-slate-500 uppercase tracking-widest">
                   <span>Ocupação G0</span>
                   <span>{stats.occupancyRate}%</span>
                 </div>
-                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden">
                    <div className="h-full bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
                 </div>
               </div>
@@ -2338,13 +2338,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
             {!isPublicView && (
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden w-10 h-10 bg-slate-900/80 border border-slate-800/50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95 shadow-lg"
+                className="lg:hidden w-10 h-10 bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-800/50 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-all active:scale-95 shadow-lg"
               >
                 <Menu className="w-5 h-5" />
               </button>
             )}
             {isPublicView && <Logo size="sm" />}
-            <h2 className="text-base md:text-xl font-black text-white tracking-tight uppercase italic line-clamp-1">
+            <h2 className="text-base md:text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase italic line-clamp-1">
               {isPublicView ? 'Dashboard Público' : (
                 <>
                   {activeTab === 'dashboard' && 'Painel de Controle'}
@@ -2368,7 +2368,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <button
               onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-              className="flex items-center justify-center w-10 h-6 bg-slate-900/50 hover:bg-slate-800/80 border border-slate-800/50 rounded-full text-slate-500 hover:text-slate-300 transition-all active:scale-95 group"
+              className="flex items-center justify-center w-10 h-6 bg-slate-100 dark:bg-slate-900/50 hover:bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-800/50 rounded-full text-slate-600 dark:text-slate-500 hover:text-slate-700 dark:text-slate-300 transition-all active:scale-95 group"
               title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
             >
               {theme === 'dark' ? <Sun className="w-3 h-3 group-hover:rotate-90 transition-transform duration-500" /> : <Moon className="w-3 h-3 group-hover:-rotate-12 transition-transform duration-500" />}
@@ -2382,7 +2382,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                  Acessar App
                </button>
              )}
-             <div className="flex items-center justify-center w-10 h-6 bg-slate-900/50 rounded-full border border-slate-800/50">
+             <div className="flex items-center justify-center w-10 h-6 bg-slate-100 dark:bg-slate-900/50 rounded-full border border-slate-300 dark:border-slate-800/50">
                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
              </div>
           </div>
@@ -2394,8 +2394,8 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               <div className="w-24 h-24 bg-blue-600/10 text-blue-500 rounded-[32px] flex items-center justify-center mx-auto border border-blue-500/20 shadow-2xl shadow-blue-900/20 mb-8">
                 <Truck className="w-10 h-10" />
               </div>
-              <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase italic">Gestão de Movimentação</h2>
-              <p className="text-slate-500 text-sm md:text-base font-bold uppercase tracking-[0.3em] max-w-xl mx-auto leading-relaxed">
+              <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Gestão de Movimentação</h2>
+              <p className="text-slate-600 dark:text-slate-500 text-sm md:text-base font-bold uppercase tracking-[0.3em] max-w-xl mx-auto leading-relaxed">
                 Realize entradas, saídas e transferências de pallets no armazém G0 de forma rápida e segura.
               </p>
               <div className="pt-10">
@@ -2425,13 +2425,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                       <>
                         <button 
                             onClick={handleExportInventory}
-                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-blue-500/30 group"
+                            className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-500/30 group"
                         >
                             <Download className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" /> Exportar CSV
                         </button>
                         <button 
                             onClick={handleShareDashboard}
-                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-800 hover:border-purple-500/30 group"
+                            className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-200 dark:border-slate-800 hover:border-purple-500/30 group"
                         >
                             <Share2 className="w-3.5 h-3.5 text-purple-500 group-hover:scale-110 transition-transform" /> Compartilhar Dashboard
                         </button>
@@ -2442,17 +2442,17 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 {/* Occupancy Progress Bar Area */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* General Occupancy (A-D) */}
-                  <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
+                  <div className="bg-slate-100 dark:bg-slate-900/40 p-6 rounded-[2rem] border border-slate-300 dark:border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
                     <div className="flex justify-between items-end">
                       <div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Estoque Geral (A-D)</h4>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Capacidade Real Pallets</p>
+                        <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Estoque Geral (A-D)</h4>
+                        <p className="text-[9px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">Capacidade Real Pallets</p>
                       </div>
                       <div className="text-right flex items-center gap-4">
                         {!isPublicView && (
                           <button 
                             onClick={handleResyncSlots}
-                            className="p-2 bg-slate-950 hover:bg-slate-900 text-slate-500 hover:text-blue-500 rounded-lg border border-slate-800 transition-all group"
+                            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 text-slate-600 dark:text-slate-500 hover:text-blue-500 rounded-lg border border-slate-200 dark:border-slate-800 transition-all group"
                             title="Sincronizar Vagas"
                           >
                             <RefreshCw className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" />
@@ -2461,7 +2461,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                       </div>
                     </div>
-                    <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
+                    <div className="h-3 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
@@ -2478,7 +2478,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     </div>
                     <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
                       <span>Livre</span>
-                      <span className={stats.occupancyRate > 90 ? 'text-red-500' : 'text-slate-500'}>
+                      <span className={stats.occupancyRate > 90 ? 'text-red-500' : 'text-slate-600 dark:text-slate-500'}>
                         {stats.occupiedSlots} / {stats.totalSlots} Vagas
                       </span>
                       <span>Ocupado</span>
@@ -2486,17 +2486,17 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   </div>
 
                   {/* Container Occupancy (E-F) */}
-                  <div className="bg-slate-900/40 p-6 rounded-[2rem] border border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
+                  <div className="bg-slate-100 dark:bg-slate-900/40 p-6 rounded-[2rem] border border-slate-300 dark:border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
                     <div className="flex justify-between items-end">
                       <div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Área de Containers (E-F)</h4>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Posições Específicas</p>
+                        <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Área de Containers (E-F)</h4>
+                        <p className="text-[9px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">Posições Específicas</p>
                       </div>
                       <div className="text-right flex items-center gap-4">
                         <span className="text-2xl font-black text-indigo-500 italic">{stats.containerOccupancyRate}%</span>
                       </div>
                     </div>
-                    <div className="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden relative">
+                    <div className="h-3 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(stats.containerOccupancyRate, 100)}%` }}
@@ -2510,7 +2510,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     </div>
                     <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
                       <span>Livre</span>
-                      <span className="text-slate-500">
+                      <span className="text-slate-600 dark:text-slate-500">
                         Em uso: {stats.containerOccupiedSlots} / {stats.containerTotalSlots} unidades
                       </span>
                       <span>Ocupado</span>
@@ -2542,7 +2542,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             </div>
                             <div className="flex-1">
                               <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Pendente de Alocação</p>
-                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                              <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">
                                 Existem {warehouseDiagnostic.noDefinitiveSlot} pallets cadastrados sem vaga definitiva.
                               </p>
                             </div>
@@ -2557,7 +2557,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             </div>
                             <div className="flex-1">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest italic">Conflito de Vagas</p>
-                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                              <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">
                                 Existem {warehouseDiagnostic.slotConflicts} vagas com conflito, onde mais de um pallet está registrado na mesma posição. Esses casos exigem conferência manual.
                               </p>
                             </div>
@@ -2572,7 +2572,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             </div>
                             <div className="flex-1">
                               <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">Vagas Órfãs</p>
-                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                              <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">
                                 Existem {warehouseDiagnostic.orphanedSlots} vagas marcadas como ocupadas no mapa, mas sem pallet correspondente no inventário.
                               </p>
                             </div>
@@ -2594,7 +2594,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             </div>
                             <div className="flex-1">
                               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Vagas Não Marcadas</p>
-                              <p className="text-[11px] font-medium text-slate-300 leading-tight">
+                              <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">
                                 Foram encontradas {warehouseDiagnostic.freeSlotsWithPallets} vagas marcadas como livres no mapa, mas que possuem pallets registrados no inventário.
                               </p>
                             </div>
@@ -2671,7 +2671,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         value={historySearch}
                         onChange={(e) => setHistorySearch(e.target.value)}
                         placeholder="Pesquisar no histórico (OP, Produto, Lote, ID)..." 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                     />
                 </div>
 
@@ -2760,7 +2760,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
                             placeholder="Digite a VAGA (Ex: E.1.3), OP, Produto ou Lote..." 
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-11 py-3 text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
                     
@@ -2768,23 +2768,23 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     <div className="relative w-full md:w-64">
                       <button
                         onClick={() => setIsInventoryFilterOpen(!isInventoryFilterOpen)}
-                        className={`w-full flex items-center justify-between px-5 py-3 bg-slate-900 border ${isInventoryFilterOpen ? 'border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'border-slate-800'} rounded-xl transition-all group`}
+                        className={`w-full flex items-center justify-between px-5 py-3 bg-white dark:bg-slate-900 border ${isInventoryFilterOpen ? 'border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)]' : 'border-slate-200 dark:border-slate-800'} rounded-xl transition-all group`}
                       >
                         <div className="flex items-center gap-3">
-                          <Filter className={`w-4 h-4 ${inventoryTypeFilter !== 'ALL' ? 'text-blue-500' : 'text-slate-500'}`} />
-                          <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-white' : 'text-slate-500'}`}>
+                          <Filter className={`w-4 h-4 ${inventoryTypeFilter !== 'ALL' ? 'text-blue-500' : 'text-slate-600 dark:text-slate-500'}`} />
+                          <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500'}`}>
                             {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : 
                              inventoryTypeFilter === 'CONTAINER' ? 'Container (SJ/LP/CP)' : 
                              translateSlotContent(inventoryTypeFilter as SlotContent)}
                           </span>
                         </div>
-                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-300 ${isInventoryFilterOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-4 h-4 text-slate-600 dark:text-slate-500 transition-transform duration-300 ${isInventoryFilterOpen ? 'rotate-180' : ''}`} />
                       </button>
 
                       {isInventoryFilterOpen && (
                         <>
                           <div className="fixed inset-0 z-[60]" onClick={() => setIsInventoryFilterOpen(false)} />
-                          <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[70] animate-in fade-in zoom-in-95 duration-200">
+                          <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[70] animate-in fade-in zoom-in-95 duration-200">
                             <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1">
                               {[
                                 { value: 'ALL', label: 'Todos os Tipos' },
@@ -2814,7 +2814,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                                   } ${
                                     inventoryTypeFilter === type.value 
                                       ? 'bg-blue-600 text-white' 
-                                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-900 dark:text-white'
                                   }`}
                                 >
                                   {type.label}
@@ -2875,7 +2875,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     <button
                       onClick={loadMoreInventory}
                       disabled={isLoadingMore}
-                      className="px-8 py-4 bg-slate-900 text-white rounded-[20px] font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-3 border border-slate-800 shadow-xl"
+                      className="px-8 py-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-[20px] font-black uppercase text-xs tracking-widest hover:bg-slate-100 dark:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-3 border border-slate-200 dark:border-slate-800 shadow-xl"
                     >
                       {isLoadingMore ? (
                         <>
@@ -2903,15 +2903,15 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]"
           >
-            <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <div className="p-8 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-100 dark:bg-slate-900/50">
               <div>
-                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Diagnóstico do Armazém</h3>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Conferência de integridade de dados</p>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Diagnóstico do Armazém</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">Conferência de integridade de dados</p>
               </div>
-              <button onClick={() => setIsDiagnosticDetailsOpen(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
+              <button onClick={() => setIsDiagnosticDetailsOpen(false)} className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-xl transition-colors">
+                <X className="w-6 h-6 text-slate-500 dark:text-slate-400" />
               </button>
             </div>
             
@@ -2923,7 +2923,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {warehouseDiagnostic.details.noDefinitiveSlotItems.map((item, i) => (
-                      <div key={i} className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 text-[10px] font-bold text-slate-300">
+                      <div key={i} className="bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300">
                         {item}
                       </div>
                     ))}
@@ -2982,17 +2982,17 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white tracking-tight uppercase tracking-widest">Nenhuma divergência encontrada</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">O armazém está em conformidade total.</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight uppercase tracking-widest">Nenhuma divergência encontrada</p>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest mt-1">O armazém está em conformidade total.</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="p-8 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-4">
+            <div className="p-8 border-t border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/50 flex justify-end gap-4">
               <button 
                 onClick={() => setIsDiagnosticDetailsOpen(false)}
-                className="px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:bg-slate-800 transition-all font-black"
+                className="px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 transition-all font-black"
               >
                 Fechar
               </button>
@@ -3021,23 +3021,23 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
       {deleteContext && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertCircle className="w-8 h-8" /></div>
-            <h3 className="text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Exclusão</h3>
-            <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed">{deleteContext.type === 'row' ? 'Deseja remover este carregamento da fila?' : 'Deseja remover este pallet do inventário?'}</p>
-            <div className="flex gap-4 pt-4"><button onClick={() => setDeleteContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-800 text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Cancelar</button><button onClick={confirmDelete} className="flex-1 py-3 md:py-3.5 bg-red-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95">Remover</button></div>
+            <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Exclusão</h3>
+            <p className="text-slate-600 dark:text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed">{deleteContext.type === 'row' ? 'Deseja remover este carregamento da fila?' : 'Deseja remover este pallet do inventário?'}</p>
+            <div className="flex gap-4 pt-4"><button onClick={() => setDeleteContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Cancelar</button><button onClick={confirmDelete} className="flex-1 py-3 md:py-3.5 bg-red-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95">Remover</button></div>
           </div>
         </div>
       )}
 
       {matrixConfirmContext && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-blue-900/20"><Truck className="w-8 h-8" /></div>
-            <h3 className="text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Envio</h3>
-            <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja enviar este pallet para processamento na Matriz?</p>
+            <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Envio</h3>
+            <p className="text-slate-600 dark:text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja enviar este pallet para processamento na Matriz?</p>
             <div className="flex gap-4 pt-4">
-              <button onClick={() => setMatrixConfirmContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-800 text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Não</button>
+              <button onClick={() => setMatrixConfirmContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Não</button>
               <button onClick={confirmMatrixSend} className="flex-1 py-3 md:py-3.5 bg-blue-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg shadow-blue-900/40 transition-all active:scale-95">Sim, Enviar</button>
             </div>
           </div>
@@ -3046,18 +3046,18 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
       {isLogoutConfirmOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-300">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-300">
             <div className="w-16 h-16 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-red-900/20">
               <LogOut className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-white font-black uppercase text-xl italic tracking-tight mb-2">Encerrar Sessão</h3>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja sair do sistema Stoque+?</p>
+              <h3 className="text-slate-900 dark:text-white font-black uppercase text-xl italic tracking-tight mb-2">Encerrar Sessão</h3>
+              <p className="text-slate-600 dark:text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja sair do sistema Stoque+?</p>
             </div>
             <div className="flex gap-4 pt-4">
               <button 
                 onClick={() => setIsLogoutConfirmOpen(false)} 
-                className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all hover:bg-slate-700"
+                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all hover:bg-slate-700"
               >
                 Cancelar
               </button>

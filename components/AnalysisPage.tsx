@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../types';
-import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container } from 'lucide-react';
+import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AnalysisPageProps {
@@ -26,6 +26,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   const [caps, setCaps] = useState(0);
   const [boxes, setBoxes] = useState(0);
   const [cradles, setCradles] = useState(0);
+  const [withoutSeal, setWithoutSeal] = useState(false);
   const [others, setOthers] = useState<{ id: string; name: string; quantity: number }[]>([]);
 
   const addOther = () => {
@@ -82,6 +83,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     setCaps(item.inspections?.[0]?.caps || 0);
     setBoxes(item.inspections?.[0]?.boxes || 0);
     setCradles(item.inspections?.[0]?.cradles || 0);
+    setWithoutSeal(item.inspections?.[0]?.withoutSeal || false);
     if (item.inspections?.[0]?.others) {
       setOthers(item.inspections[0].others.map(o => ({ ...o, id: Math.random().toString() })));
     } else {
@@ -121,6 +123,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
           caps,
           boxes,
           cradles,
+          withoutSeal,
           others: others.map(o => ({ name: o.name.toUpperCase(), quantity: o.quantity }))
         }
       );
@@ -135,6 +138,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
       setCaps(0);
       setBoxes(0);
       setCradles(0);
+      setWithoutSeal(false);
       setOthers([]);
     } catch (error) {
       console.error('Analysis confirmation error:', error);
@@ -322,6 +326,23 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                         <option key={s.id} value={s.id}>{s.id} ({s.rack})</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWithoutSeal(!withoutSeal)}
+                      className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                        withoutSeal 
+                          ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500' 
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
+                      }`}
+                    >
+                      <ShieldAlert className="w-4 h-4" />
+                      Marcar Sem Selo
+                    </button>
                   </div>
                 </div>
 

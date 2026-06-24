@@ -14,7 +14,8 @@ import {
   Info, 
   Pencil, 
   Trash2,
-  Warehouse 
+  Warehouse,
+  ShieldAlert
 } from 'lucide-react';
 import { SheetRow, InspectionData, SlotContent, translateSlotContent, getContentTypeColor } from '../types';
 
@@ -86,12 +87,16 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
       onClick={() => onToggleSelection(item.id, idx)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`group bg-slate-900/60 backdrop-blur-md p-6 rounded-[2rem] border border-slate-800 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full ${
+      className={`group bg-white dark:bg-slate-900/60 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full shadow-lg ${
         isSelected 
-          ? 'ring-2 ring-purple-500/50 bg-purple-900/10 border-purple-500/50' 
-          : `hover:border-${baseColor}-500/30`
+          ? 'ring-2 ring-purple-500/50 bg-purple-50 dark:bg-purple-900/10 border-purple-500/50' 
+          : `hover:border-${baseColor}-500/30 hover:shadow-xl`
       }`}
     >
+      {insp.withoutSeal && (
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-red-500 to-orange-500 z-20" />
+      )}
+
       {/* Background Icon Accent - Reduced size for better perf */}
       <div className={`absolute -top-6 -right-6 opacity-[0.03] group-hover:opacity-[0.1] transition-all duration-300 text-${baseColor}-500`}>
         <ContentIcon className="w-40 h-40" />
@@ -100,16 +105,19 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
       <div className="relative z-10 flex flex-col h-full">
         {/* Header Info */}
         <div className="flex justify-between items-start mb-5 pl-5">
-          <div className={`w-12 h-12 bg-${baseColor}-500/10 text-${baseColor}-400 rounded-xl flex items-center justify-center border border-${baseColor}-500/20 shadow-lg shadow-${baseColor}-950/10 group-hover:scale-105 transition-transform`}>
+          <div className={`w-12 h-12 bg-${baseColor}-500/10 text-${baseColor}-500 rounded-xl flex items-center justify-center border border-${baseColor}-500/20 shadow-lg shadow-${baseColor}-900/10 group-hover:scale-105 transition-transform`}>
             <ContentIcon className="w-6 h-6" />
           </div>
           <div className="text-right">
             <div className="flex items-center gap-2 justify-end mb-1">
+              {insp.withoutSeal && (
+                <ShieldAlert className="w-3.5 h-3.5 text-red-500 animate-pulse" title="Sem Selo" />
+              )}
               <span className={`w-2 h-2 rounded-full bg-${baseColor}-500`} />
               <span className={`text-[14px] font-black uppercase tracking-widest italic ${
                 insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
                 insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
-                `text-${baseColor}-400`
+                `text-${baseColor}-500 dark:text-${baseColor}-400`
               }`}>
                 {insp.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${insp.assignedSlot}`}
               </span>
@@ -124,7 +132,7 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
         {/* Product Info */}
         <div className="flex-1 space-y-4 mb-6">
           <div>
-            <h4 className="text-base font-black text-white uppercase tracking-tighter italic leading-tight line-clamp-2 min-h-[2.5rem]">
+            <h4 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter italic leading-tight line-clamp-2 min-h-[2.5rem]">
               {item.description}
             </h4>
             {item.operatorName && (
@@ -133,31 +141,31 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
           </div>
           
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
                 <Tag className="w-2.5 h-2.5" /> OP Origem
               </p>
-              <p className={`text-[10px] font-black text-${baseColor}-400 font-mono italic`}>{item.originOP || 'N/A'}</p>
+              <p className={`text-[10px] font-black text-${baseColor}-600 dark:text-${baseColor}-400 font-mono italic`}>{item.originOP || 'N/A'}</p>
             </div>
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
                 <Layers className="w-2.5 h-2.5" /> Lote
               </p>
-              <p className="text-[10px] font-black text-white font-mono italic">{item.lot || 'N/A'}</p>
+              <p className="text-[10px] font-black text-slate-900 dark:text-white font-mono italic">{item.lot || 'N/A'}</p>
             </div>
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
                 <Hash className="w-2.5 h-2.5" /> {qtyLabel}
               </p>
-              <p className="text-[10px] font-black text-green-400 font-mono italic">{qtyValue}</p>
+              <p className="text-[10px] font-black text-green-600 dark:text-green-400 font-mono italic">{qtyValue}</p>
             </div>
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
                 <Warehouse className="w-2.5 h-2.5" /> Vaga
               </p>
-              <p className={`text-[10px] font-black text-blue-400 font-mono italic`}>{insp.assignedSlot || 'N/A'}</p>
+              <p className={`text-[10px] font-black text-blue-600 dark:text-blue-400 font-mono italic`}>{insp.assignedSlot || 'N/A'}</p>
             </div>
-            <div className="col-span-2 bg-slate-950/40 p-3 rounded-xl border border-slate-800/30">
+            <div className="col-span-2 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/30">
               <p className="text-[7px] text-slate-600 font-bold uppercase mb-1 tracking-widest flex items-center gap-1.5">
                 <Package className="w-2.5 h-2.5" /> Tipo
               </p>
@@ -172,7 +180,7 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
         <div className="flex gap-2">
           <button 
             onClick={(e) => { e.stopPropagation(); onShowDetail(item, insp, idx); }} 
-            className="flex-1 py-2.5 bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-950/50 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
           >
             <Info className="w-3.5 h-3.5" /> Detalhes
           </button>
@@ -182,14 +190,14 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
               e.stopPropagation(); 
               onEdit(item, insp, idx); 
             }} 
-            className={`flex-1 py-2.5 bg-slate-950/50 hover:bg-${baseColor}-500/10 text-${baseColor}-400 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2`}
+            className={`flex-1 py-2.5 bg-slate-100 dark:bg-slate-950/50 hover:bg-${baseColor}-500/10 text-${baseColor}-600 dark:text-${baseColor}-400 border border-slate-200 dark:border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2`}
           >
-            <Pencil className="w-3.5 h-3.5" /> {userRole === 'admin' ? 'Editar' : 'Solicitar Alteração'}
+            <Pencil className="w-3.5 h-3.5" /> {userRole === 'admin' ? 'Editar' : 'Solicitar'}
           </button>
           
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(item.id, idx); }}
-            className="p-2.5 bg-slate-950/50 hover:bg-red-600/10 text-red-500 border border-slate-800 rounded-xl transition-all flex items-center justify-center"
+            className="p-2.5 bg-slate-100 dark:bg-slate-950/50 hover:bg-red-600/10 text-red-600 dark:text-red-500 border border-slate-200 dark:border-slate-800 rounded-xl transition-all flex items-center justify-center"
             title="Remover do estoque"
           >
             <Trash2 className="w-4 h-4" />
