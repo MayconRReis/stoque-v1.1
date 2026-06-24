@@ -20,7 +20,8 @@ import {
   MoreHorizontal,
   RefreshCw,
   MapPin,
-  ChevronDown
+  ChevronDown,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -36,6 +37,7 @@ interface EditPalletModalProps {
       contentType: SlotContent;
       assignedSlot?: string;
       reason?: string;
+      withoutSeal?: boolean;
       supplyDetails?: {
         bottles: number;
         caps: number;
@@ -94,6 +96,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const [caps, setCaps] = useState(0);
   const [boxes, setBoxes] = useState(0);
   const [cradles, setCradles] = useState(0);
+  const [withoutSeal, setWithoutSeal] = useState(false);
   const [others, setOthers] = useState<{ id: string; name: string; quantity: number }[]>([]);
 
   useEffect(() => {
@@ -109,6 +112,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       setCaps(pallet.inspection.caps || 0);
       setBoxes(pallet.inspection.boxes || 0);
       setCradles(pallet.inspection.cradles || 0);
+      setWithoutSeal(pallet.inspection.withoutSeal || false);
       setOthers(pallet.inspection.others?.map(o => ({ ...o, id: Math.random().toString(36).substring(2, 9) })) || []);
       setIsAutoFilled(false);
     }
@@ -159,6 +163,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       contentType,
       reason: userRole === 'operator' ? reason : undefined,
       assignedSlot: assignedSlot || pallet?.inspection.assignedSlot,
+      withoutSeal,
       supplyDetails: contentType === SlotContent.SUPPLIES ? {
         bottles,
         caps,
@@ -446,6 +451,23 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 </div>
               </div>
             </motion.div>
+          )}
+
+          {userRole === 'admin' && mode === 'edit' && (
+            <div className="space-y-4 pt-2">
+              <button
+                type="button"
+                onClick={() => setWithoutSeal(!withoutSeal)}
+                className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                  withoutSeal 
+                    ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500' 
+                    : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4" />
+                {withoutSeal ? 'Marcado: Sem Selo' : 'Marcar Sem Selo'}
+              </button>
+            </div>
           )}
 
           {isOperatorEdit && (

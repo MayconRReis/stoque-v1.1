@@ -98,7 +98,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
               <div className="flex justify-between items-center mb-0">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Conferência Técnica</p>
                   <span className={`bg-slate-950 px-4 py-1.5 rounded-full text-[10px] font-black border border-slate-800 uppercase italic ${inspection.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' : 'text-blue-400'}`}>
-                    {inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${inspection.assignedSlot}`}
+                    {inspection.assignedSlot === 'AGUARDANDO' ? 'AG. VAGA' : `Vaga ${inspection.assignedSlot}`}
                   </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
@@ -130,7 +130,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                <div className="flex justify-between items-center">
                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Localização</p>
                   <span className={`bg-slate-950 px-6 py-2.5 rounded-full text-xs font-black border border-slate-800 uppercase italic tracking-widest ${inspection.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' : 'text-blue-400'}`}>
-                    {inspection.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${inspection.assignedSlot}`}
+                    {inspection.assignedSlot === 'AGUARDANDO' ? 'AG. VAGA' : `Vaga ${inspection.assignedSlot}`}
                   </span>
                </div>
                {inspection.contentType !== SlotContent.CONTAINER_SJ && inspection.contentType !== SlotContent.CONTAINER_LP && (

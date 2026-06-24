@@ -104,22 +104,29 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Header Info */}
-        <div className="flex justify-between items-start mb-5 pl-5">
-          <div className={`w-12 h-12 bg-${baseColor}-500/10 text-${baseColor}-500 rounded-xl flex items-center justify-center border border-${baseColor}-500/20 shadow-lg shadow-${baseColor}-900/10 group-hover:scale-105 transition-transform`}>
-            <ContentIcon className="w-6 h-6" />
+        <div className="flex justify-between items-start mb-5 relative">
+          <div className="flex flex-col gap-2">
+            <div className={`w-12 h-12 bg-${baseColor}-500/10 text-${baseColor}-500 rounded-xl flex items-center justify-center border border-${baseColor}-500/20 shadow-lg shadow-${baseColor}-900/10 group-hover:scale-105 transition-transform`}>
+              <ContentIcon className="w-6 h-6" />
+            </div>
+            
+            {insp.withoutSeal && (
+              <div className="bg-red-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-red-600/50 animate-pulse mt-1">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                SEM SELO
+              </div>
+            )}
           </div>
+
           <div className="text-right">
             <div className="flex items-center gap-2 justify-end mb-1">
-              {insp.withoutSeal && (
-                <ShieldAlert className="w-3.5 h-3.5 text-red-500 animate-pulse" title="Sem Selo" />
-              )}
               <span className={`w-2 h-2 rounded-full bg-${baseColor}-500`} />
               <span className={`text-[14px] font-black uppercase tracking-widest italic ${
                 insp.assignedSlot === 'AGUARDANDO' ? 'text-amber-500' :
                 insp.assignedSlot?.startsWith('D') ? 'text-green-500' : 
                 `text-${baseColor}-500 dark:text-${baseColor}-400`
               }`}>
-                {insp.assignedSlot === 'AGUARDANDO' ? 'Aguardando Vaga' : `Vaga ${insp.assignedSlot}`}
+                {insp.assignedSlot === 'AGUARDANDO' ? 'AG. VAGA' : `Vaga ${insp.assignedSlot}`}
               </span>
             </div>
             <div className="flex items-center gap-1.5 justify-end text-slate-500">

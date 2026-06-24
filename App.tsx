@@ -1689,6 +1689,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     contentType: SlotContent;
     assignedSlot?: string;
     reason?: string;
+    withoutSeal?: boolean;
     supplyDetails?: {
       bottles: number;
       caps: number;
@@ -1708,6 +1709,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           ...updatedInspections[idx],
           contentType: updatedData.contentType,
           assignedSlot: updatedData.assignedSlot || updatedInspections[idx].assignedSlot,
+          withoutSeal: updatedData.withoutSeal !== undefined ? updatedData.withoutSeal : updatedInspections[idx].withoutSeal,
           ...(updatedData.supplyDetails || {})
         };
       }
@@ -2111,13 +2113,16 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     inspectedItems.forEach(item => {
       item.inspections?.forEach((insp, idx) => {
         // Search term check
+        const isSemSeloSearch = term === 'sem selo';
         const matchesSearch = !term || 
-          item.description.toLowerCase().includes(term) || 
-          item.originOP.includes(term) || 
-          item.lot.toLowerCase().includes(term) ||
-          item.loadingId.toLowerCase().includes(term) ||
-          (insp.assignedSlot && insp.assignedSlot.toLowerCase().includes(term)) ||
-          item.id.toLowerCase().includes(term);
+          (isSemSeloSearch ? insp.withoutSeal : (
+            item.description.toLowerCase().includes(term) || 
+            item.originOP.includes(term) || 
+            item.lot.toLowerCase().includes(term) ||
+            item.loadingId.toLowerCase().includes(term) ||
+            (insp.assignedSlot && insp.assignedSlot.toLowerCase().includes(term)) ||
+            item.id.toLowerCase().includes(term)
+          ));
         
         // Type filter check
         const matchesType = inventoryTypeFilter === 'ALL' || 
@@ -2759,7 +2764,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             type="text" 
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
-                            placeholder="Digite a VAGA (Ex: E.1.3), OP, Produto ou Lote..." 
+                            placeholder="Digite a VAGA, OP, Produto, Lote ou SEM SELO..." 
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>

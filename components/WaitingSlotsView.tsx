@@ -96,7 +96,7 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
                   <div className="text-right">
                     <div className="flex items-center gap-2 justify-end mb-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Aguardando Vaga</span>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">AG. VAGA</span>
                     </div>
                     <div className="flex items-center gap-1.5 justify-end text-slate-500">
                       <Calendar className="w-3 h-3" />

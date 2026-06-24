@@ -138,6 +138,7 @@ export const supabaseService = {
         const upperTerm = originalTerm.toUpperCase();
         const term = originalTerm.toLowerCase();
         const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+        const isSemSelo = upperTerm === 'SEM SELO';
 
         filtered = filtered.filter(row => {
           const matchesText = 
@@ -148,6 +149,10 @@ export const supabaseService = {
             row.loadingId?.toLowerCase().includes(term);
           
           if (matchesText) return true;
+          
+          if (isSemSelo) {
+             return row.inspections?.some((i: any) => i.withoutSeal);
+          }
           
           if (isSlot) {
             return row.inspections?.some((i: any) => {
@@ -192,10 +197,11 @@ export const supabaseService = {
       const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
       
       let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+      const isSemSeloSearch = upperTerm === 'SEM SELO';
 
-      if (isSlotSearch) {
+      if (isSlotSearch || isSemSeloSearch) {
         try {
-          // If it's a slot search, find the IDs of pallets in those slots via JS filter (more reliable than or.cs for jsonb)
+          // If it's a slot search or sem selo search, find the IDs of pallets in those slots via JS filter
           const { data: allWithInsps } = await supabase
             .from('inventory')
             .select('id, inspections');
@@ -203,7 +209,8 @@ export const supabaseService = {
           if (allWithInsps) {
             const palletsInTargetSlots = allWithInsps.filter(p => 
               p.inspections?.some((insp: any) => 
-                insp.assignedSlot?.toUpperCase().startsWith(upperTerm)
+                (isSlotSearch && insp.assignedSlot?.toUpperCase().startsWith(upperTerm)) ||
+                (isSemSeloSearch && insp.withoutSeal)
               )
             ).map(p => p.id);
 
@@ -458,8 +465,9 @@ export const supabaseService = {
       const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
       
       let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+      const isSemSeloSearch = upperTerm === 'SEM SELO';
 
-      if (isSlot) {
+      if (isSlot || isSemSeloSearch) {
         try {
           const { data: allWithInsps } = await supabase
             .from('inventory')
@@ -468,7 +476,8 @@ export const supabaseService = {
           if (allWithInsps) {
             const palletsInTargetSlots = allWithInsps.filter(p => 
               p.inspections?.some((insp: any) => 
-                insp.assignedSlot?.toUpperCase().startsWith(upperTerm)
+                (isSlot && insp.assignedSlot?.toUpperCase().startsWith(upperTerm)) ||
+                (isSemSeloSearch && insp.withoutSeal)
               )
             ).map(p => p.id);
 

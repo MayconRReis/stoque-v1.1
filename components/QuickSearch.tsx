@@ -129,7 +129,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="DIGITE OP, LOTE, NOME OU VAGA..."
+          placeholder="DIGITE OP, LOTE, NOME, VAGA OU SEM SELO..."
           className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-5 pl-12 pr-32 text-slate-900 dark:text-white font-black text-lg placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-2xl"
           autoFocus
         />
@@ -183,8 +183,8 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                           {group.description}
                         </h3>
                         {group.hasWithoutSeal && (
-                          <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-500 rounded-full shrink-0">
-                            <ShieldAlert className="w-3.5 h-3.5" />
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg shadow-lg border border-red-600/50 shrink-0 animate-pulse">
+                            <ShieldAlert className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Sem Selo</span>
                           </div>
                         )}
@@ -233,7 +233,10 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                                 <p className="text-xs font-black text-slate-900 dark:text-slate-200 uppercase flex items-center gap-2">
                                   {p.inspections?.[0]?.assignedSlot || 'NÃO ALOCADO'}
                                   {p.inspections?.some(i => i.withoutSeal) && (
-                                    <ShieldAlert className="w-3 h-3 text-red-500" />
+                                    <span className="flex items-center gap-1 text-[8px] bg-red-500 text-white px-1.5 py-0.5 rounded shadow-sm animate-pulse">
+                                      <ShieldAlert className="w-2.5 h-2.5" />
+                                      SEM SELO
+                                    </span>
                                   )}
                                 </p>
                                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{p.loadingId || p.id}</p>
