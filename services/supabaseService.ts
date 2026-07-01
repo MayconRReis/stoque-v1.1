@@ -233,6 +233,9 @@ export const supabaseService = {
       if (allWithInsps && !inspError) {
         const matchingIds = allWithInsps.filter(item => 
           item.inspections?.some((insp: any) => {
+            if (filters.typeFilter === 'SEM_SELO') {
+              return insp.withoutSeal;
+            }
             if (isContainerSearch) {
               return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
             }
@@ -500,6 +503,9 @@ export const supabaseService = {
       if (allWithInsps && !inspError) {
         const matchingIds = allWithInsps.filter(item => 
           item.inspections?.some((insp: any) => {
+            if (filters.typeFilter === 'SEM_SELO') {
+              return insp.withoutSeal;
+            }
             if (isContainerSearch) {
               return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
             }

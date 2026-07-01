@@ -219,7 +219,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   
   // Selection and Search State
   const [inventorySearch, setInventorySearch] = useState('');
-  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL' | 'CONTAINER'>('ALL');
+  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL' | 'CONTAINER' | 'SEM_SELO'>('ALL');
   const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
   const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
@@ -2126,6 +2126,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         
         // Type filter check
         const matchesType = inventoryTypeFilter === 'ALL' || 
+          (inventoryTypeFilter === 'SEM_SELO' && insp.withoutSeal) ||
           insp.contentType === inventoryTypeFilter ||
           (inventoryTypeFilter === 'CONTAINER' && [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType));
 
@@ -2779,6 +2780,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                           <Filter className={`w-4 h-4 ${inventoryTypeFilter !== 'ALL' ? 'text-blue-500' : 'text-slate-600 dark:text-slate-500'}`} />
                           <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500'}`}>
                             {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : 
+                             inventoryTypeFilter === 'SEM_SELO' ? 'SEM SELO' : 
                              inventoryTypeFilter === 'CONTAINER' ? 'Container (SJ/LP/CP)' : 
                              translateSlotContent(inventoryTypeFilter as SlotContent)}
                           </span>
@@ -2793,6 +2795,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                             <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1">
                               {[
                                 { value: 'ALL', label: 'Todos os Tipos' },
+                                { value: 'SEM_SELO', label: 'SEM SELO' },
                                 { value: SlotContent.BOTTLES, label: 'Frasco' },
                                 { value: SlotContent.SUPPLIES, label: 'Insumo' },
                                 { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },
