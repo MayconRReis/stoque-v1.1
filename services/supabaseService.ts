@@ -585,13 +585,15 @@ export const supabaseService = {
     const containerSlots = allSlots.filter(s => s.id.startsWith('E') || s.id.startsWith('F'));
 
     const totalGeneral = generalSlots.length;
-    const occupiedGeneral = generalSlots.filter(s => s.status !== 'EMPTY').length;
+    const occupiedGeneralPhysical = generalSlots.filter(s => s.status !== 'EMPTY').length;
     
     const totalContainer = containerSlots.length;
-    const occupiedContainer = containerSlots.filter(s => s.status !== 'EMPTY').length;
+    const occupiedContainerPhysical = containerSlots.filter(s => s.status !== 'EMPTY').length;
 
     let totalBottles = 0;
     let waitingPallets = 0;
+    let waitingPalletsGeneral = 0;
+    let waitingPalletsContainer = 0;
     const productDistribution: Record<string, number> = {};
 
     allInspections.forEach(item => {
@@ -599,6 +601,12 @@ export const supabaseService = {
         totalBottles += (insp.bottles || 0);
         if (insp.assignedSlot === 'AGUARDANDO') {
           waitingPallets += 1;
+          const type = insp.contentType || 'OTHER';
+          if (['CONTAINER_SJ', 'CONTAINER_LP', 'CONTAINER_CP'].includes(type)) {
+            waitingPalletsContainer += 1;
+          } else {
+            waitingPalletsGeneral += 1;
+          }
         }
         
         // Count content type distribution
@@ -609,14 +617,14 @@ export const supabaseService = {
 
     return {
       totalSlots: totalGeneral,
-      occupiedSlots: occupiedGeneral,
-      freeSlots: totalGeneral - occupiedGeneral,
-      occupancyRate: totalGeneral > 0 ? Math.round((occupiedGeneral / totalGeneral) * 100) : 0,
+      occupiedSlots: occupiedGeneralPhysical + waitingPalletsGeneral,
+      freeSlots: totalGeneral - occupiedGeneralPhysical,
+      occupancyRate: totalGeneral > 0 ? Math.round(((occupiedGeneralPhysical + waitingPalletsGeneral) / totalGeneral) * 100) : 0,
       
       containerTotalSlots: totalContainer,
-      containerOccupiedSlots: occupiedContainer,
-      containerFreeSlots: totalContainer - occupiedContainer,
-      containerOccupancyRate: totalContainer > 0 ? Math.round((occupiedContainer / totalContainer) * 100) : 0,
+      containerOccupiedSlots: occupiedContainerPhysical + waitingPalletsContainer,
+      containerFreeSlots: totalContainer - occupiedContainerPhysical,
+      containerOccupancyRate: totalContainer > 0 ? Math.round(((occupiedContainerPhysical + waitingPalletsContainer) / totalContainer) * 100) : 0,
 
       pendingEntries: pendingCount,
       openShipmentsCount: openShipments,
