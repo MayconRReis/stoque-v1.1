@@ -647,6 +647,7 @@ export const supabaseService = {
       
       if (error) {
         console.error('Supabase saveInventoryItem error:', error);
+        throw error;
       }
     }
     localStorageHelper.update('inventory', item);
@@ -727,6 +728,7 @@ export const supabaseService = {
       
       if (error) {
         console.error('Supabase updateSlot error:', error);
+        throw error;
       }
     }
     localStorageHelper.update('warehouse_slots', slot);
@@ -800,6 +802,7 @@ export const supabaseService = {
       
       if (error) {
         console.error('Supabase addHistoryEntry error:', error);
+        throw error;
       }
     }
     localStorageHelper.add('history', entry);

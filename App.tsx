@@ -1131,7 +1131,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     updatedInspection?: Partial<InspectionData>
   ) => {
     try {
-      const row = data.find(r => r.id === rowId);
+      const row = data.find(r => r.id === rowId) || pendingRows.find(r => r.id === rowId);
       if (!row) return;
 
       // 1. Pre-validation: check if slot is still free or shareable
@@ -1204,6 +1204,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
       await Promise.all(promises);
 
+      setPendingRows(prev => prev.filter(r => r.id !== rowId));
       setData(prev => prev.map(r => r.id === rowId ? updatedRow : r));
       if (updatedSlot) {
         const newSlot = updatedSlot;
@@ -1222,11 +1223,12 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       console.error('Analysis confirmation error:', error);
       showNotification(`Erro ao confirmar análise: ${error.message}`, 'error');
     }
-  }, [data, slots, user, addToHistory]);
+  }, [data, pendingRows, slots, user, addToHistory]);
 
   const handleRejectAnalysis = async (rowId: string) => {
     try {
       await supabaseService.deleteInventoryItem(rowId);
+      setPendingRows(prev => prev.filter(r => r.id !== rowId));
       setData(prev => prev.filter(r => r.id !== rowId));
       showNotification('Pallet rejeitado e removido da fila.');
       refreshCombinedData();
@@ -1784,14 +1786,14 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     if (!deleteContext) return;
     try {
       if (deleteContext.type === 'row') {
-        const row = data.find(r => r.id === deleteContext.rowId);
+        const row = data.find(r => r.id === deleteContext.rowId) || pendingRows.find(r => r.id === deleteContext.rowId);
         if (row) {
           await addToHistory(createHistoryEntry(HistoryType.REMOVAL, row, `Remoção total da OP ${row.originOP} por ${user?.name || 'Operador'}`));
         }
         await supabaseService.deleteInventoryItem(deleteContext.rowId);
         setData(prev => prev.filter(item => item.id !== deleteContext.rowId));
       } else if (deleteContext.type === 'pallet' && deleteContext.palletIdx !== undefined) {
-        const row = data.find(r => r.id === deleteContext.rowId);
+        const row = data.find(r => r.id === deleteContext.rowId) || pendingRows.find(r => r.id === deleteContext.rowId);
         if (row && row.inspections) {
           const inspection = row.inspections[deleteContext.palletIdx];
           await addToHistory(createHistoryEntry(HistoryType.REMOVAL, row, 'Remoção de pallet', deleteContext.palletIdx + 1));
@@ -1835,7 +1837,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   const confirmMatrixSend = async () => {
     if (!matrixConfirmContext) return;
     const { rowId, palletIdx, slotId } = matrixConfirmContext;
-    const row = data.find(r => r.id === rowId);
+    const row = data.find(r => r.id === rowId) || pendingRows.find(r => r.id === rowId);
     if (!row || !row.inspections) return;
 
     try {
