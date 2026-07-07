@@ -118,17 +118,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
   // Logic to determine available slots for Entry
   const computedAvailableSlots = useMemo(() => {
-    return allSlots.filter(s => {
-      if (s.status === SlotContent.EMPTY) return true;
-      
-      // If the current slot is occupied by a shareable type AND the item we are entering is shareable
-      if (SHAREABLE_SLOT_TYPES.includes(contentType) && SHAREABLE_SLOT_TYPES.includes(s.status)) {
-        return true;
-      }
-      
-      return false;
-    });
-  }, [allSlots, contentType]);
+    return availableSlots;
+  }, [availableSlots]);
 
   const sortedAvailableSlots = useMemo(() => {
     return [...computedAvailableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));

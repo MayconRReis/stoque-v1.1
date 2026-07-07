@@ -50,19 +50,8 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   ];
 
   const computedAvailableSlots = React.useMemo(() => {
-    const currentContentType = contentType || SlotContent.SUPPLIES;
-    
-    return allSlots.filter(s => {
-      if (s.status === SlotContent.EMPTY) return true;
-      
-      // If the current slot is occupied by a shareable type AND the item we are entering is shareable
-      if (shareableSlotTypes.includes(currentContentType) && shareableSlotTypes.includes(s.status)) {
-        return true;
-      }
-      
-      return false;
-    });
-  }, [allSlots, contentType]);
+    return availableSlots;
+  }, [availableSlots]);
 
   const sortedAvailableSlots = React.useMemo(() => {
     return [...computedAvailableSlots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
