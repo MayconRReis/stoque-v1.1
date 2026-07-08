@@ -10,21 +10,16 @@ interface ProductDistributionChartProps {
 const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ productDistribution, occupiedSlots }) => {
   const productData = useMemo(() => {
     const categories = [
-      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600' },
-      { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600' },
-      { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600' },
-      { type: 'CONTAINERS', label: 'Containers', color: 'bg-indigo-600' },
-      { type: SlotContent.RETURN, label: 'Retorno', color: 'bg-red-600' },
-      { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600' },
-      { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-purple-600' },
-      { type: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', color: 'bg-indigo-600' },
-      { type: SlotContent.MISCELLANEOUS, label: 'Diversos', color: 'bg-slate-500' },
-      { type: SlotContent.DISCARD, label: 'Descarte', color: 'bg-red-700' },
-      { type: 'OTHER', label: 'Outros', color: 'bg-slate-600' }
+      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600', maxCapacity: 28 },
+      { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600', maxCapacity: 48 },
+      { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600', maxCapacity: 46 },
+      { type: 'CONTAINERS', label: 'Containers', color: 'bg-indigo-600', maxCapacity: 90 },
+      { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600', maxCapacity: 10 },
+      { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-teal-600', maxCapacity: 10 },
+      { type: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', color: 'bg-pink-600', maxCapacity: 20 },
+      { type: SlotContent.DISCARD, label: 'Descarte', color: 'bg-red-700', maxCapacity: 5 },
+      { type: 'OTHER', label: 'Outros', color: 'bg-slate-600', maxCapacity: 31 }
     ];
-
-    // Total of all pallets in inventory might be different from occupied slots
-    const totalPallets = (Object.values(productDistribution) as number[]).reduce((a, b) => a + b, 0);
 
     return categories.map(item => {
       let count = 0;
@@ -43,8 +38,7 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
         count = (productDistribution[item.type] as number) || 0;
       }
       
-      const totalForRate = totalPallets || 1;
-      const rate = Math.round((count / totalForRate) * 100);
+      const rate = Math.round((count / item.maxCapacity) * 100);
       
       return { ...item, count, rate };
     }).filter(item => item.count > 0 || [SlotContent.BOTTLES, SlotContent.SUPPLIES, SlotContent.FINISHED_PRODUCT].includes(item.type as any));
@@ -69,13 +63,15 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
           <div key={item.label} className="space-y-2">
             <div className="flex justify-between items-end">
               <span className="text-[10px] font-black text-white uppercase tracking-widest italic leading-none">{item.label}</span>
-              <span className="text-[10px] font-black text-slate-400 leading-none">{item.rate}% ({item.count})</span>
+              <span className={`text-[10px] font-black leading-none ${item.rate > 100 ? 'text-red-500' : 'text-slate-400'}`}>
+                {item.rate}% ({item.count} / {item.maxCapacity})
+              </span>
             </div>
-            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden flex">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${item.rate}%` }}
-                className={`h-full ${item.color} rounded-full`}
+                animate={{ width: `${Math.min(item.rate, 100)}%` }}
+                className={`h-full ${item.rate > 100 ? 'bg-red-500' : item.color} rounded-full`}
               />
             </div>
           </div>
