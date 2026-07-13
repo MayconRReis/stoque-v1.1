@@ -104,13 +104,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
       const limit = getProductLimit(productName);
       // Check if product already exists in this slot with SAME TYPE
       const existingItem = items.find(
-        i => i.productName.toLowerCase() === productName.toLowerCase() && 
+        i => (i.productName || '').toLowerCase() === (productName || '').toLowerCase() && 
              i.slotId === selectedSlotId &&
              i.type === productType
       );
 
       const totalExisting = items
-        .filter(i => i.productName.toLowerCase() === productName.toLowerCase())
+        .filter(i => (i.productName || '').toLowerCase() === (productName || '').toLowerCase())
         .reduce((sum, i) => sum + i.quantity, 0);
 
       if (limit && (totalExisting + quantity) > limit) {
@@ -264,8 +264,8 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
   };
 
   const filteredItems = items.filter(i => {
-    const matchesSearch = i.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         i.slotId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (i.productName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+                         (i.slotId || '').toLowerCase().includes((searchTerm || '').toLowerCase());
     const matchesType = typeFilter === 'ALL' || i.type === typeFilter;
     return matchesSearch && matchesType;
   });
@@ -626,7 +626,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
     try {
       const limit = getProductLimit(pName);
       const totalExisting = items
-        .filter(i => i.productName.toLowerCase() === pName.toLowerCase())
+        .filter(i => (i.productName || '').toLowerCase() === (pName || '').toLowerCase())
         .reduce((sum, i) => sum + i.quantity, 0);
 
       if (limit && (totalExisting + qty) > limit) {
@@ -635,7 +635,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
       }
 
       const existingItem = items.find(
-        i => i.productName.toLowerCase() === pName.toLowerCase() && i.slotId === sId && i.type === pType
+        i => (i.productName || '').toLowerCase() === (pName || '').toLowerCase() && i.slotId === sId && i.type === pType
       );
 
       if (existingItem) {

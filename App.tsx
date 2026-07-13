@@ -83,6 +83,7 @@ import WarehouseMap from './components/WarehouseMap';
 import RackDistributionChart from './components/RackDistributionChart';
 import ProductDistributionChart from './components/ProductDistributionChart';
 import InventoryCard from './components/InventoryCard';
+import { ConsolidateDrawer } from './components/ConsolidateDrawer';
 import { RecoveryModal } from './components/RecoveryModal';
 import { User as AppUser } from './types';
 
@@ -222,11 +223,12 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL' | 'CONTAINER' | 'SEM_SELO'>('ALL');
   const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
   const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
+  const [isConsolidateDrawerOpen, setIsConsolidateDrawerOpen] = useState(false);
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
   const [selectedPalletsData, setSelectedPalletsData] = useState<{ row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string }[]>([]);
 
   useEffect(() => {
-    if (isBulkConfirmOpen && selectedPallets.length > 0) {
+    if ((isBulkConfirmOpen || isConsolidateDrawerOpen) && selectedPallets.length > 0) {
       const fetchSelectedData = async () => {
         const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
         try {
@@ -245,10 +247,10 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         }
       };
       fetchSelectedData();
-    } else if (!isBulkConfirmOpen) {
+    } else if (!isBulkConfirmOpen && !isConsolidateDrawerOpen) {
       setSelectedPalletsData([]);
     }
-  }, [isBulkConfirmOpen, selectedPallets]);
+  }, [isBulkConfirmOpen, isConsolidateDrawerOpen, selectedPallets]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historySearch, setHistorySearch] = useState('');
@@ -1971,6 +1973,26 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     setDetailContext({ row, inspection, idx });
   }, []);
 
+  const [isUnconsolidating, setIsUnconsolidating] = useState(false);
+  const handleUnconsolidate = useCallback(async (groupId: string) => {
+    setIsUnconsolidating(true);
+    try {
+      const historyId = crypto.randomUUID();
+      await supabaseService.unconsolidatePallets(groupId, historyId, user?.id || null, user?.name || 'Operador');
+      showNotification('Grupo desconsolidado com sucesso!', 'success');
+      setDetailContext(null);
+      const refreshEvent = new CustomEvent('refresh-inventory');
+      window.dispatchEvent(refreshEvent);
+      const refreshEventDash = new CustomEvent('refresh-dashboard');
+      window.dispatchEvent(refreshEventDash);
+    } catch (error: any) {
+      console.error('Error unconsolidating:', error);
+      showNotification(error.message || 'Erro ao desconsolidar grupo', 'error');
+    } finally {
+      setIsUnconsolidating(false);
+    }
+  }, [user, showNotification]);
+
   const handleEditPallet = useCallback((row: SheetRow, inspection: InspectionData, idx: number) => {
     setEditPalletMode('edit');
     setEditPalletContext({ row, inspection, idx });
@@ -2090,16 +2112,16 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
 
   const filteredHistory = useMemo(() => {
-    const term = historySearch.toLowerCase().trim();
+    const term = (historySearch || '').toLowerCase().trim();
     if (!term) return history;
     return history.filter(entry => 
-      entry.op.toLowerCase().includes(term) ||
-      entry.description.toLowerCase().includes(term) ||
-      entry.lot.toLowerCase().includes(term) ||
-      entry.details.toLowerCase().includes(term) ||
-      entry.loadingId.toLowerCase().includes(term) ||
-      entry.slot.toLowerCase().includes(term) ||
-      (entry.operatorName && entry.operatorName.toLowerCase().includes(term))
+      (entry.op || '').toLowerCase().includes(term) ||
+      (entry.description || '').toLowerCase().includes(term) ||
+      (entry.lot || '').toLowerCase().includes(term) ||
+      (entry.details || '').toLowerCase().includes(term) ||
+      (entry.loadingId || '').toLowerCase().includes(term) ||
+      (entry.slot || '').toLowerCase().includes(term) ||
+      (entry.operatorName && (entry.operatorName || '').toLowerCase().includes(term))
     );
   }, [history, historySearch]);
 
@@ -2108,7 +2130,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     if (activeTab !== 'inventory' && activeTab !== 'shipments' && !isBulkConfirmOpen) return [];
     
     const start = performance.now();
-    const term = inventorySearch.toLowerCase().trim();
+    const term = (inventorySearch || '').toLowerCase().trim();
     const inspectedItems = data.filter(item => item.status === StockStatus.INSPECTED);
     const allPallets: { row: SheetRow, inspection: InspectionData, idx: number }[] = [];
     
@@ -2116,14 +2138,14 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       item.inspections?.forEach((insp, idx) => {
         // Search term check
         const isSemSeloSearch = term === 'sem selo';
-        const matchesSearch = !term || 
+        const matchesSearch = !term || item.is_group || 
           (isSemSeloSearch ? insp.withoutSeal : (
-            item.description.toLowerCase().includes(term) || 
-            item.originOP.includes(term) || 
-            item.lot.toLowerCase().includes(term) ||
-            item.loadingId.toLowerCase().includes(term) ||
-            (insp.assignedSlot && insp.assignedSlot.toLowerCase().includes(term)) ||
-            item.id.toLowerCase().includes(term)
+            (item.description || '').toLowerCase().includes(term) || 
+            (item.originOP || '').toLowerCase().includes(term) || 
+            (item.lot || '').toLowerCase().includes(term) ||
+            (item.loadingId || '').toLowerCase().includes(term) ||
+            (insp.assignedSlot && (insp.assignedSlot || '').toLowerCase().includes(term)) ||
+            (item.id || '').toLowerCase().includes(term)
           ));
         
         // Type filter check
@@ -2422,12 +2444,20 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 {/* Dashboard Actions */}
                 <div className="flex flex-wrap gap-3">
                     {!isPublicView && selectedPallets.length > 0 && (
+                        <>
+                        <button 
+                            onClick={() => setIsConsolidateDrawerOpen(true)}
+                            className="w-full md:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
+                        >
+                            <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
+                        </button>
                         <button 
                             onClick={() => setIsShipmentModalOpen(true)}
                             className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
                         >
                             <Truck className="w-3.5 h-3.5" /> Enviar para Carregamento ({selectedPallets.length})
                         </button>
+                    </>
                     )}
                     {!isPublicView && (
                       <>
@@ -2839,6 +2869,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
                     {selectedPallets.length > 0 && (
                         <div className="flex gap-3 w-full md:w-auto">
+
+                            <button 
+                                onClick={() => setIsConsolidateDrawerOpen(true)}
+                                className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
+                            >
+                                <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
+                            </button>
                             <button 
                                 onClick={() => setIsShipmentModalOpen(true)}
                                 className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20 animate-in zoom-in duration-200"
@@ -3082,7 +3119,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         </div>
       )}
 
-      {detailContext && <InventoryDetailModal isOpen={!!detailContext} onClose={() => setDetailContext(null)} row={detailContext.row} inspection={detailContext.inspection} palletIdx={detailContext.idx} />}
+      {detailContext && <InventoryDetailModal isOpen={!!detailContext} onClose={() => setDetailContext(null)} row={detailContext.row} inspection={detailContext.inspection} palletIdx={detailContext.idx} onUnconsolidate={handleUnconsolidate} isUnconsolidating={isUnconsolidating} />}
       
       {editPalletContext && (
         <EditPalletModal 
@@ -3105,6 +3142,20 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         onCreateNew={handleCreateShipment}
         onAddToExisting={handleAddToShipment}
         selectedCount={selectedPallets.length}
+      />
+
+      
+      <ConsolidateDrawer 
+        isOpen={isConsolidateDrawerOpen}
+        onClose={() => setIsConsolidateDrawerOpen(false)}
+        selectedPalletsData={selectedPalletsData}
+        user={user}
+        onSuccess={() => {
+           setIsConsolidateDrawerOpen(false);
+           setSelectedPallets([]);
+           showNotification('Pallets consolidados com sucesso!');
+           refreshCombinedData();
+        }}
       />
 
       <ShipmentDetailModal 

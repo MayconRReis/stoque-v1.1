@@ -99,8 +99,8 @@ export const UserManager: React.FC = () => {
   };
 
   const filteredProfiles = profiles.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+    (p.id || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   return (

@@ -7,7 +7,8 @@ export interface User {
 
 export enum StockStatus {
   PENDING = 'PENDING',
-  INSPECTED = 'INSPECTED'
+  INSPECTED = 'INSPECTED',
+  CANCELLED = 'CANCELLED'
 }
 
 export enum SlotContent {
@@ -34,7 +35,9 @@ export enum HistoryType {
   REMOVAL = 'REMOVAL',
   TRANSFER = 'TRANSFER',
   ALLOCATION = 'ALLOCATION',
-  EDIT = 'EDIT'
+  EDIT = 'EDIT',
+  CONSOLIDATE_GROUP = 'CONSOLIDATE_GROUP',
+  UNCONSOLIDATE_GROUP = 'UNCONSOLIDATE_GROUP'
 }
 
 export enum ShipmentType {
@@ -116,6 +119,9 @@ export interface SheetRow {
   loadingId: string; // ID extraído da célula B1
   operatorName?: string;
   _isRecovery?: boolean;
+  is_group?: boolean;
+  parent_group_id?: string | null;
+  parentGroup?: SheetRow;
 }
 
 export interface DashboardStats {

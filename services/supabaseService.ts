@@ -16,8 +16,15 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   date TEXT,
  *   status TEXT DEFAULT 'PENDING',
  *   inspections JSONB DEFAULT '[]'::jsonb,
+ *   is_group BOOLEAN DEFAULT false,
+ *   parent_group_id TEXT REFERENCES inventory(id) ON DELETE SET NULL,
  *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
+ * 
+ * -- Migration: Consolidate Pallets
+ * -- ALTER TABLE inventory ADD COLUMN is_group BOOLEAN DEFAULT false;
+ * -- ALTER TABLE inventory ADD COLUMN parent_group_id TEXT REFERENCES inventory(id) ON DELETE SET NULL;
+ * -- CREATE INDEX idx_inventory_parent_group_id ON inventory(parent_group_id);
  * 
  * CREATE TABLE warehouse_slots (
  *   id TEXT PRIMARY KEY,
@@ -99,32 +106,230 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  * ALTER TABLE rotative_stock DISABLE ROW LEVEL SECURITY;
  */
 
+export type InventoryFilter = 'ROOT_ONLY' | 'CHILDREN_ONLY' | 'ALL';
+
+const applyInventoryFilter = (query: any, filterType: InventoryFilter = 'ROOT_ONLY') => {
+  if (filterType === 'ROOT_ONLY') return query.is('parent_group_id', null);
+  if (filterType === 'CHILDREN_ONLY') return query.not('parent_group_id', 'is', null);
+  return query;
+};
+
+const mapInventoryRow = (item: any): SheetRow => ({
+  id: item.id,
+  loadingId: item.loading_id,
+  originOP: item.origin_op,
+  description: item.description,
+  lot: item.lot,
+  pallets: item.pallets,
+  date: item.date,
+  status: item.status as StockStatus,
+  inspections: item.inspections || [],
+  operatorName: item.operator_name,
+  is_group: item.is_group,
+  parent_group_id: item.parent_group_id
+});
+
 export const supabaseService = {
+  async consolidatePallets(childIds: string[], parentId: string, historyId: string, userId: string | null, userName: string): Promise<any> {
+    if (!isSupabaseConfigured) {
+      // Mock implementation for local storage
+      const inventory = localStorageHelper.get('inventory');
+      const children = inventory.filter((item: any) => childIds.includes(item.id));
+      if (children.length < 2) throw new Error('A consolidação requer pelo menos 2 pallets.');
+      
+      const firstChild = children[0];
+      const loadingId = 'PC' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      
+      let totalPallets = 0;
+      let totalBottles = 0;
+      
+      children.forEach((child: any) => {
+        child.parent_group_id = parentId;
+        totalPallets += child.pallets || 0;
+        totalBottles += (child.inspections?.[0]?.bottles) || 0;
+      });
+      
+      const newParent = {
+        ...firstChild,
+        id: parentId,
+        loadingId: loadingId,
+        loading_id: loadingId,
+        pallets: totalPallets,
+        is_group: true,
+        parent_group_id: null,
+        inspections: [
+          {
+            ...firstChild.inspections[0],
+            bottles: totalBottles
+          }
+        ]
+      };
+      
+      inventory.push(newParent);
+      localStorageHelper.save('inventory', inventory);
+      
+      return { success: true, group_id: parentId, loading_id: loadingId, data: mapInventoryRow(newParent) };
+    }
+    
+    const { data: children, error: fetchError } = await supabase.from('inventory').select('*').in('id', childIds);
+    if (fetchError || !children || children.length < 2) throw new Error('Falha ao buscar pallets para consolidação.');
+
+    const firstChild = children[0];
+    const loadingId = 'PC' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    
+    let totalPallets = 0;
+    let totalBottles = 0;
+    
+    children.forEach((child: any) => {
+      totalPallets += child.pallets || 0;
+      totalBottles += (child.inspections?.[0]?.bottles) || 0;
+    });
+
+    const newParent = {
+      id: parentId,
+      loading_id: loadingId,
+      origin_op: firstChild.origin_op,
+      description: firstChild.description,
+      lot: firstChild.lot,
+      pallets: totalPallets,
+      status: 'INSPECTED',
+      is_group: true,
+      parent_group_id: null,
+      inspections: [
+        {
+          ...firstChild.inspections[0],
+          bottles: totalBottles
+        }
+      ]
+    };
+
+    const { data: insertedParent, error: insertError } = await supabase.from('inventory').insert(newParent).select('*').single();
+    if (insertError) throw insertError;
+
+    const { error: updateError } = await supabase.from('inventory').update({ parent_group_id: parentId }).in('id', childIds);
+    if (updateError) throw updateError;
+    
+    const { error: historyError } = await supabase.from('history').insert({
+      id: historyId,
+      type: 'transfer',
+      loading_id: loadingId,
+      origin_op: firstChild.origin_op,
+      description: firstChild.description,
+      lot: firstChild.lot,
+      pallets: totalPallets,
+      details: `Pallets consolidados em ${loadingId}`,
+      user_id: userId,
+      user_name: userName
+    });
+
+    return {
+      success: true,
+      group_id: parentId,
+      loading_id: loadingId,
+      data: mapInventoryRow(insertedParent)
+    };
+  },
+
+  async unconsolidatePallets(groupId: string, historyId: string, userId: string | null, userName: string): Promise<any> {
+    if (!isSupabaseConfigured) {
+      let inventory = localStorageHelper.get('inventory');
+      const groupIndex = inventory.findIndex((item: any) => item.id === groupId);
+      if (groupIndex === -1) throw new Error('Grupo não encontrado.');
+      
+      inventory.forEach((item: any) => {
+        if (item.parent_group_id === groupId) {
+          item.parent_group_id = null;
+        }
+      });
+      
+      inventory.splice(groupIndex, 1);
+      localStorageHelper.save('inventory', inventory);
+      return { success: true };
+    }
+    
+    const { data: parent, error: parentError } = await supabase.from('inventory').select('*').eq('id', groupId).single();
+    if (parentError || !parent) throw new Error('Grupo não encontrado.');
+
+    const { error: updateError } = await supabase.from('inventory').update({ parent_group_id: null }).eq('parent_group_id', groupId);
+    if (updateError) throw updateError;
+
+    const { error: deleteError } = await supabase.from('inventory').delete().eq('id', groupId);
+    if (deleteError) throw deleteError;
+
+    const { error: historyError } = await supabase.from('history').insert({
+      id: historyId,
+      type: 'transfer',
+      loading_id: parent.loading_id,
+      origin_op: parent.origin_op,
+      description: parent.description,
+      lot: parent.lot,
+      pallets: parent.pallets,
+      details: `Desconsolidação do pallet ${parent.loading_id}`,
+      user_id: userId,
+      user_name: userName
+    });
+
+    return { success: true };
+  },
+
+  isGrouped(item: SheetRow): boolean {
+    return !!item.parent_group_id;
+  },
+
+  async getGroupChildren(groupId: string): Promise<SheetRow[]> {
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.filter((r: any) => r.parent_group_id === groupId);
+    }
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('parent_group_id', groupId);
+    if (error) throw error;
+    console.log('--- LOG getPendingInventory ---');
+    console.log((data || []).map((item: any) => ({ loading: item.loading_id, parent: item.parent_group_id, isGroup: item.is_group })));
+    return (data || []).map(mapInventoryRow);
+  },
+
+  async getGroupSummary(groupId: string): Promise<any> {
+    const children = await this.getGroupChildren(groupId);
+    if (children.length === 0) return null;
+    
+    let totalPallets = 0;
+    let totalBottles = 0;
+    
+    children.forEach(child => {
+      totalPallets += child.pallets || 0;
+      child.inspections?.forEach(i => {
+        totalBottles += i.bottles || 0;
+      });
+    });
+
+    return {
+      childrenCount: children.length,
+      totalPallets,
+      totalBottles,
+      children
+    };
+  },
+
   // Inventory
   async getInventory(): Promise<SheetRow[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('inventory');
 
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await applyInventoryFilter(
+      supabase.from('inventory').select('*')
+    ).order('created_at', { ascending: false });
     
     if (error) {
       console.warn('Supabase getInventory failed, falling back to local storage:', error);
       return localStorageHelper.get('inventory');
     }
-    const inventory = (data || []).map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    })).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
+    console.log('--- LOG getInventoryPaginated ---');
+    console.log((data || []).map((item: any) => ({ loading: item.loading_id, parent: item.parent_group_id, isGroup: item.is_group })));
+    console.log('--- LOG getInventory ---');
+    console.log((data || []).map((item: any) => ({ loading: item.loading_id, parent: item.parent_group_id, isGroup: item.is_group })));
+    const inventory = (data || []).map(mapInventoryRow).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
     localStorageHelper.save('inventory', inventory);
     return inventory;
   },
@@ -132,21 +337,22 @@ export const supabaseService = {
   async getInventoryPaginated(page: number, pageSize: number, filters?: { searchTerm?: string, typeFilter?: string }): Promise<{ data: SheetRow[], count: number }> {
     if (!isSupabaseConfigured) {
       const all = localStorageHelper.get('inventory');
-      let filtered = [...all];
+      let filtered = all.filter((row: any) => !row.parent_group_id);
+      
       if (filters?.searchTerm) {
         const originalTerm = filters.searchTerm.trim();
         const upperTerm = originalTerm.toUpperCase();
-        const term = originalTerm.toLowerCase();
+        const term = (originalTerm || '').toLowerCase();
         const isSlot = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
         const isSemSelo = upperTerm === 'SEM SELO';
 
         filtered = filtered.filter(row => {
           const matchesText = 
-            row.originOP.toLowerCase().includes(term) ||
-            row.description.toLowerCase().includes(term) ||
-            row.lot.toLowerCase().includes(term) ||
-            row.id.toLowerCase().includes(term) ||
-            row.loadingId?.toLowerCase().includes(term);
+            (row.originOP || '').toLowerCase().includes(term) ||
+            (row.description || '').toLowerCase().includes(term) ||
+            (row.lot || '').toLowerCase().includes(term) ||
+            (row.id || '').toLowerCase().includes(term) ||
+            (row.loadingId || '').toLowerCase().includes(term);
           
           if (matchesText) return true;
           
@@ -186,53 +392,78 @@ export const supabaseService = {
     const from = page * pageSize;
     const to = from + pageSize - 1;
 
-    let query = supabase
-      .from('inventory')
-      .select('*', { count: 'exact' });
+    let query = applyInventoryFilter(
+      supabase.from('inventory').select('*', { count: 'exact' }),
+      'ROOT_ONLY'
+    );
 
     if (filters?.searchTerm) {
       const originalTerm = filters.searchTerm.trim();
       const upperTerm = originalTerm.toUpperCase();
-      const termFragment = `%${originalTerm}%`;
+      const term = originalTerm.toLowerCase();
       const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
-      
-      let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
       const isSemSeloSearch = upperTerm === 'SEM SELO';
 
-      if (isSlotSearch || isSemSeloSearch) {
-        try {
-          // If it's a slot search or sem selo search, find the IDs of pallets in those slots via JS filter
-          const { data: allWithInsps } = await supabase
-            .from('inventory')
-            .select('id, inspections');
+      try {
+        
+        // Adding limit to avoid missing rows if >1000, or maybe we just do a text search
+        const { data: searchData, error: searchErr } = await supabase.from('inventory').select('id, parent_group_id, origin_op, description, lot, loading_id, inspections').limit(10000);
+        if (searchErr) console.error("Search fetch error:", searchErr);
 
-          if (allWithInsps) {
-            const palletsInTargetSlots = allWithInsps.filter(p => 
-              p.inspections?.some((insp: any) => 
-                (isSlotSearch && insp.assignedSlot?.toUpperCase().startsWith(upperTerm)) ||
-                (isSemSeloSearch && insp.withoutSeal)
-              )
-            ).map(p => p.id);
+        if (searchData) {
+          const matchedRootIds = new Set<string>();
+          console.log('Search Data Count:', searchData.length, 'Search Term:', term);
 
-            if (palletsInTargetSlots.length > 0) {
-              orClause += `,id.in.(${palletsInTargetSlots.join(',')})`;
+
+          searchData.forEach((row: any) => {
+            const matchesText = 
+              (row.origin_op || '').toLowerCase().includes(term) ||
+              (row.description || '').toLowerCase().includes(term) ||
+              (row.lot || '').toLowerCase().includes(term) ||
+              (row.id || '').toLowerCase().includes(term) ||
+              (row.loading_id || '').toLowerCase().includes(term);
+              
+            const matchesSlot = isSlotSearch && row.inspections?.some((i:any) => i.assignedSlot?.toUpperCase().startsWith(upperTerm));
+            const matchesSemSelo = isSemSeloSearch && row.inspections?.some((i:any) => i.withoutSeal);
+            const matchesAssignedSlot = row.inspections?.some((i:any) => (i.assignedSlot || '').toLowerCase().includes(term));
+
+            if (matchesText || matchesSlot || matchesSemSelo || matchesAssignedSlot) {
+              if (row.parent_group_id) {
+                matchedRootIds.add(row.parent_group_id);
+              } else {
+                matchedRootIds.add(row.id);
+              }
             }
+          });
+
+          console.log('Matched Root IDs:', Array.from(matchedRootIds));
+          if (matchedRootIds.size > 0) {
+            
+            const idsArray = Array.from(matchedRootIds);
+            // Limit to 100 to prevent URI Too Long (Failed to fetch)
+            query = query.in('id', idsArray.slice(0, 100));
+
+          } else {
+            query = query.eq('id', 'none_found_' + Date.now());
           }
-        } catch (e) {
-          console.warn('Erro ao processar busca por vaga:', e);
         }
+      } catch (e) {
+         console.warn('Erro na busca', e);
+         const termFragment = `%${originalTerm}%`;
+         let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+         query = query.or(orClause);
       }
-      
-      query = query.or(orClause);
     }
 
     if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
       const isContainerSearch = filters.typeFilter === 'CONTAINER';
-      const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, inspections');
+      const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, parent_group_id, inspections');
       
       if (allWithInsps && !inspError) {
-        const matchingIds = allWithInsps.filter(item => 
-          item.inspections?.some((insp: any) => {
+        const matchedRootIds = new Set<string>();
+
+        allWithInsps.forEach((item: any) => {
+          const matches = item.inspections?.some((insp: any) => {
             if (filters.typeFilter === 'SEM_SELO') {
               return insp.withoutSeal;
             }
@@ -240,62 +471,61 @@ export const supabaseService = {
               return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
             }
             return insp.contentType === filters.typeFilter;
-          })
-        ).map(i => i.id);
+          });
+
+          if (matches) {
+             if (item.parent_group_id) {
+               matchedRootIds.add(item.parent_group_id);
+             } else {
+               matchedRootIds.add(item.id);
+             }
+          }
+        });
         
-        if (matchingIds.length > 0) {
-          query = query.in('id', matchingIds);
+        console.log('Matched Root IDs:', Array.from(matchedRootIds));
+          if (matchedRootIds.size > 0) {
+          
+            const idsArray = Array.from(matchedRootIds);
+            // Limit to 100 to prevent URI Too Long (Failed to fetch)
+            query = query.in('id', idsArray.slice(0, 100));
+
         } else {
           query = query.eq('id', 'none_found_' + Date.now());
         }
       }
     }
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
+    query = query.eq('status', 'INSPECTED').order('created_at', { ascending: false }).range(from, to);
 
+    const { data, count, error } = await query;
+    
     if (error) {
-      console.error('Supabase getInventoryPaginated error:', error);
-      throw error;
+      console.warn('Supabase getInventoryPaginated failed, falling back to local storage:', error);
+      const all = localStorageHelper.get('inventory');
+      return { data: all.slice(from, to), count: all.length };
     }
 
-    const inventory = (data || []).map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    })).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
-
-    return { data: inventory, count: inventory.length };
+    return {
+      data: (data || []).map(mapInventoryRow),
+      count: count || 0
+    };
   },
 
   async getPendingInventory(): Promise<SheetRow[]> {
-    if (!isSupabaseConfigured) return localStorageHelper.get('inventory').filter((r: any) => r.status === StockStatus.PENDING);
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('status', 'PENDING')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    }));
+    if (!isSupabaseConfigured) {
+      const all = localStorageHelper.get('inventory');
+      return all.filter((r: any) => r.status === 'PENDING');
+    }
+    const { data, error } = await applyInventoryFilter(
+      supabase.from('inventory').select('*'),
+      'ROOT_ONLY'
+    ).eq('status', 'PENDING').order('created_at', { ascending: false });
+    
+    if (error) {
+      console.warn('Supabase getPendingInventory failed:', error);
+      return [];
+    }
+    return (data || []).map(mapInventoryRow);
   },
 
   async getWaitingInventory(): Promise<SheetRow[]> {
@@ -304,25 +534,15 @@ export const supabaseService = {
     // Since we can't easily filter by nested JSON array value in a simple .eq(), 
     // we fetch items that likely have it or just fetch and filter.
     // Given 'AGUARDANDO' is a specific use case, we fetch all non-pending and filter.
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .neq('status', 'PENDING');
+    const { data, error } = await applyInventoryFilter(
+      supabase.from('inventory').select('*'),
+      'ROOT_ONLY'
+    ).neq('status', 'PENDING');
     
     if (error) throw error;
-    
-    const inventory = (data || []).map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    }));
+    console.log('--- LOG getWaitingInventory ---');
+    console.log((data || []).map((item: any) => ({ loading: item.loading_id, parent: item.parent_group_id, isGroup: item.is_group })));
+    const inventory = (data || []).map(mapInventoryRow);
 
     return inventory.filter(row => row.inspections?.some(insp => insp.assignedSlot === 'AGUARDANDO'));
   },
@@ -347,18 +567,18 @@ export const supabaseService = {
       return null;
     }
 
-    return {
-      id: data.id,
-      loadingId: data.loading_id,
-      originOP: data.origin_op,
-      description: data.description,
-      lot: data.lot,
-      pallets: data.pallets,
-      date: data.date,
-      status: data.status as StockStatus,
-      inspections: data.inspections || [],
-      operatorName: data.operator_name
-    };
+    let item = mapInventoryRow(data);
+    if (item.parent_group_id) {
+      const { data: parentData } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('id', item.parent_group_id)
+        .single();
+      if (parentData) {
+        (item as any).parentGroup = mapInventoryRow(parentData);
+      }
+    }
+    return item;
   },
 
   async getInventoryItemByLoadingId(loadingId: string): Promise<SheetRow | null> {
@@ -379,18 +599,7 @@ export const supabaseService = {
       return null;
     }
 
-    return {
-      id: data.id,
-      loadingId: data.loading_id,
-      originOP: data.origin_op,
-      description: data.description,
-      lot: data.lot,
-      pallets: data.pallets,
-      date: data.date,
-      status: data.status as StockStatus,
-      inspections: data.inspections || [],
-      operatorName: data.operator_name
-    };
+    return mapInventoryRow(data);
   },
 
   async getInventoryItemsByShipmentId(shipmentId: string): Promise<SheetRow[]> {
@@ -400,11 +609,11 @@ export const supabaseService = {
     }
     
     // Use the reliable fetch-and-filter approach for JSONB content
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*');
+    const { data, error } = await applyInventoryFilter(supabase.from('inventory').select('*'), 'ROOT_ONLY');
 
     if (error) throw error;
+    console.log('--- LOG getAllInventoryForExport ---');
+    console.log((data || []).map((item: any) => ({ loading: item.loading_id, parent: item.parent_group_id, isGroup: item.is_group })));
 
     const filtered = (data || []).filter(item => 
       Array.isArray(item.inspections) && item.inspections.some((i: any) => 
@@ -412,18 +621,7 @@ export const supabaseService = {
       )
     );
     
-    return filtered.map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    }));
+    return filtered.map(mapInventoryRow);
   },
 
   async getInventoryItemsByIds(ids: string[]): Promise<SheetRow[]> {
@@ -439,27 +637,14 @@ export const supabaseService = {
     if (error) throw error;
 
     return (data || [])
-      .map(item => ({
-        id: item.id,
-        loadingId: item.loading_id,
-        originOP: item.origin_op,
-        description: item.description,
-        lot: item.lot,
-        pallets: item.pallets,
-        date: item.date,
-        status: item.status as StockStatus,
-        inspections: item.inspections || [],
-        operatorName: item.operator_name
-      }))
+      .map(mapInventoryRow)
       .filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
   },
 
-  async getAllInventoryForExport(filters?: { searchTerm?: string, typeFilter?: string }): Promise<SheetRow[]> {
+  async getAllInventoryForExport(filters?: { searchTerm?: string, typeFilter?: string, includeGrouped?: boolean }): Promise<SheetRow[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('inventory');
 
-    let query = supabase
-      .from('inventory')
-      .select('*');
+    let query = applyInventoryFilter(supabase.from('inventory').select('*'), filters?.includeGrouped ? 'ALL' : 'ROOT_ONLY');
 
     if (filters?.searchTerm) {
       const originalTerm = filters.searchTerm.trim();
@@ -514,7 +699,7 @@ export const supabaseService = {
         ).map(i => i.id);
         
         if (matchingIds.length > 0) {
-          query = query.in('id', matchingIds);
+          query = query.in('id', matchingIds.slice(0, 150));
         } else {
           query = query.eq('id', 'none_found_export_' + Date.now());
         }
@@ -528,18 +713,7 @@ export const supabaseService = {
     // Filter out items with empty inspections as they are considered "out of stock"
     const validItems = (data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
-    return validItems.map(item => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date,
-      status: item.status as StockStatus,
-      inspections: item.inspections || [],
-      operatorName: item.operator_name
-    }));
+    return validItems.map(mapInventoryRow);
   },
 
   async getGlobalStats(): Promise<DashboardStats> {
@@ -566,11 +740,11 @@ export const supabaseService = {
 
     const results = await Promise.all([
       supabase.from('warehouse_slots').select('id, status'),
-      supabase.from('inventory').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
+      applyInventoryFilter(supabase.from('inventory').select('*', { count: 'exact', head: true }), 'ROOT_ONLY').eq('status', 'PENDING'),
       supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
       supabase.from('history').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'CLOSED').gte('closed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-      supabase.from('inventory').select('inspections') 
+      applyInventoryFilter(supabase.from('inventory').select('inspections, parent_group_id'), 'ROOT_ONLY') 
     ]);
 
     const allSlots = results[0].data || [];
@@ -578,6 +752,8 @@ export const supabaseService = {
     const openShipments = results[2].count || 0;
     const movements24h = results[3].count || 0;
     const finishedShipments = results[4].count || 0;
+    console.log('--- LOG getGlobalStats (inspections) ---');
+    console.log((results[5].data || []).map((item: any) => ({ parent: item.parent_group_id })));
     const allInspections = (results[5].data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
     // Filter slots by category
@@ -827,13 +1003,13 @@ export const supabaseService = {
       localStorage.setItem('stoque_plus_logged_user', JSON.stringify({
         id: mockUser.id,
         name: username,
-        role: username.toLowerCase() === 'admin' ? 'admin' : 'operator'
+        role: (username || '').toLowerCase() === 'admin' ? 'admin' : 'operator'
       }));
       return { user: mockUser, session: { access_token: 'mock-token' } };
     }
 
     // We append a domain to the username to use Supabase Auth's email system
-    const email = `${username.toLowerCase().trim()}@stoqueplus.com`;
+    const email = `${(username || '').toLowerCase().trim()}@stoqueplus.com`;
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -951,7 +1127,7 @@ export const supabaseService = {
       throw new Error('Apenas administradores podem criar novos usuários.');
     }
 
-    const email = `${username.toLowerCase().trim()}@stoqueplus.com`;
+    const email = `${(username || '').toLowerCase().trim()}@stoqueplus.com`;
     
     // Step 1: Create a temporary client that doesn't persist session
     // This prevents the admin from being logged out when creating a new user
@@ -1057,9 +1233,10 @@ export const supabaseService = {
 
     // Fetching and filtering in JS is safer against inconsistent JSONB structures (array vs object)
     // that cause Postgrest syntax errors.
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*');
+    const { data, error } = await applyInventoryFilter(
+      supabase.from('inventory').select('*'),
+      'ROOT_ONLY'
+    );
 
     if (error) throw error;
     if (!data) return [];
@@ -1517,7 +1694,7 @@ export const supabaseService = {
     try {
       const [slotsRes, inventoryRes] = await Promise.all([
         supabase.from('warehouse_slots').select('id, status, occupied_by'),
-        supabase.from('inventory').select('id, loading_id, inspections').neq('status', 'PENDING')
+        applyInventoryFilter(supabase.from('inventory').select('id, loading_id, inspections'), 'ROOT_ONLY').neq('status', 'PENDING')
       ]);
 
       const slots = slotsRes.data || [];
@@ -1652,10 +1829,7 @@ export const supabaseService = {
     try {
       // Find all items with status NOT PENDING (as pending items don't have inspections yet)
       // and check if inspections is empty
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('id, inspections')
-        .neq('status', 'PENDING');
+      const { data, error } = await supabase.from('inventory').select('id, inspections').neq('status', 'PENDING').eq('is_group', false).is('parent_group_id', null);
       
       if (error) throw error;
       

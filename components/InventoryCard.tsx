@@ -11,7 +11,7 @@ import {
   Layers, 
   Hash, 
   AlertCircle, 
-  Info, 
+  Info, Link, 
   Pencil, 
   Trash2,
   Warehouse,
@@ -116,6 +116,14 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
                 SEM SELO
               </div>
             )}
+
+            {item.is_group && (
+              <div className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-emerald-500/30 mt-1">
+                <Layers className="w-3 h-3" />
+                CONSOLIDADO
+              </div>
+            )}
+
           </div>
 
           <div className="text-right">

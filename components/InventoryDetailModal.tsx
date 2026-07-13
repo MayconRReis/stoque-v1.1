@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SheetRow, InspectionData, SlotContent } from '../types';
 import { 
   FlaskConical, 
@@ -18,10 +18,25 @@ interface InventoryDetailModalProps {
   row: SheetRow;
   inspection: InspectionData;
   palletIdx: number;
+  onUnconsolidate?: (groupId: string) => Promise<void>;
+  isUnconsolidating?: boolean;
 }
 
-export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOpen, onClose, row, inspection, palletIdx }) => {
+export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOpen, onClose, row, inspection, palletIdx, onUnconsolidate, isUnconsolidating }) => {
   if (!isOpen) return null;
+
+
+    const [children, setChildren] = useState<SheetRow[]>([]);
+  
+  useEffect(() => {
+    if (isOpen && row.is_group) {
+      import('../services/supabaseService').then(({ supabaseService }) => {
+        supabaseService.getGroupChildren(row.id).then(data => {
+          setChildren(data);
+        });
+      });
+    }
+  }, [isOpen, row.is_group, row.id]);
 
   const isBottles = inspection.contentType === SlotContent.BOTTLES;
   const isFinished = inspection.contentType === SlotContent.FINISHED_PRODUCT;
@@ -139,6 +154,30 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                     <span className="text-lg font-black text-green-400 font-mono">{row.pallets}</span>
                  </div>
                )}
+            </div>
+          )}
+
+          {row.is_group && children.length > 0 && (
+            <div className="bg-slate-800/20 p-6 rounded-[32px] border border-slate-800/40 space-y-4">
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Pallets Agrupados ({children.length})</p>
+              <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                {children.map(child => (
+                  <div key={child.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-300 font-mono">{child.loadingId}</span>
+                    <div className="flex gap-3"><span className="text-[10px] text-slate-500 uppercase tracking-widest">{child.originOP ? `OP ${child.originOP}` : ''}</span><span className="text-[10px] text-slate-500 uppercase tracking-widest">{child.lot ? `Lote ${child.lot}` : ''}</span></div>
+                  </div>
+                ))}
+              </div>
+              {onUnconsolidate && (
+                <button
+                  onClick={() => onUnconsolidate(row.id)}
+                  disabled={isUnconsolidating}
+                  className="w-full py-4 mt-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl font-black text-[10px] uppercase tracking-widest border border-red-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isUnconsolidating && <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />}
+                  Desconsolidar Grupo
+                </button>
+              )}
             </div>
           )}
 
