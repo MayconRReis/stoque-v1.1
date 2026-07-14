@@ -2137,16 +2137,20 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     inspectedItems.forEach(item => {
       item.inspections?.forEach((insp, idx) => {
         // Search term check
+        
         const isSemSeloSearch = term === 'sem selo';
-        const matchesSearch = !term || item.is_group || 
-          (isSemSeloSearch ? insp.withoutSeal : (
-            (item.description || '').toLowerCase().includes(term) || 
-            (item.originOP || '').toLowerCase().includes(term) || 
-            (item.lot || '').toLowerCase().includes(term) ||
-            (item.loadingId || '').toLowerCase().includes(term) ||
-            (insp.assignedSlot && (insp.assignedSlot || '').toLowerCase().includes(term)) ||
-            (item.id || '').toLowerCase().includes(term)
-          ));
+        const isSlotSearch = /^[a-fA-F](\.\d+){0,2}$/.test(term);
+        
+        let matchesSearch = true;
+        if (term) {
+           if (isSemSeloSearch) {
+              matchesSearch = insp.withoutSeal === true;
+           } else if (isSlotSearch) {
+              matchesSearch = (insp.assignedSlot || '').toLowerCase().includes(term);
+           }
+        }
+
+
         
         // Type filter check
         const matchesType = inventoryTypeFilter === 'ALL' || 

@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabaseService } from '../services/supabaseService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { FileText } from 'lucide-react';
 
 interface ShipmentDetailModalProps {
   isOpen: boolean;
@@ -89,6 +92,80 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
     } finally {
       setIsSearching(false);
     }
+  };
+
+  
+    const handleGeneratePDF = () => {
+    if (!shipment) return;
+    
+    // Use landscape orientation
+    const doc = new jsPDF('l', 'mm', 'a4');
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text('Lista de Separação - Carregamento', 14, 15);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`ID do Carregamento: ${shipment.id}`, 14, 22);
+    doc.text(`Tipo: ${shipment.type === 'THIRD_PARTY' ? 'Terceirista' : 'Próprio'}`, 14, 28);
+    const dateStr = shipment.scheduledDate ? new Date(shipment.scheduledDate).toLocaleDateString('pt-BR') : (shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString('pt-BR') : 'N/A');
+    doc.text(`Data Agendada: ${dateStr}`, 14, 34);
+    
+    doc.text(`Total de Pallets: ${linkedPallets.length}`, 230, 34);
+
+    const tableData = linkedPallets.map(p => {
+      const insp = p.inspections?.[0] || {};
+      
+      // Clean up garbled characters like 'ÿý'
+      let cleanDesc = (p.description || '-')
+        .replace(/[ÿý]/gi, '')
+        .replace(/[^a-zA-Z0-9À-ÖØ-öø-ÿ \-.,()/]/g, '')
+        .trim();
+      
+      const tipo = p.is_group ? 'CONSOLIDADO' : (insp.contentType ? translateSlotContent(insp.contentType) : '-');
+
+      return [
+        p.originOP || '-',
+        p.lot || '-',
+        cleanDesc || '-',
+        tipo,
+        insp.assignedSlot || 'SEM VAGA'
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['OP', 'Lote', 'Produto', 'Tipo', 'Vaga']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [37, 99, 235],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      styles: { 
+        fontSize: 11,
+        cellPadding: 4,
+        minCellHeight: 8,
+        valign: 'middle'
+      },
+      columnStyles: {
+        0: { cellWidth: 30, halign: 'center' },
+        1: { cellWidth: 40, halign: 'center' },
+        2: { cellWidth: 'auto' }, 
+        3: { cellWidth: 35, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    doc.save(`Separacao_${shipment.id || 'Carregamento'}.pdf`);
   };
 
   const handleFinalize = async () => {
@@ -285,6 +362,13 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
               title="Excluir Carregamento"
             >
               <Trash2 className="w-5 h-5 mx-auto" />
+            </button>
+            
+            <button 
+              onClick={handleGeneratePDF}
+              className="flex-1 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-blue-900/40 transition-all flex items-center justify-center gap-3 active:scale-95"
+            >
+              <FileText className="w-5 h-5" /> PDF
             </button>
             <button 
               onClick={onClose}
