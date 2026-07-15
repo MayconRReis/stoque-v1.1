@@ -338,6 +338,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[8px] font-black text-slate-600 uppercase">Lote: {pallet.lot}</span>
                           <span className="text-[8px] font-black text-slate-600 uppercase">Vaga: {pallet.inspections?.[0]?.assignedSlot || 'N/A'}</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase">Tipo: {pallet.is_group ? 'CONSOLIDADO' : (pallet.inspections?.[0]?.contentType ? translateSlotContent(pallet.inspections[0].contentType) : '-')}</span>
                         </div>
                       </div>
                     </div>
