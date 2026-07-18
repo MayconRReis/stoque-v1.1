@@ -194,12 +194,12 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                           {group.status || 'STATUS DESCONHECIDO'}
                         </span>
                         <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[9px] font-black uppercase tracking-widest">
-                          {group.pallets.length} {group.pallets.length === 1 ? 'Registro' : 'Registros'}
+                          {group.totalPallets} UN
                         </span>
                       </div>
                     </div>
                     <div className="w-16 h-16 bg-slate-50 dark:bg-slate-950/50 rounded-2xl flex flex-col items-center justify-center border border-slate-200 dark:border-slate-800 shadow-inner shrink-0">
-                      <span className="text-xl font-black text-slate-900 dark:text-white leading-none">{group.totalPallets}</span>
+                      <span className="text-xl font-black text-slate-900 dark:text-white leading-none">{group.pallets.length}</span>
                       <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Plts Totais</span>
                     </div>
                   </div>
