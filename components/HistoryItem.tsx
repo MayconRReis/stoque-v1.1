@@ -46,6 +46,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ entry, onRecover }) => {
           <div className="flex flex-wrap gap-3 mt-1">
             <span className="text-[9px] font-bold text-blue-500/80">OP {entry.op}</span>
             <span className="text-[9px] font-bold text-amber-500/80">Lote {entry.lot}</span>
+            <span className="text-[9px] font-bold text-slate-400/80">Tipo: {entry.palletType || '-'}</span>
             {entry.operatorName && (
               <span className="text-[9px] font-bold text-purple-500/80">Op: {entry.operatorName}</span>
             )}

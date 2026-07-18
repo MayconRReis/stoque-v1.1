@@ -73,6 +73,7 @@ export interface HistoryEntry {
   slot: string;
   details: string;
   operatorName?: string;
+  palletType?: string;
 }
 
 export interface WarehouseSlot {

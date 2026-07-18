@@ -435,20 +435,25 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     }
   }, [user]);
 
-  const createHistoryEntry = useCallback((type: HistoryType, row: SheetRow, details: string, palletNum: number = 1): HistoryEntry => ({
-    id: Math.random().toString(36).substring(2, 9),
-    type,
-    timestamp: new Date().toLocaleString('pt-BR'),
-    loadingId: row.loadingId,
-    description: row.description,
-    op: row.originOP,
-    lot: row.lot,
-    palletNumber: palletNum,
-    totalPallets: row.pallets,
-    slot: row.inspections?.[0]?.assignedSlot || 'N/A',
-    details,
-    operatorName: user?.name
-  }), [user]);
+  const createHistoryEntry = useCallback((type: HistoryType, row: SheetRow, details: string, palletNum: number = 1): HistoryEntry => {
+    const inspection = row.inspections?.[palletNum - 1];
+    const palletType = row.is_group ? 'CONSOLIDADO' : (inspection?.contentType ? translateSlotContent(inspection.contentType) : '-');
+    return {
+      id: Math.random().toString(36).substring(2, 9),
+      type,
+      timestamp: new Date().toLocaleString('pt-BR'),
+      loadingId: row.loadingId,
+      description: row.description,
+      op: row.originOP,
+      lot: row.lot,
+      palletNumber: palletNum,
+      totalPallets: row.pallets,
+      slot: inspection?.assignedSlot || row.inspections?.[0]?.assignedSlot || 'N/A',
+      details,
+      operatorName: user?.name,
+      palletType
+    };
+  }, [user]);
 
   const createRecoverableExitEntry = useCallback((row: SheetRow, inspection: InspectionData, details: string, palletNum: number = 1, fullRow: boolean = false): HistoryEntry => ({
     ...createHistoryEntry(HistoryType.EXIT, row, details, palletNum),
