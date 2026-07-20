@@ -110,7 +110,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
     doc.setTextColor(100, 116, 139); // slate-500
     doc.text(`ID do Carregamento: ${shipment.id}`, 14, 22);
     doc.text(`Tipo: ${shipment.type === 'THIRD_PARTY' ? 'Terceirista' : 'Próprio'}`, 14, 28);
-    const dateStr = shipment.scheduledDate ? new Date(shipment.scheduledDate).toLocaleDateString('pt-BR') : (shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString('pt-BR') : 'N/A');
+    const dateStr = shipment.scheduledDate ? new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR') : (shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString('pt-BR') : 'N/A');
     doc.text(`Data Agendada: ${dateStr}`, 14, 34);
     
     doc.text(`Total de Pallets: ${linkedPallets.length}`, 230, 34);
@@ -268,7 +268,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
             </div>
             <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Data de Envio</p>
-              <p className="text-sm font-black text-white italic">{new Date(shipment.scheduledDate).toLocaleDateString('pt-BR')}</p>
+              <p className="text-sm font-black text-white italic">{new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
             </div>
             <div className="bg-slate-950/50 p-5 rounded-[2rem] border border-slate-800/50">
               <p className="text-[9px] text-slate-600 font-black uppercase mb-1">Total Pallets</p>
