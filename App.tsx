@@ -136,12 +136,12 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
 const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, activeTab }: { tab: string, icon: React.ElementType, label: string, badge?: number, isActive: boolean, onNavigate: (tab: any) => void, activeTab: string }) => (
   <button 
     onClick={() => onNavigate(tab)} 
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-200 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200'}`}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-slate-900 dark:text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-200 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200'}`}
   >
     <Icon className={`w-4 h-4 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-slate-700 dark:text-slate-300'}`} />
     <span className="font-semibold text-sm">{label}</span>
     {badge ? (
-      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-950 text-blue-400 border border-blue-900/30">
+      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-950 text-blue-400 border border-blue-900/30">
         {badge}
       </span>
     ) : null}
@@ -2039,7 +2039,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
              </div>
           </div>
           
-          <div className="bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800/50 flex items-center gap-6">
+          <div className="bg-slate-50/50 dark:bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800/50 flex items-center gap-6">
             <div className="flex flex-col items-center">
               <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Livres</span>
               <span className="text-sm font-black text-blue-500">{freeCount}</span>
@@ -2076,7 +2076,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   setSelectedMappingSlot(slot);
                 }}
                 className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all group relative cursor-pointer ${
-                slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-300 dark:border-slate-800/50 hover:border-slate-700' : 
+                slot.status === SlotContent.EMPTY ? 'bg-slate-50/30 dark:bg-slate-950/30 border-slate-300 dark:border-slate-800/50 hover:border-slate-700' : 
                 slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
                 slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
                 isContainer ? 'bg-slate-300/10 border-slate-100/30' :
@@ -2191,7 +2191,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-[10px] font-black text-slate-600 dark:text-slate-500 uppercase tracking-[0.3em]">Carregando Stoque+</p>
@@ -2208,7 +2208,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col lg:flex-row font-sans selection:bg-blue-600/30 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col lg:flex-row font-sans selection:bg-blue-600/30 overflow-x-hidden">
       
       {/* Slot Actions Modal */}
       <AnimatePresence>
@@ -2219,7 +2219,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedMappingSlot(null)}
-              className="absolute inset-0 bg-slate-950/90 backdrop-blur-md"
+              className="absolute inset-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-md"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -2241,7 +2241,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 {selectedMappingSlot.status === SlotContent.EMPTY && (
                   <button 
                     onClick={() => handleDedicateSlot(selectedMappingSlot)}
-                    className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                    className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
                   >
                     <TrendingUp className="w-4 h-4" /> Dedicar ao Rotativo
                   </button>
@@ -2254,7 +2254,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         navigateToTab('rotative');
                         setSelectedMappingSlot(null);
                       }}
-                      className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+                      className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
                     >
                       <Search className="w-4 h-4" /> Ver Estoque Rotativo
                     </button>
@@ -2268,7 +2268,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 )}
 
                 {![SlotContent.EMPTY, SlotContent.ROTATIVE].includes(selectedMappingSlot.status as any) && (
-                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
                     <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-2 text-center">Ocupado por</p>
                     <p className="text-slate-900 dark:text-white font-black uppercase text-center text-sm">{selectedMappingSlot.occupiedBy || 'N/A'}</p>
                   </div>
@@ -2301,7 +2301,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       {/* Sidebar Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
+          className="fixed inset-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -2350,7 +2350,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                 </div>
                 <button 
                   onClick={() => setIsLogoutConfirmOpen(true)}
-                  className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg"
+                  className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg"
                   title="Sair do Sistema"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -2361,7 +2361,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   <span>Ocupação G0</span>
                   <span>{stats.occupancyRate}%</span>
                 </div>
-                <div className="h-1.5 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="h-1.5 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden">
                    <div className="h-full bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
                 </div>
               </div>
@@ -2372,7 +2372,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-900/50 h-16 px-4 md:px-10 flex justify-between items-center sticky top-0 z-40 shrink-0">
+        <header className="bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-300/50 dark:border-slate-900/50 h-16 px-4 md:px-10 flex justify-between items-center sticky top-0 z-40 shrink-0">
           <div className="flex items-center gap-3 md:gap-4">
             {!isPublicView && (
               <button 
@@ -2416,7 +2416,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
              {isPublicView && (
                <button 
                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
-                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[9px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
+                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[9px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
                >
                  Acessar App
                </button>
@@ -2440,7 +2440,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               <div className="pt-10">
                 <button 
                   onClick={() => setIsMovementModalOpen(true)}
-                  className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 flex items-center gap-4 mx-auto"
+                  className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 flex items-center gap-4 mx-auto"
                 >
                   Abrir Painel de Movimentação <Plus className="w-5 h-5" />
                 </button>
@@ -2456,13 +2456,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         <>
                         <button 
                             onClick={() => setIsConsolidateDrawerOpen(true)}
-                            className="w-full md:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
+                            className="w-full md:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
                         >
                             <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
                         </button>
                         <button 
                             onClick={() => setIsShipmentModalOpen(true)}
-                            className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
+                            className="w-full md:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 animate-in zoom-in duration-200"
                         >
                             <Truck className="w-3.5 h-3.5" /> Enviar para Carregamento ({selectedPallets.length})
                         </button>
@@ -2508,7 +2508,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                       </div>
                     </div>
-                    <div className="h-3 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+                    <div className="h-3 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
@@ -2543,7 +2543,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                         <span className="text-2xl font-black text-indigo-500 italic">{stats.containerOccupancyRate}%</span>
                       </div>
                     </div>
-                    <div className="h-3 bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+                    <div className="h-3 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(stats.containerOccupancyRate, 100)}%` }}
@@ -2724,7 +2724,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
                 <div className="space-y-3">
                     {filteredHistory.length === 0 ? (
-                        <div className="py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
+                        <div className="py-32 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[2.5rem]">
                             <History className="w-12 h-12 text-slate-800 mx-auto mb-4" />
                             <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">
                                 {historySearch ? 'Nenhum registro encontrado para esta pesquisa' : 'Sem movimentações registradas'}
@@ -2859,10 +2859,10 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                                     setIsInventoryFilterOpen(false);
                                   }}
                                   className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                                    (type as any).isSub ? 'ml-4 bg-slate-950/30' : ''
+                                    (type as any).isSub ? 'ml-4 bg-slate-50/30 dark:bg-slate-950/30' : ''
                                   } ${
                                     inventoryTypeFilter === type.value 
-                                      ? 'bg-blue-600 text-white' 
+                                      ? 'bg-blue-600 text-slate-900 dark:text-white' 
                                       : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-900 dark:text-white'
                                   }`}
                                 >
@@ -2881,19 +2881,19 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
                             <button 
                                 onClick={() => setIsConsolidateDrawerOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
+                                className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
                             >
                                 <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
                             </button>
                             <button 
                                 onClick={() => setIsShipmentModalOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20 animate-in zoom-in duration-200"
+                                className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20 animate-in zoom-in duration-200"
                             >
                                 <Truck className="w-3.5 h-3.5" /> Carregamento ({selectedPallets.length})
                             </button>
                             <button 
                                 onClick={() => setIsBulkConfirmOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
+                                className="flex-1 md:flex-none px-5 py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
                             >
                                 <Send className="w-3.5 h-3.5" /> Enviar ({selectedPallets.length})
                             </button>
@@ -2903,7 +2903,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
                 {filteredInventory.length === 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-                        <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-900 rounded-[32px]">
+                        <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[32px]">
                             <p className="text-slate-700 font-black uppercase text-[10px] tracking-[0.3em]">Nenhum item encontrado no estoque</p>
                         </div>
                     </div>
@@ -2955,7 +2955,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       {/* Modals & Dialogs */}
 
       {isDiagnosticDetailsOpen && warehouseDiagnostic && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+        <div className="fixed inset-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -2979,7 +2979,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {warehouseDiagnostic.details.noDefinitiveSlotItems.map((item, i) => (
-                      <div key={i} className="bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                      <div key={i} className="bg-slate-50/50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300">
                         {item}
                       </div>
                     ))}
@@ -3055,7 +3055,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               {!isPublicView && (warehouseDiagnostic.orphanedSlots > 0 || warehouseDiagnostic.freeSlotsWithPallets > 0) && (
                 <button 
                   onClick={handleResyncSlots}
-                  className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                  className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" /> Reparar Vagas
                 </button>
@@ -3076,32 +3076,32 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       )}
 
       {deleteContext && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertCircle className="w-8 h-8" /></div>
             <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Exclusão</h3>
             <p className="text-slate-600 dark:text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed">{deleteContext.type === 'row' ? 'Deseja remover este carregamento da fila?' : 'Deseja remover este pallet do inventário?'}</p>
-            <div className="flex gap-4 pt-4"><button onClick={() => setDeleteContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Cancelar</button><button onClick={confirmDelete} className="flex-1 py-3 md:py-3.5 bg-red-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95">Remover</button></div>
+            <div className="flex gap-4 pt-4"><button onClick={() => setDeleteContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Cancelar</button><button onClick={confirmDelete} className="flex-1 py-3 md:py-3.5 bg-red-600 text-slate-900 dark:text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95">Remover</button></div>
           </div>
         </div>
       )}
 
       {matrixConfirmContext && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-200">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-blue-900/20"><Truck className="w-8 h-8" /></div>
             <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg md:text-xl italic tracking-tight">Confirmar Envio</h3>
             <p className="text-slate-600 dark:text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed px-4">Tem certeza que deseja enviar este pallet para processamento na Matriz?</p>
             <div className="flex gap-4 pt-4">
               <button onClick={() => setMatrixConfirmContext(null)} className="flex-1 py-3 md:py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[9px] md:text-[10px] uppercase rounded-2xl transition-all">Não</button>
-              <button onClick={confirmMatrixSend} className="flex-1 py-3 md:py-3.5 bg-blue-600 text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg shadow-blue-900/40 transition-all active:scale-95">Sim, Enviar</button>
+              <button onClick={confirmMatrixSend} className="flex-1 py-3 md:py-3.5 bg-blue-600 text-slate-900 dark:text-white font-black text-[9px] md:text-[10px] uppercase rounded-2xl shadow-lg shadow-blue-900/40 transition-all active:scale-95">Sim, Enviar</button>
             </div>
           </div>
         </div>
       )}
 
       {isLogoutConfirmOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-3xl text-center space-y-6 animate-in zoom-in duration-300">
             <div className="w-16 h-16 bg-red-600/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto border border-red-500/20 shadow-xl shadow-red-900/20">
               <LogOut className="w-8 h-8" />
@@ -3119,7 +3119,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
               </button>
               <button 
                 onClick={handleLogout} 
-                className="flex-1 py-4 bg-red-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-lg shadow-red-900/40 transition-all hover:bg-red-500 active:scale-95"
+                className="flex-1 py-4 bg-red-600 text-slate-900 dark:text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-lg shadow-red-900/40 transition-all hover:bg-red-500 active:scale-95"
               >
                 Sair
               </button>

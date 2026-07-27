@@ -117,12 +117,12 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div className="bg-slate-900/40 backdrop-blur-xl p-8 md:p-16 rounded-[2.5rem] border border-slate-800 shadow-3xl text-center relative overflow-hidden">
+      <div className="bg-slate-100/40 dark:bg-slate-900/40 backdrop-blur-xl p-8 md:p-16 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-3xl text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent"></div>
         <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-blue-500/20 shadow-xl">
           <FileUp className="w-8 h-8" />
         </div>
-        <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight mb-4">Importar Carregamento</h3>
+        <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight mb-4">Importar Carregamento</h3>
         <p className="text-slate-500 text-[11px] md:text-xs font-bold uppercase tracking-widest leading-relaxed mb-10 max-w-md mx-auto">
           Selecione um arquivo CSV para pré-carregar os pallets. Após a importação, eles ficarão na aba <span className="text-blue-400">Análise</span> para conferência e alocação.
         </p>
@@ -137,7 +137,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
         />
         <label 
           htmlFor="csv-upload"
-          className="inline-flex items-center gap-2.5 px-8 py-4 bg-slate-950 hover:bg-slate-800 text-white rounded-xl font-bold text-[11px] uppercase tracking-widest border border-slate-800 transition-all cursor-pointer shadow-xl active:scale-95 group"
+          className="inline-flex items-center gap-2.5 px-8 py-4 bg-slate-50 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[11px] uppercase tracking-widest border border-slate-200 dark:border-slate-800 transition-all cursor-pointer shadow-xl active:scale-95 group"
         >
           <Upload className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" /> Selecionar Arquivo
         </label>
@@ -149,17 +149,17 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="bg-slate-900/40 backdrop-blur-xl rounded-[2.5rem] border border-slate-800 shadow-3xl overflow-hidden"
+            className="bg-slate-100/40 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-3xl overflow-hidden"
           >
-            <div className="p-6 md:p-8 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-center bg-slate-800/20 gap-4">
+            <div className="p-6 md:p-8 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center bg-slate-200/20 dark:bg-slate-800/20 gap-4">
               <div>
-                <h4 className="text-lg font-black text-white uppercase italic tracking-tight">Validar Pallets</h4>
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Validar Pallets</h4>
                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{items.length} itens encontrados no arquivo</p>
               </div>
               <button 
                 onClick={handleProcess}
                 disabled={isProcessing}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all"
+                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all"
               >
                 {isProcessing ? (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando</>
@@ -172,16 +172,16 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-950/50">
-                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Status</th>
-                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">OP / Nome</th>
-                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Lote</th>
-                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50">Qtd / Tipo</th>
+                  <tr className="bg-slate-50/50 dark:bg-slate-950/50">
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50">Status</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50">OP / Nome</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50">Lote</th>
+                    <th className="p-5 text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50">Qtd / Tipo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/30">
                   {items.map((item, idx) => (
-                    <tr key={idx} className={`hover:bg-slate-800/20 transition-colors ${!item.selected ? 'opacity-40' : ''}`}>
+                    <tr key={idx} className={`hover:bg-slate-200/20 dark:hover:bg-slate-800/20 transition-colors ${!item.selected ? 'opacity-40' : ''}`}>
                       <td className="p-5">
                         <button 
                           onClick={() => {
@@ -189,21 +189,21 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
                             newItems[idx].selected = !newItems[idx].selected;
                             setItems(newItems);
                           }}
-                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${item.selected ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-950 border-slate-800 text-transparent'}`}
+                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${item.selected ? 'bg-blue-600 border-blue-400 text-slate-900 dark:text-white' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-transparent'}`}
                         >
                           <Check className="w-3 h-3" />
                         </button>
                       </td>
                       <td className="p-5">
                         <p className="text-blue-400 font-black text-[10px] font-mono mb-0.5">{item.op}</p>
-                        <p className="text-white font-bold text-xs uppercase tracking-tight line-clamp-1">{item.nome}</p>
+                        <p className="text-slate-900 dark:text-white font-bold text-xs uppercase tracking-tight line-clamp-1">{item.nome}</p>
                       </td>
                       <td className="p-5">
                         <p className="text-amber-500 font-black text-[10px] font-mono">{item.lote}</p>
                       </td>
                       <td className="p-5">
                         <div className="flex items-center gap-2">
-                          <span className="text-white font-black text-xs">{item.quantidade}</span>
+                          <span className="text-slate-900 dark:text-white font-black text-xs">{item.quantidade}</span>
                           <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
                             item.contentType === SlotContent.BOTTLES ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' :
                             item.contentType === SlotContent.FINISHED_PRODUCT ? 'bg-green-600/10 text-green-500 border-green-500/20' :

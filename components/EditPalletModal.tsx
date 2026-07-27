@@ -183,19 +183,19 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const isOperatorEdit = userRole === 'operator' && mode === 'edit';
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-2xl p-4 overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-slate-900 border border-slate-800 rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] w-full max-w-md overflow-hidden my-8"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] w-full max-w-md overflow-hidden my-8"
       >
-        <div className="bg-slate-800/30 p-6 flex justify-between items-center border-b border-slate-800/50">
+        <div className="bg-slate-200/30 dark:bg-slate-800/30 p-6 flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 ${isOperatorEdit ? 'bg-amber-600' : 'bg-blue-600'} rounded-xl flex items-center justify-center shadow-lg ${isOperatorEdit ? 'shadow-amber-900/40' : 'shadow-blue-900/40'} transform -rotate-3`}>
-              <Pencil className="text-white w-5 h-5" />
+              <Pencil className="text-slate-900 dark:text-white w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-lg italic uppercase tracking-tighter text-white">
+              <h3 className="font-black text-lg italic uppercase tracking-tighter text-slate-900 dark:text-white">
                 {mode === 'assign' ? 'Alocar Pallet' : (isOperatorEdit ? 'Solicitar Alteração' : 'Editar Pallet')}
               </h3>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
@@ -203,7 +203,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-950/50 rounded-lg text-slate-500 hover:text-white transition-all">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -211,8 +211,8 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {/* PALLET SUMMARY - Always show basic info in assign mode */}
           {mode === 'assign' && (
-            <div className="p-5 bg-slate-900/40 rounded-3xl border border-slate-800/50 mb-2">
-              <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-4 leading-tight">
+            <div className="p-5 bg-slate-100/40 dark:bg-slate-900/40 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 mb-2">
+              <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase italic tracking-tighter mb-4 leading-tight">
                 {pallet.row.description}
               </h4>
               <div className="grid grid-cols-2 gap-4">
@@ -233,7 +233,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
             <div className="space-y-3 p-5 bg-purple-600/10 rounded-3xl border border-purple-500/30 shadow-lg shadow-purple-900/10">
               <div className="flex items-center gap-2 mb-1">
                 <Warehouse className="w-4 h-4 text-purple-500" />
-                <h4 className="text-[10px] font-black text-white uppercase tracking-widest italic">Escolher Vaga de Destino</h4>
+                <h4 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Escolher Vaga de Destino</h4>
               </div>
               <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-2 leading-relaxed">
                 Selecione uma vaga disponível para remover este pallet do estado de espera.
@@ -244,7 +244,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 <select
                   value={assignedSlot}
                   onChange={(e) => setAssignedSlot(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-[10px] uppercase focus:border-purple-600 outline-none appearance-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 text-slate-900 dark:text-white font-bold text-[10px] uppercase focus:border-purple-600 outline-none appearance-none transition-all"
                 >
                   <option value="AGUARDANDO">MANTER AGUARDANDO VAGA</option>
                   {computedAvailableSlots
@@ -280,7 +280,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   <select
                     value={contentType}
                     onChange={(e) => setContentType(e.target.value as SlotContent)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm uppercase focus:border-blue-600 outline-none appearance-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm uppercase focus:border-blue-600 outline-none appearance-none transition-all"
                   >
                     {[
                       { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo' },
@@ -313,7 +313,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={2}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all resize-none"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all resize-none"
               placeholder="Descrição completa do item..."
             />
           </div>
@@ -328,7 +328,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   type="text" 
                   value={op}
                   onChange={e => setOp(e.target.value)}
-                  className={`w-full bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-800'} rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all`}
+                  className={`w-full bg-slate-50 dark:bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-200 dark:border-slate-800'} rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all`}
                 />
                 {isAutoFilled && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 flex items-center gap-1 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
@@ -347,7 +347,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 inputMode="numeric"
                 value={lot}
                 onChange={e => setLot(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
               />
             </div>
           </div>
@@ -365,7 +365,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   const val = e.target.value.replace(/\D/g, '');
                   setQuantity(val === '' ? 0 : Number(val));
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
               />
             </div>
           )}
@@ -374,11 +374,11 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-5"
+              className="p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-5"
             >
               <div className="flex items-center gap-2 mb-1">
                 <Package className="w-4 h-4 text-indigo-500" />
-                <h4 className="text-[9px] font-bold text-white uppercase tracking-widest">Detalhamento de Insumos</h4>
+                <h4 className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-widest">Detalhamento de Insumos</h4>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -389,7 +389,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                     inputMode="numeric"
                     value={boxes === 0 ? '' : boxes} 
                     onChange={e => setBoxes(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -399,7 +399,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                     inputMode="numeric"
                     value={bottles === 0 ? '' : bottles} 
                     onChange={e => setBottles(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -409,7 +409,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                     inputMode="numeric"
                     value={cradles === 0 ? '' : cradles} 
                     onChange={e => setCradles(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -419,7 +419,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                     inputMode="numeric"
                     value={caps === 0 ? '' : caps} 
                     onChange={e => setCaps(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                   />
                 </div>
               </div>
@@ -437,13 +437,13 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                         value={other.name}
                         onChange={e => updateOther(other.id, 'name', e.target.value)}
                         placeholder="Item..."
-                        className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white font-bold text-[10px] focus:border-indigo-600 outline-none"
+                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 text-slate-900 dark:text-white font-bold text-[10px] focus:border-indigo-600 outline-none"
                       />
                       <input 
                         type="number" 
                         value={other.quantity}
                         onChange={e => updateOther(other.id, 'quantity', Number(e.target.value))}
-                        className="w-16 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
+                        className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 text-slate-900 dark:text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
                       />
                       <button onClick={() => removeOther(other.id)} className="p-1.5 bg-red-600/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-600/20 transition-all"><X className="w-3 h-3" /></button>
                     </div>
@@ -479,7 +479,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 rows={3}
-                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-amber-500 outline-none transition-all resize-none placeholder:text-amber-500/20 shadow-inner"
+                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-amber-500 outline-none transition-all resize-none placeholder:text-amber-500/20 shadow-inner"
                 placeholder="Explique por que esta alteração é necessária..."
                 required
               />
@@ -492,7 +492,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
           <div className="flex gap-3 pt-4">
             <button 
               onClick={onClose}
-              className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+              className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
             >
               Cancelar
             </button>
@@ -500,8 +500,8 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               onClick={handleSave}
               className={`flex-[2] py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 text-center ${
                 mode === 'assign' || (pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO')
-                  ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-xl shadow-amber-900/40 text-white' 
-                  : (isOperatorEdit ? 'bg-amber-600 hover:bg-amber-500 shadow-xl shadow-amber-900/20 text-white' : 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-xl shadow-blue-900/40 text-white')
+                  ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-xl shadow-amber-900/40 text-slate-900 dark:text-white' 
+                  : (isOperatorEdit ? 'bg-amber-600 hover:bg-amber-500 shadow-xl shadow-amber-900/20 text-slate-900 dark:text-white' : 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-xl shadow-blue-900/40 text-slate-900 dark:text-white')
               }`}
             >
               {pallet.inspection.assignedSlot === 'AGUARDANDO' && assignedSlot !== 'AGUARDANDO' ? 'Confirmar Alocação' : (isOperatorEdit ? 'Enviar Solicitação' : 'Salvar Alterações')} 

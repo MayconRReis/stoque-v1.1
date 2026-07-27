@@ -45,10 +45,10 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
   }, [productDistribution]);
 
   return (
-    <div className="bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
+    <div className="bg-slate-100/40 dark:bg-slate-900/40 p-8 md:p-10 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800/50 shadow-2xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <h4 className="text-lg font-black text-white uppercase italic tracking-tighter leading-none">Distribuição por Produto</h4>
+          <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">Distribuição por Produto</h4>
           <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mt-1">Ocupação por Categoria Armazém G0</p>
         </div>
         <div className="flex gap-3">
@@ -62,12 +62,12 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
         {productData.map(item => (
           <div key={item.label} className="space-y-2">
             <div className="flex justify-between items-end">
-              <span className="text-[10px] font-black text-white uppercase tracking-widest italic leading-none">{item.label}</span>
-              <span className={`text-[10px] font-black leading-none ${item.rate > 100 ? 'text-red-500' : 'text-slate-400'}`}>
+              <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic leading-none">{item.label}</span>
+              <span className={`text-[10px] font-black leading-none ${item.rate > 100 ? 'text-red-500' : 'text-slate-600 dark:text-slate-400'}`}>
                 {item.rate}% ({item.count} / {item.maxCapacity})
               </span>
             </div>
-            <div className="h-2 bg-slate-950 rounded-full border border-slate-800 overflow-hidden flex">
+            <div className="h-2 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden flex">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.min(item.rate, 100)}%` }}

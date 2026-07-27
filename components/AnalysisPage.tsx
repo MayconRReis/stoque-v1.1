@@ -154,8 +154,8 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
       {pendingItems.length === 0 ? (
-        <div className="py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
-          <div className="w-16 h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-800">
+        <div className="py-32 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[2.5rem]">
+          <div className="w-16 h-16 bg-slate-100/50 dark:bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-slate-800">
             <ClipboardCheck className="w-8 h-8 text-slate-700" />
           </div>
           <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">Nenhum pallet pendente de análise</p>
@@ -185,7 +185,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
               <motion.div 
                 layout
                 key={item.id} 
-                className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-[2rem] p-6 space-y-5 hover:border-blue-600/30 transition-all group relative overflow-hidden"
+                className="bg-slate-100/40 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-[2rem] p-6 space-y-5 hover:border-blue-600/30 transition-all group relative overflow-hidden"
               >
                 <div className="flex justify-between items-start">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
@@ -201,20 +201,20 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
               
               <div>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">OP {item.originOP}</p>
-                <h4 className="text-white font-bold uppercase text-xs leading-tight line-clamp-2 min-h-[2.5rem]">{item.description}</h4>
+                <h4 className="text-slate-900 dark:text-white font-bold uppercase text-xs leading-tight line-clamp-2 min-h-[2.5rem]">{item.description}</h4>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50">
+                <div className="bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
                   <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Lote</p>
-                  <p className="text-[10px] font-black text-white font-mono">{item.lot}</p>
+                  <p className="text-[10px] font-black text-slate-900 dark:text-white font-mono">{item.lot}</p>
                 </div>
                 {item.pallets > 0 && 
                  insp?.contentType !== SlotContent.CONTAINER_SJ && 
                  insp?.contentType !== SlotContent.CONTAINER_LP && (
-                  <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/50">
+                  <div className="bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
                     <p className="text-[7px] text-slate-600 font-bold uppercase mb-0.5">Qtd</p>
-                    <p className="text-[10px] font-black text-white">{item.pallets}</p>
+                    <p className="text-[10px] font-black text-slate-900 dark:text-white">{item.pallets}</p>
                   </div>
                 )}
               </div>
@@ -222,7 +222,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
               <div className="flex gap-2">
                 <button 
                   onClick={() => handleStartAnalysis(item)}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" /> Analisar
                 </button>
@@ -235,24 +235,24 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
       {/* Analysis Modal */}
       <AnimatePresence>
         {selectedItem && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-3xl w-full max-w-lg overflow-hidden"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-3xl w-full max-w-lg overflow-hidden"
             >
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+              <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-200/20 dark:bg-slate-800/20">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-xl">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl">
                     <ClipboardCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-white uppercase italic tracking-tight">Confirmar Entrada</h3>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Confirmar Entrada</h3>
                     <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Validação técnica e alocação</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedItem(null)} className="w-8 h-8 rounded-lg bg-slate-950 text-slate-500 hover:text-white flex items-center justify-center border border-slate-800 transition-colors">
+                <button onClick={() => setSelectedItem(null)} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center border border-slate-200 dark:border-slate-800 transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -265,7 +265,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                       type="text" 
                       value={op}
                       onChange={e => setOp(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -274,7 +274,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                       type="text" 
                       value={lot}
                       onChange={e => setLot(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
                     />
                   </div>
                 </div>
@@ -285,7 +285,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     type="text" 
                     value={description}
                     onChange={e => setDescription(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
                   />
                 </div>
 
@@ -295,7 +295,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     <select 
                       value={contentType}
                       onChange={e => setContentType(e.target.value as SlotContent)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all"
                     >
                       {Object.values(SlotContent).map(type => (
                         <option key={type} value={type}>{translateSlotContent(type)}</option>
@@ -307,7 +307,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     <select 
                       value={slotId}
                       onChange={e => setSlotId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
                     >
                       <option value="">Selecionar</option>
                       <option value="AGUARDANDO" className="text-amber-500 font-bold">Aguardando Vaga</option>
@@ -337,12 +337,12 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
 
                 {(contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Frascos</label>
                         <input 
                           type="number" min="0" value={bottles} onChange={e => setBottles(parseInt(e.target.value) || 0)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none"
                         />
                       </div>
                       {contentType === SlotContent.SUPPLIES && (
@@ -351,21 +351,21 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tampas</label>
                             <input 
                               type="number" min="0" value={caps} onChange={e => setCaps(parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none"
                             />
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Caixas</label>
                             <input 
                               type="number" min="0" value={boxes} onChange={e => setBoxes(parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none"
                             />
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Berços</label>
                             <input 
                               type="number" min="0" value={cradles} onChange={e => setCradles(parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-blue-600 outline-none"
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none"
                             />
                           </div>
                         </>
@@ -392,7 +392,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                               value={other.name}
                               onChange={e => updateOther(other.id, 'name', e.target.value)}
                               placeholder="Nome do item..."
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-[10px] focus:border-blue-600 outline-none uppercase"
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-[10px] focus:border-blue-600 outline-none uppercase"
                             />
                           </div>
                           <div className="w-24 space-y-1.5">
@@ -401,12 +401,12 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                               type="number" min="0"
                               value={other.quantity || ''}
                               onChange={e => updateOther(other.id, 'quantity', parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-[10px] focus:border-blue-600 outline-none text-center"
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold text-[10px] focus:border-blue-600 outline-none text-center"
                             />
                           </div>
                           <button 
                             onClick={() => removeOther(other.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-950 text-slate-500 hover:text-red-400 border border-slate-800 hover:border-red-900/50 hover:bg-red-950/30 transition-all mb-[1px]"
+                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-500 hover:text-red-400 border border-slate-200 dark:border-slate-800 hover:border-red-900/50 hover:bg-red-950/30 transition-all mb-[1px]"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -416,14 +416,14 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 pt-4 border-t border-slate-800/50">
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">ID Final</label>
                     <input 
                       type="text" 
                       value={finalId}
                       onChange={e => setFinalId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-blue-600 outline-none transition-all font-mono uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all font-mono uppercase"
                     />
                   </div>
                 </div>
@@ -432,7 +432,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   <button 
                     onClick={handleReject}
                     disabled={isProcessing}
-                    className="flex-1 py-3 bg-slate-950 hover:bg-red-500/10 text-slate-500 hover:text-red-500 border border-slate-800 hover:border-red-500/30 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-3 bg-slate-50 dark:bg-slate-950 hover:bg-red-500/10 text-slate-500 hover:text-red-500 border border-slate-200 dark:border-slate-800 hover:border-red-500/30 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                   >
                     {isProcessing ? (
                       <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
@@ -444,7 +444,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   <button 
                     onClick={handleConfirm}
                     disabled={isProcessing || !slotId || !finalId}
-                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2"
+                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2"
                   >
                     {isProcessing ? (
                       <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processando</>

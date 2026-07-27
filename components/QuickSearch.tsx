@@ -123,20 +123,20 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
       {/* Search Input */}
       <form onSubmit={handleSearch} className="relative group">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className={`w-5 h-5 transition-colors ${isSearching ? 'text-blue-500 animate-pulse' : 'text-slate-400 group-focus-within:text-blue-500'}`} />
+          <Search className={`w-5 h-5 transition-colors ${isSearching ? 'text-blue-500 animate-pulse' : 'text-slate-600 dark:text-slate-400 group-focus-within:text-blue-500'}`} />
         </div>
         <input 
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="DIGITE OP, LOTE, NOME, VAGA OU SEM SELO..."
-          className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-5 pl-12 pr-32 text-slate-900 dark:text-white font-black text-lg placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-2xl"
+          className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-5 pl-12 pr-32 text-slate-900 dark:text-white font-black text-lg placeholder:text-slate-600 dark:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-2xl"
           autoFocus
         />
         <button 
           type="submit"
           disabled={isSearching}
-          className="absolute inset-y-2 right-2 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+          className="absolute inset-y-2 right-2 px-6 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
         >
           {isSearching ? 'Buscando...' : 'Buscar'}
         </button>
@@ -183,7 +183,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                           {group.description}
                         </h3>
                         {group.hasWithoutSeal && (
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg shadow-lg border border-red-600/50 shrink-0 animate-pulse">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-slate-900 dark:text-white rounded-lg shadow-lg border border-red-600/50 shrink-0 animate-pulse">
                             <ShieldAlert className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Sem Selo</span>
                           </div>
@@ -221,7 +221,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                   
                   {group.pallets.length > 0 && (
                     <div className="space-y-3">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">Pallets Encontrados</h4>
+                      <h4 className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">Pallets Encontrados</h4>
                       <div className="max-h-48 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                         {group.pallets.map((p, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -233,7 +233,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                                 <p className="text-xs font-black text-slate-900 dark:text-slate-200 uppercase flex items-center gap-2">
                                   {p.inspections?.[0]?.assignedSlot || 'NÃO ALOCADO'}
                                   {p.inspections?.some(i => i.withoutSeal) && (
-                                    <span className="flex items-center gap-1 text-[8px] bg-red-500 text-white px-1.5 py-0.5 rounded shadow-sm animate-pulse">
+                                    <span className="flex items-center gap-1 text-[8px] bg-red-500 text-slate-900 dark:text-white px-1.5 py-0.5 rounded shadow-sm animate-pulse">
                                       <ShieldAlert className="w-2.5 h-2.5" />
                                       SEM SELO
                                     </span>
@@ -244,7 +244,7 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                             </div>
                             <button 
                               onClick={() => onShowDetail(p)}
-                              className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-blue-500 text-slate-700 dark:text-slate-300 hover:text-white rounded-lg transition-colors text-[9px] font-black uppercase tracking-widest"
+                              className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-blue-500 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors text-[9px] font-black uppercase tracking-widest"
                             >
                               Ver
                             </button>

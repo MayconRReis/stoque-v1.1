@@ -188,7 +188,7 @@ export const translateSlotContent = (content: SlotContent): string => {
 
 export const getContentTypeColor = (content: SlotContent): string => {
   const colors: Record<SlotContent, string> = {
-    [SlotContent.EMPTY]: 'text-slate-400',
+    [SlotContent.EMPTY]: 'text-slate-600 dark:text-slate-400',
     [SlotContent.BOTTLES]: 'text-sky-400',
     [SlotContent.SUPPLIES]: 'text-amber-400',
     [SlotContent.FINISHED_PRODUCT]: 'text-emerald-400',
@@ -200,11 +200,11 @@ export const getContentTypeColor = (content: SlotContent): string => {
     [SlotContent.REWORK]: 'text-yellow-400',
     [SlotContent.REPROCESS]: 'text-teal-400',
     [SlotContent.ROTATIVE]: 'text-pink-400',
-    [SlotContent.MISCELLANEOUS]: 'text-slate-400',
+    [SlotContent.MISCELLANEOUS]: 'text-slate-600 dark:text-slate-400',
     [SlotContent.DISCARD]: 'text-red-500',
     [SlotContent.OTHER]: 'text-gray-400'
   };
-  return colors[content] || 'text-slate-400';
+  return colors[content] || 'text-slate-600 dark:text-slate-400';
 };
 
 export interface InventoryEditRequest {

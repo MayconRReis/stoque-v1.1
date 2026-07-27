@@ -281,7 +281,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter flex items-center gap-3">
             <TrendingUp className="w-8 h-8 text-blue-500" />
             Estoque Rotativo
           </h2>
@@ -289,7 +289,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
         </div>
         <button
           onClick={() => setIsEntryMode(true)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-900/20 transition-all border border-blue-400/20"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-900/20 transition-all border border-blue-400/20"
         >
           <Plus className="w-4 h-4" /> Nova Entrada
         </button>
@@ -303,16 +303,16 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Digite a VAGA (Ex: E.1.3), Produto ou Tipo..."
-            className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl px-12 py-4 text-white font-bold text-sm focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-700"
+            className="w-full bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl px-12 py-4 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-700"
           />
         </div>
-        <div className="flex gap-2 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800">
+        <div className="flex gap-2 bg-slate-100/60 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
           {['ALL', ...rotativeTypes].map(type => (
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
               className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                typeFilter === type ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-500 hover:text-slate-300'
+                typeFilter === type ? 'bg-blue-600 text-slate-900 dark:text-white shadow-lg shadow-blue-900/20' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               {type === 'ALL' ? 'Todos' : type}
@@ -329,7 +329,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               key={slotId}
-              className="bg-slate-900/40 p-6 rounded-[2.5rem] border border-slate-800/80 shadow-2xl space-y-4 hover:border-slate-700 transition-all transition-transform hover:scale-[1.01] group"
+              className="bg-slate-100/40 dark:bg-slate-900/40 p-6 rounded-[2.5rem] border border-slate-200/80 dark:border-slate-800/80 shadow-2xl space-y-4 hover:border-slate-700 transition-all transition-transform hover:scale-[1.01] group"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
@@ -337,7 +337,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     <Warehouse className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-white uppercase italic tracking-tight">Vaga {slotId}</h3>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Vaga {slotId}</h3>
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Estoque Rotativo</span>
                     </div>
@@ -353,7 +353,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                       setSelectedItemForAction({ item, action: 'add' });
                       setActionQuantity(0);
                     }}
-                    className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 group/item hover:border-blue-500/50 transition-all cursor-pointer relative"
+                    className="bg-slate-50/50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 group/item hover:border-blue-500/50 transition-all cursor-pointer relative"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
@@ -363,13 +363,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                             <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest border ${
                               item.quantity <= (getProductLimit(item.productName)! / 2) 
                                 ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' 
-                                : 'bg-slate-800 text-slate-500 border-slate-700'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-700'
                             }`}>
                               Limite: {getProductLimit(item.productName)}
                             </span>
                           )}
                         </div>
-                        <h4 className="text-white font-black uppercase text-xs sm:text-sm leading-tight">{item.productName}</h4>
+                        <h4 className="text-slate-900 dark:text-white font-black uppercase text-xs sm:text-sm leading-tight">{item.productName}</h4>
                         {getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) && (
                           <div className="flex items-center gap-1.5 mt-1">
                             <AlertCircle className="w-3 h-3 text-red-500" />
@@ -380,13 +380,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                       <div className="text-right">
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Saldo</p>
                         <p className={`text-lg font-black italic transition-colors ${
-                          getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) ? 'text-red-500' : 'text-white'
+                          getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) ? 'text-red-500' : 'text-slate-900 dark:text-white'
                         }`}>
                           {item.quantity} <span className="text-[10px] text-slate-600 px-1 font-normal tracking-normal not-italic">Un</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/30">
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/30 dark:border-slate-800/30">
                       <div className="text-[9px] text-slate-600 font-bold uppercase tracking-tight opacity-0 group-hover/item:opacity-100 transition-opacity">
                         Clique para ajustar saldo
                       </div>
@@ -399,7 +399,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
         })}
 
         {filteredItems.length === 0 && !isLoading && (
-          <div className="col-span-full py-32 text-center border-2 border-dashed border-slate-900 rounded-[2.5rem]">
+          <div className="col-span-full py-32 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[2.5rem]">
             <Boxes className="w-12 h-12 text-slate-800 mx-auto mb-4" />
             <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">Nenhum item no estoque rotativo</p>
           </div>
@@ -415,19 +415,19 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsEntryMode(false)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Nova Entrada Rotativa</h3>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Nova Entrada Rotativa</h3>
                 <button 
                   onClick={() => setIsEntryMode(false)}
-                  className="p-2 hover:bg-slate-800 rounded-xl transition-colors"
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors"
                 >
                   <AlertCircle className="w-5 h-5 text-slate-500" />
                 </button>
@@ -440,7 +440,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3.5 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
                     placeholder="Ex: Frasco 500ml"
                   />
                 </div>
@@ -454,8 +454,8 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                         onClick={() => setProductType(type)}
                         className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
                           productType === type 
-                            ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-900/20' 
-                            : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-700'
+                            ? 'bg-blue-600 text-slate-900 dark:text-white border-blue-400 shadow-lg shadow-blue-900/20' 
+                            : 'bg-slate-50 dark:bg-slate-950 text-slate-500 border-slate-200 dark:border-slate-800 hover:border-slate-700'
                         }`}
                       >
                         {type}
@@ -470,7 +470,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     type="number"
                     value={quantity || ''}
                     onChange={(e) => setQuantity(parseInt(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3.5 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
                     placeholder="Quantidade de unidades"
                   />
                 </div>
@@ -480,7 +480,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                   <select
                     value={selectedSlotId}
                     onChange={(e) => setSelectedSlotId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3.5 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none appearance-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none appearance-none"
                   >
                     <option value="">Selecione uma vaga...</option>
                     {availableSlots.map(s => (
@@ -495,13 +495,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
               <div className="flex gap-4 pt-4">
                 <button 
                   onClick={() => setIsEntryMode(false)}
-                  className="flex-1 px-6 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
+                  className="flex-1 px-6 py-4 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleEntry}
-                  className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 transition-all"
+                  className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 transition-all"
                 >
                   Registrar
                 </button>
@@ -517,13 +517,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedItemForAction(null)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 space-y-6"
             >
               <div className="text-center space-y-2">
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
@@ -531,12 +531,12 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                 }`}>
                   {selectedItemForAction.action === 'add' ? <Plus className="w-7 h-7" /> : <Minus className="w-7 h-7" />}
                 </div>
-                <h3 className="text-white font-black uppercase text-lg italic tracking-tight leading-tight">
+                <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg italic tracking-tight leading-tight">
                   {selectedItemForAction.action === 'add' ? 'Adicionar Saldo' : 'Retirar Saldo'}
                 </h3>
                 <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{selectedItemForAction.item.productName}</p>
                 <div className="flex justify-center gap-1 mt-1">
-                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-black tracking-widest">Saldo: {selectedItemForAction.item.quantity}</span>
+                  <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded uppercase font-black tracking-widest">Saldo: {selectedItemForAction.item.quantity}</span>
                 </div>
               </div>
 
@@ -544,7 +544,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                 <div className="flex justify-center items-center gap-4">
                   <button 
                     onClick={() => setActionQuantity(q => Math.max(0, q - 1))}
-                    className="w-12 h-12 bg-slate-800 text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
+                    className="w-12 h-12 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
                   >
                     <Minus className="w-5 h-5" />
                   </button>
@@ -552,11 +552,11 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     type="number"
                     value={actionQuantity || ''}
                     onChange={(e) => setActionQuantity(parseInt(e.target.value) || 0)}
-                    className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-2 py-3 text-white font-black text-center text-xl focus:border-blue-500 outline-none transition-all"
+                    className="w-24 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-3 text-slate-900 dark:text-white font-black text-center text-xl focus:border-blue-500 outline-none transition-all"
                   />
                   <button 
                     onClick={() => setActionQuantity(q => q + 1)}
-                    className="w-12 h-12 bg-slate-800 text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
+                    className="w-12 h-12 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl flex items-center justify-center hover:bg-slate-700 transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
@@ -566,7 +566,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                   <button 
                     onClick={() => setSelectedItemForAction(prev => prev ? { ...prev, action: 'remove' } : null)}
                     className={`py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
-                      selectedItemForAction.action === 'remove' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'bg-slate-800 text-slate-500 hover:text-white'
+                      selectedItemForAction.action === 'remove' ? 'bg-red-600 text-slate-900 dark:text-white shadow-lg shadow-red-900/40' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     Saída
@@ -574,7 +574,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                   <button 
                     onClick={() => setSelectedItemForAction(prev => prev ? { ...prev, action: 'add' } : null)}
                     className={`py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
-                      selectedItemForAction.action === 'add' ? 'bg-green-600 text-white shadow-lg shadow-green-900/40' : 'bg-slate-800 text-slate-500 hover:text-white'
+                      selectedItemForAction.action === 'add' ? 'bg-green-600 text-slate-900 dark:text-white shadow-lg shadow-green-900/40' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     Entrada
@@ -585,7 +585,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
               <div className="flex gap-4 pt-2">
                 <button 
                   onClick={() => setSelectedItemForAction(null)}
-                  className="flex-1 py-4 bg-slate-800 text-slate-500 font-black text-[10px] uppercase rounded-2xl hover:text-white transition-all"
+                  className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 text-slate-500 font-black text-[10px] uppercase rounded-2xl hover:text-slate-900 dark:hover:text-white transition-all"
                 >
                   Cancelar
                 </button>
@@ -599,7 +599,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     }
                     setSelectedItemForAction(null);
                   }}
-                  className={`flex-1 py-4 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95 ${
+                  className={`flex-1 py-4 text-slate-900 dark:text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all active:scale-95 ${
                     selectedItemForAction.action === 'add' ? 'bg-green-600 shadow-green-900/40' : 'bg-red-600 shadow-red-900/40'
                   }`}
                 >

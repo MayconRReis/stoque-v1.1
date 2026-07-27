@@ -30,7 +30,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-blue-600/30">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 selection:bg-blue-600/30">
       {/* Background patterns */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
@@ -38,7 +38,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       </div>
 
       <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-700">
-        <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-[48px] p-8 md:p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)]">
+        <div className="bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 rounded-[48px] p-8 md:p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)]">
           <div className="flex flex-col items-center mb-10">
             <div className="w-20 h-20 bg-blue-600 rounded-[28px] flex items-center justify-center shadow-2xl shadow-blue-900/40 mb-6">
               <svg width="44" height="44" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -47,7 +47,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <path d="M28 10V20M23 15H33" stroke="white" strokeWidth="4" strokeLinecap="round"/>
               </svg>
             </div>
-            <h1 className="text-4xl font-black tracking-tighter text-white">
+            <h1 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
               Stoque<span className="text-blue-500">+</span>
             </h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em] mt-1">Ybera Paris</p>
@@ -63,7 +63,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Seu nome de acesso"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
                   required
                 />
               </div>
@@ -78,7 +78,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
                   required
                 />
               </div>
@@ -94,7 +94,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-6 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-[28px] font-black text-sm uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-900/20 active:scale-[0.98]"
+              className="w-full py-6 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600 text-slate-900 dark:text-white rounded-[28px] font-black text-sm uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-900/20 active:scale-[0.98]"
             >
               {loading ? (
                 <i className="fa-solid fa-circle-notch animate-spin"></i>

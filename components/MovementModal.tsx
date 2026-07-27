@@ -436,21 +436,21 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl p-4 overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-3xl w-full max-w-2xl overflow-hidden my-auto"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-3xl w-full max-w-2xl overflow-hidden my-auto"
       >
         
-        <div className="bg-slate-950/40 p-6 md:p-8 flex justify-between items-center border-b border-slate-800/50 relative overflow-hidden">
+        <div className="bg-slate-50/40 dark:bg-slate-950/40 p-6 md:p-8 flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
           <div className="flex items-center gap-5">
              <div className="w-12 h-12 bg-blue-600/10 border border-blue-500/20 rounded-2xl flex items-center justify-center shadow-inner">
                 <Truck className="text-blue-500 w-6 h-6" />
              </div>
              <div>
-                <h3 className="font-black text-2xl italic uppercase tracking-tighter text-white leading-none">Movimentação</h3>
+                <h3 className="font-black text-2xl italic uppercase tracking-tighter text-slate-900 dark:text-white leading-none">Movimentação</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Fluxo Operacional G0</p>
@@ -459,7 +459,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
           </div>
           <button 
             onClick={onClose} 
-            className="w-10 h-10 flex items-center justify-center bg-slate-950/50 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all group"
+            className="w-10 h-10 flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-all group"
           >
             <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
           </button>
@@ -467,13 +467,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
         <div className="p-6 md:p-8 space-y-8">
           {/* Type Selector */}
-          <div className="flex p-1.5 bg-slate-950 rounded-2xl border border-slate-800/50 shadow-inner">
+          <div className="flex p-1.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 shadow-inner">
             <button 
               onClick={() => setType('entry')}
               className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 ${
                 type === 'entry' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 translate-y-[-1px]' 
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900'
+                ? 'bg-blue-600 text-slate-900 dark:text-white shadow-lg shadow-blue-900/40 translate-y-[-1px]' 
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
               }`}
             >
               <Plus className={`w-3.5 h-3.5 ${type === 'entry' ? 'opacity-100' : 'opacity-40'}`} />
@@ -483,8 +483,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
               onClick={() => setType('transfer')}
               className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 ${
                 type === 'transfer' 
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40 translate-y-[-1px]' 
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900'
+                ? 'bg-amber-600 text-slate-900 dark:text-white shadow-lg shadow-amber-900/40 translate-y-[-1px]' 
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
               }`}
             >
               <ArrowLeftRight className={`w-3.5 h-3.5 ${type === 'transfer' ? 'opacity-100' : 'opacity-40'}`} />
@@ -494,8 +494,8 @@ export const MovementModal: React.FC<MovementModalProps> = ({
               onClick={() => setType('exit')}
               className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 ${
                 type === 'exit' 
-                ? 'bg-red-600 text-white shadow-lg shadow-red-900/40 translate-y-[-1px]' 
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900'
+                ? 'bg-red-600 text-slate-900 dark:text-white shadow-lg shadow-red-900/40 translate-y-[-1px]' 
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
               }`}
             >
               <LogOut className={`w-3.5 h-3.5 ${type === 'exit' ? 'opacity-100' : 'opacity-40'}`} />
@@ -512,7 +512,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                       <Box className="w-3 h-3 text-blue-500" />
                       Tipo
                     </label>
@@ -521,7 +521,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       <select 
                         value={contentType}
                         onChange={e => setContentType(e.target.value as SlotContent)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                       >
                         {contentTypes.map(ct => (
                           <option key={ct.value} value={ct.value}>{ct.label}</option>
@@ -534,7 +534,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                   </div>
                   {contentType !== SlotContent.USE_CONSUMPTION && (
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                      <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                         <ClipboardCheck className="w-3 h-3 text-blue-500" />
                         OP (Opcional)
                       </label>
@@ -545,7 +545,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           value={op}
                           onChange={e => setOp(e.target.value)}
                           placeholder="Ex: 410-152"
-                          className={`w-full bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all group-hover:border-slate-700`}
+                          className={`w-full bg-slate-50 dark:bg-slate-950 border ${isAutoFilled ? 'border-green-500/50' : 'border-slate-200 dark:border-slate-800'} rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all group-hover:border-slate-700`}
                         />
                         {isAutoFilled && (
                           <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded-lg border border-green-500/20">
@@ -560,7 +560,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                       <Info className="w-3 h-3 text-blue-500" />
                       Nome (Obrigatório)
                     </label>
@@ -570,12 +570,12 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       value={name}
                       onChange={e => setName(e.target.value)}
                       placeholder={contentType === SlotContent.USE_CONSUMPTION ? "Ex: PAPEL TOALHA" : "Ex: SELANTE 500G"}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
                     />
                   </div>
                   {contentType !== SlotContent.USE_CONSUMPTION && (
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                      <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                         <Package className="w-3 h-3 text-blue-500" />
                         Lote (Opcional)
                       </label>
@@ -586,7 +586,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         value={lot}
                         onChange={e => setLot(e.target.value.replace(/\D/g, ''))}
                         placeholder="Ex: 01260307143"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
                       />
                     </div>
                   )}
@@ -597,7 +597,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                    contentType !== SlotContent.CONTAINER_SJ && 
                    contentType !== SlotContent.CONTAINER_LP && (
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                      <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                         <FlaskConical className="w-3 h-3 text-blue-500" />
                         Quantidade
                       </label>
@@ -610,12 +610,12 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           const val = e.target.value.replace(/\D/g, '');
                           setQuantity(val === '' ? 0 : Number(val));
                         }}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all hover:border-slate-700"
                       />
                     </div>
                   )}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                       <Warehouse className="w-3 h-3 text-blue-500" />
                       Vaga
                     </label>
@@ -624,7 +624,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       <select 
                         value={slotId}
                         onChange={e => setSlotId(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                       >
                         <option value="">Selecione uma vaga</option>
                         <option value="AGUARDANDO">⚠️ AGUARDANDO VAGA (Virtual)</option>
@@ -654,13 +654,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    className="p-5 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-6"
+                    className="p-5 bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-6"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-7 h-7 bg-indigo-600/10 text-indigo-500 rounded-lg flex items-center justify-center border border-indigo-500/20">
                         <Package className="w-4 h-4" />
                       </div>
-                      <h4 className="text-[10px] font-bold text-white uppercase tracking-widest">Detalhamento de Insumos</h4>
+                      <h4 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-widest">Detalhamento de Insumos</h4>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -671,7 +671,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           inputMode="numeric"
                           value={boxesCount === 0 ? '' : boxesCount} 
                           onChange={e => setBoxesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -681,7 +681,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           inputMode="numeric"
                           value={bottlesCount === 0 ? '' : bottlesCount} 
                           onChange={e => setBottlesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -691,7 +691,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           inputMode="numeric"
                           value={cradlesCount === 0 ? '' : cradlesCount} 
                           onChange={e => setCradlesCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -701,7 +701,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                           inputMode="numeric"
                           value={capsCount === 0 ? '' : capsCount} 
                           onChange={e => setCapsCount(Number(e.target.value.replace(/\D/g, '')) || 0)} 
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-slate-900 dark:text-white font-bold text-xs text-center focus:border-indigo-600 outline-none" 
                         />
                       </div>
                     </div>
@@ -727,7 +727,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                                 value={other.name}
                                 onChange={e => updateOther(other.id, 'name', e.target.value)}
                                 placeholder="Nome do item..."
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-[10px] focus:border-indigo-600 outline-none"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white font-bold text-[10px] focus:border-indigo-600 outline-none"
                               />
                             </div>
                             <div className="w-24 space-y-1.5">
@@ -737,7 +737,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                                 inputMode="numeric"
                                 value={other.quantity === 0 ? '' : other.quantity}
                                 onChange={e => updateOther(other.id, 'quantity', Number(e.target.value.replace(/\D/g, '')) || 0)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white font-bold text-[10px] text-center focus:border-indigo-600 outline-none"
                               />
                             </div>
                             <button 
@@ -756,7 +756,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 <button 
                   onClick={handleEntrySubmit}
                   disabled={!name || !slotId}
-                  className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-blue-900/40 active:scale-[0.98] group"
+                  className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600 text-slate-900 dark:text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-blue-900/40 active:scale-[0.98] group"
                 >
                   Confirmar Entrada 
                   <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
@@ -771,7 +771,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 className="space-y-6"
               >
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                     <Search className="w-3 h-3 text-amber-500" />
                     Vaga de Origem
                   </label>
@@ -782,7 +782,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       value={transferId}
                       onChange={e => setTransferId(e.target.value.toUpperCase())}
                       placeholder="EX: E.1.3"
-                      className={`w-full bg-slate-950 border ${error ? 'border-amber-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700`}
+                      className={`w-full bg-slate-50 dark:bg-slate-950 border ${error ? 'border-amber-500' : 'border-slate-200 dark:border-slate-800'} rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 text-amber-500">
@@ -810,10 +810,10 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                               setFromSlot(p.inspections?.[0]?.assignedSlot || '');
                               setMultipleFoundPallets([]);
                             }}
-                            className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between hover:border-amber-600/50 transition-all group"
+                            className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between hover:border-amber-600/50 transition-all group"
                           >
                             <div className="text-left">
-                              <p className="text-[11px] font-black text-white uppercase italic">{p.description}</p>
+                              <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase italic">{p.description}</p>
                               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">LOTE: {p.lot} | OP: {p.originOP} | ID: {p.loadingId || p.id}</p>
                             </div>
                             <div className="flex items-center gap-3">
@@ -839,13 +839,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         <div className="flex justify-between items-start">
                           <div className="space-y-1">
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest leading-none">Pallet Identificado</p>
-                            <h4 className="text-white font-black text-base uppercase leading-tight italic tracking-tight">{foundPallet.description}</h4>
+                            <h4 className="text-slate-900 dark:text-white font-black text-base uppercase leading-tight italic tracking-tight">{foundPallet.description}</h4>
                           </div>
                           <div className="text-right">
-                             <div className="px-2 py-1 bg-slate-950 rounded-lg border border-slate-800 text-[8px] font-black text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
+                             <div className="px-2 py-1 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 text-[8px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
                                ID TÉCNICO: {foundPallet.loadingId || foundPallet.id}
                              </div>
-                             <span className="inline-block text-[8px] font-black text-white bg-amber-600/30 px-2.5 py-1 rounded-full border border-amber-500/30 uppercase tracking-wider">
+                             <span className="inline-block text-[8px] font-black text-slate-900 dark:text-white bg-amber-600/30 px-2.5 py-1 rounded-full border border-amber-500/30 uppercase tracking-wider">
                                {foundPallet.status}
                              </span>
                           </div>
@@ -853,15 +853,15 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         <div className="grid grid-cols-4 gap-4 pt-4 border-t border-amber-500/10">
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Produto</p>
-                            <p className="text-[11px] font-mono text-white font-black truncate">{foundPallet.description.split(' ')[0]}</p>
+                            <p className="text-[11px] font-mono text-slate-900 dark:text-white font-black truncate">{foundPallet.description.split(' ')[0]}</p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP/Lote</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
+                            <p className="text-[11px] font-mono text-slate-900 dark:text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Qtd</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.pallets} PL</p>
+                            <p className="text-[11px] font-mono text-slate-900 dark:text-white font-black">{foundPallet.pallets} PL</p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Vaga Atual</p>
@@ -883,7 +883,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div>
                       <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Atenção: Nenhum Item Encontrado</p>
                       <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed italic">
-                        Não localizamos pallets ativos na vaga <span className="text-white not-italic">{transferId}</span>. Verifique se a vaga está correta.
+                        Não localizamos pallets ativos na vaga <span className="text-slate-900 dark:text-white not-italic">{transferId}</span>. Verifique se a vaga está correta.
                       </p>
                     </div>
                   </motion.div>
@@ -891,7 +891,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 
                 <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                       <ArrowLeftRight className="w-3 h-3 text-amber-500 rotate-90" />
                       Destino (Nova Vaga)
                     </label>
@@ -900,7 +900,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       <select 
                         value={toSlot}
                         onChange={e => setToSlot(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-amber-600 focus:ring-4 focus:ring-amber-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                       >
                         <option value="">Selecione a vaga de destino</option>
                         <option value="AGUARDANDO">⚠️ AGUARDANDO VAGA (Virtual)</option>
@@ -918,7 +918,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 <button 
                   onClick={handleTransferSubmit}
                   disabled={!foundPallet || !toSlot}
-                  className="w-full py-5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-amber-900/40 active:scale-[0.98] group"
+                  className="w-full py-5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600 text-slate-900 dark:text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-amber-900/40 active:scale-[0.98] group"
                 >
                   Confirmar Transferência 
                   <ArrowLeftRight className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
@@ -933,7 +933,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 className="space-y-6"
               >
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                     <Search className="w-3 h-3 text-red-500" />
                     Vaga de Origem
                   </label>
@@ -944,7 +944,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                       value={exitId}
                       onChange={e => setExitId(e.target.value.toUpperCase())}
                       placeholder="EX: E.1.3"
-                      className={`w-full bg-slate-950 border ${error ? 'border-red-500' : 'border-slate-800'} rounded-2xl px-5 py-4 text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700`}
+                      className={`w-full bg-slate-50 dark:bg-slate-950 border ${error ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'} rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-mono font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all hover:border-slate-700`}
                     />
                     {isSearching && (
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 text-red-500">
@@ -971,10 +971,10 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                               setFoundPallet(p);
                               setMultipleFoundPallets([]);
                             }}
-                            className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between hover:border-red-600/50 transition-all group"
+                            className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between hover:border-red-600/50 transition-all group"
                           >
                             <div className="text-left">
-                              <p className="text-[11px] font-black text-white uppercase italic">{p.description}</p>
+                              <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase italic">{p.description}</p>
                               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">LOTE: {p.lot} | OP: {p.originOP} | ID: {p.loadingId || p.id}</p>
                             </div>
                             <div className="flex items-center gap-3">
@@ -1000,13 +1000,13 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         <div className="flex justify-between items-start">
                           <div className="space-y-1">
                             <p className="text-[9px] font-black text-red-500 uppercase tracking-widest leading-none">Confirmação de Saída</p>
-                            <h4 className="text-white font-black text-base uppercase leading-tight italic tracking-tight">{foundPallet.description}</h4>
+                            <h4 className="text-slate-900 dark:text-white font-black text-base uppercase leading-tight italic tracking-tight">{foundPallet.description}</h4>
                           </div>
                           <div className="text-right">
-                             <div className="px-2 py-1 bg-slate-950 rounded-lg border border-slate-800 text-[8px] font-black text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
+                             <div className="px-2 py-1 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 text-[8px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tighter shadow-sm mb-1">
                                ID TÉCNICO: {foundPallet.loadingId || foundPallet.id}
                              </div>
-                             <span className="inline-block text-[8px] font-black text-white bg-red-600/30 px-2.5 py-1 rounded-full border border-red-500/30 uppercase tracking-wider">
+                             <span className="inline-block text-[8px] font-black text-slate-900 dark:text-white bg-red-600/30 px-2.5 py-1 rounded-full border border-red-500/30 uppercase tracking-wider">
                                VAGA: {foundPallet.inspections?.[0]?.assignedSlot || '---'}
                              </span>
                           </div>
@@ -1014,11 +1014,11 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                         <div className="grid grid-cols-3 gap-4 pt-4 border-t border-red-500/10">
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">OP/Lote</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
+                            <p className="text-[11px] font-mono text-slate-900 dark:text-white font-black">{foundPallet.originOP} / {foundPallet.lot}</p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Quantidade</p>
-                            <p className="text-[11px] font-mono text-white font-black">{foundPallet.pallets} PL</p>
+                            <p className="text-[11px] font-mono text-slate-900 dark:text-white font-black">{foundPallet.pallets} PL</p>
                           </div>
                           <div className="space-y-1 text-right">
                             <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Confirmar Saída?</p>
@@ -1040,14 +1040,14 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div>
                       <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Atenção: Nenhum Item Encontrado</p>
                       <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed italic">
-                        Não localizamos pallets ativos na vaga <span className="text-white not-italic">{exitId}</span>. Verifique se a vaga está correta.
+                        Não localizamos pallets ativos na vaga <span className="text-slate-900 dark:text-white not-italic">{exitId}</span>. Verifique se a vaga está correta.
                       </p>
                     </div>
                   </motion.div>
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                     <Info className="w-3 h-3 text-red-500" />
                     Motivo da Saída
                   </label>
@@ -1056,7 +1056,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <select 
                       value={exitReason}
                       onChange={e => setExitReason(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white font-black text-sm focus:border-red-600 focus:ring-4 focus:ring-red-600/10 outline-none transition-all appearance-none cursor-pointer group-hover:border-slate-700"
                     >
                       <option value="">Selecione o motivo</option>
                       <option value="EXPEDICAO">EXPEDIÇÃO / CARREGAMENTO</option>
@@ -1074,7 +1074,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                 <button 
                   onClick={handleExitSubmit}
                   disabled={!foundPallet || !exitReason}
-                  className="w-full py-5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-red-900/40 active:scale-[0.98] group"
+                  className="w-full py-5 bg-red-600 hover:bg-red-500 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600 text-slate-900 dark:text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 shadow-2xl shadow-red-900/40 active:scale-[0.98] group"
                 >
                   Confirmar Saída Operacional 
                   <LogOut className="w-4 h-4" />

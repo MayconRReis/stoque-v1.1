@@ -111,7 +111,7 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
             </div>
             
             {insp.withoutSeal && (
-              <div className="bg-red-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-red-600/50 animate-pulse mt-1">
+              <div className="bg-red-500 text-slate-900 dark:text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-red-600/50 animate-pulse mt-1">
                 <ShieldAlert className="w-3.5 h-3.5" />
                 SEM SELO
               </div>

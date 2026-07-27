@@ -107,18 +107,18 @@ export const UserManager: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter flex items-center gap-3">
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
             Gerenciar Usuários
             <span className="text-blue-500 text-sm font-bold bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 tracking-normal">
               {profiles.length}
             </span>
           </h2>
-          <p className="text-slate-400 text-sm font-medium mt-1">Controle de acesso e níveis de permissão do sistema</p>
+          <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mt-1">Controle de acesso e níveis de permissão do sistema</p>
         </div>
 
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="group relative flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-[2rem] font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95"
+          className="group relative flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white px-8 py-4 rounded-[2rem] font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95"
         >
           <UserPlus className="w-5 h-5 transition-transform group-hover:scale-110" />
           Novo Usuário
@@ -134,7 +134,7 @@ export const UserManager: React.FC = () => {
           placeholder="Buscar por nome ou ID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/50 rounded-[2rem] pl-14 pr-8 py-5 text-white font-bold focus:border-blue-500 outline-none transition-all placeholder:text-slate-700"
+          className="w-full bg-slate-100/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-[2rem] pl-14 pr-8 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-500 outline-none transition-all placeholder:text-slate-700"
         />
       </div>
 
@@ -143,7 +143,7 @@ export const UserManager: React.FC = () => {
           {loading ? (
             <div className="col-span-full flex flex-col items-center justify-center py-20 grayscale opacity-50">
               <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Carregando perfis...</p>
+              <p className="text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Carregando perfis...</p>
             </div>
           ) : filteredProfiles.map((profile) => (
             <motion.div
@@ -152,8 +152,8 @@ export const UserManager: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className={`group bg-slate-900/60 backdrop-blur-md border rounded-[2.5rem] p-8 transition-all hover:bg-slate-900/80 ${
-                !profile.active ? 'border-slate-800 opacity-60 grayscale' : 'border-slate-800 hover:border-slate-700'
+              className={`group bg-slate-100/60 dark:bg-slate-900/60 backdrop-blur-md border rounded-[2.5rem] p-8 transition-all hover:bg-slate-900/80 ${
+                !profile.active ? 'border-slate-200 dark:border-slate-800 opacity-60 grayscale' : 'border-slate-200 dark:border-slate-800 hover:border-slate-700'
               }`}
             >
               <div className="flex items-start justify-between mb-6">
@@ -181,8 +181,8 @@ export const UserManager: React.FC = () => {
 
               <div className="space-y-1 mb-6">
                 <div className="flex items-center gap-2">
-                   <h3 className="text-xl font-black text-white tracking-tight truncate">{profile.name}</h3>
-                   {!profile.active && <span className="text-[9px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full uppercase">Inativo</span>}
+                   <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">{profile.name}</h3>
+                   {!profile.active && <span className="text-[9px] font-black bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full uppercase">Inativo</span>}
                 </div>
                 <p className="text-[10px] text-slate-500 font-mono tracking-tight truncate">{profile.id}</p>
               </div>
@@ -195,15 +195,15 @@ export const UserManager: React.FC = () => {
                 }`}>
                   {profile.role === 'admin' ? 'Administrador' : 'Operador'}
                 </span>
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-950/50 px-3 py-1 rounded-full">
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-50/50 dark:bg-slate-950/50 px-3 py-1 rounded-full">
                   CRIADO EM {new Date(profile.createdAt).toLocaleDateString()}
                 </span>
               </div>
 
-              <div className="pt-6 border-t border-slate-800/50 flex gap-3">
+              <div className="pt-6 border-t border-slate-200/50 dark:border-slate-800/50 flex gap-3">
                 <button 
                    onClick={() => handleRoleChange(profile, profile.role === 'admin' ? 'operator' : 'admin')}
-                   className="flex-1 flex items-center justify-center gap-2 bg-slate-950/50 hover:bg-slate-950 text-slate-400 hover:text-white px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800/30"
+                   className="flex-1 flex items-center justify-center gap-2 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-200/30 dark:border-slate-800/30"
                 >
                   {profile.role === 'admin' ? <UserIcon className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
                   Mudar p/ {profile.role === 'admin' ? 'Operador' : 'Admin'}
@@ -223,29 +223,29 @@ export const UserManager: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsAddModalOpen(false)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
+              className="absolute inset-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl"
             />
             
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-[3rem] overflow-hidden shadow-2xl relative z-10"
+              className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[3rem] overflow-hidden shadow-2xl relative z-10"
             >
               <div className="p-8 md:p-12">
                 <div className="flex items-center justify-between mb-10">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-900/20">
-                      <UserPlus className="w-7 h-7 text-white" />
+                      <UserPlus className="w-7 h-7 text-slate-900 dark:text-white" />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-black text-white tracking-tighter">Novo Usuário</h2>
+                      <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Novo Usuário</h2>
                       <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Cadastro de Acesso</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => setIsAddModalOpen(false)}
-                    className="w-12 h-12 flex items-center justify-center rounded-2xl bg-slate-950 text-slate-500 hover:text-white transition-colors"
+                    className="w-12 h-12 flex items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                   >
                     <XCircle className="w-6 h-6" />
                   </button>
@@ -261,7 +261,7 @@ export const UserManager: React.FC = () => {
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         placeholder="Nome do colaborador"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
                         required
                       />
                     </div>
@@ -277,7 +277,7 @@ export const UserManager: React.FC = () => {
                           value={newUsername}
                           onChange={(e) => setNewUsername(e.target.value)}
                           placeholder="usuario.acesso"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
                           required
                         />
                       </div>
@@ -292,7 +292,7 @@ export const UserManager: React.FC = () => {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-14 pr-6 py-5 text-slate-900 dark:text-white font-bold focus:border-blue-600 outline-none transition-all placeholder:text-slate-800"
                           required
                         />
                       </div>
@@ -308,7 +308,7 @@ export const UserManager: React.FC = () => {
                         className={`flex items-center justify-center gap-3 p-5 rounded-3xl border transition-all ${
                           newRole === 'operator' 
                             ? 'bg-blue-600/10 border-blue-600 text-blue-500' 
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-700'
                         }`}
                       >
                         <UserIcon className="w-5 h-5" />
@@ -320,7 +320,7 @@ export const UserManager: React.FC = () => {
                         className={`flex items-center justify-center gap-3 p-5 rounded-3xl border transition-all ${
                           newRole === 'admin' 
                             ? 'bg-amber-500/10 border-amber-500 text-amber-500' 
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-700'
                         }`}
                       >
                         <ShieldCheck className="w-5 h-5" />
@@ -340,14 +340,14 @@ export const UserManager: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => setIsAddModalOpen(false)}
-                      className="flex-1 py-6 bg-slate-950 hover:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-[0.3em] rounded-3xl transition-all"
+                      className="flex-1 py-6 bg-slate-50 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-[0.3em] rounded-3xl transition-all"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex-[2] py-6 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-[0.3em] rounded-3xl transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3 disabled:bg-slate-800 disabled:text-slate-600"
+                      className="flex-[2] py-6 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-black text-xs uppercase tracking-[0.3em] rounded-3xl transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600"
                     >
                       {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Criar Usuário <ChevronRight className="w-4 h-4" /></>}
                     </button>

@@ -35,7 +35,7 @@ const SlotCell: React.FC<SlotCellProps> = ({ slot, onClick, getContainerColor })
     <div 
       onClick={() => onClick(slot)}
       className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-1 transition-all duration-200 group relative cursor-pointer ${
-        slot.status === SlotContent.EMPTY ? 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700' : 
+        slot.status === SlotContent.EMPTY ? 'bg-slate-50/30 dark:bg-slate-950/30 border-slate-200/50 dark:border-slate-800/50 hover:border-slate-700' : 
         slot.status === SlotContent.BOTTLES ? 'bg-blue-600/10 border-blue-600/30' : 
         slot.status === SlotContent.SUPPLIES ? 'bg-amber-600/10 border-amber-600/30' :
         isContainer ? 'bg-slate-300/10 border-slate-100/30' :

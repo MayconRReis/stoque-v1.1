@@ -61,20 +61,20 @@ export function ConsolidateDrawer({ isOpen, onClose, selectedPalletsData, onSucc
   return (
     <>
       <div 
-        className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm animate-in fade-in"
+        className="fixed inset-0 z-[100] bg-slate-50/60 dark:bg-slate-950/60 backdrop-blur-sm animate-in fade-in"
         onClick={onClose}
       />
       
-      <div className="fixed inset-y-0 right-0 z-[110] w-full md:w-[500px] bg-slate-900 border-l border-slate-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+      <div className="fixed inset-y-0 right-0 z-[110] w-full md:w-[500px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800/60 bg-slate-900/50">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/60 dark:border-slate-800/60 bg-slate-100/50 dark:bg-slate-900/50">
           <div className="flex items-center gap-3 text-emerald-400">
             <Layers className="w-5 h-5" />
             <h2 className="text-lg font-semibold tracking-tight text-slate-100">Consolidar Pallets</h2>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-800 rounded-full transition-colors"
+            className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -84,7 +84,7 @@ export function ConsolidateDrawer({ isOpen, onClose, selectedPalletsData, onSucc
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
             <h3 className="text-emerald-400 font-medium mb-2 text-sm uppercase tracking-wider">Novo Grupo de Pallets</h3>
-            <p className="text-slate-300 text-sm leading-relaxed">
+            <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
               Você está prestes a agrupar {uniqueRows.length} {uniqueRows.length === 1 ? 'registro' : 'registros'} em um único pallet consolidado. 
               Esta operação é executada em uma única transação e pode ser desfeita futuramente.
             </p>
@@ -98,18 +98,18 @@ export function ConsolidateDrawer({ isOpen, onClose, selectedPalletsData, onSucc
           )}
 
           <div>
-            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">Pallets Selecionados</h3>
+            <h3 className="text-slate-600 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">Pallets Selecionados</h3>
             <div className="space-y-3">
               {uniqueRows.map((row) => (
-                <div key={row.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 flex flex-col gap-1">
+                <div key={row.id} className="bg-slate-200/50 dark:bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-emerald-400 text-sm">{row.loadingId}</span>
-                    <span className="text-slate-400 text-xs">{row.originOP}</span>
+                    <span className="text-slate-600 dark:text-slate-400 text-xs">{row.originOP}</span>
                   </div>
-                  <span className="text-slate-300 text-sm truncate">{row.description}</span>
+                  <span className="text-slate-700 dark:text-slate-300 text-sm truncate">{row.description}</span>
                   <div className="flex gap-4 mt-2">
-                    <span className="text-xs text-slate-500">Lote: <span className="text-slate-400">{row.lot || 'N/A'}</span></span>
-                    <span className="text-xs text-slate-500">Pallets: <span className="text-slate-400">{row.pallets || 1}</span></span>
+                    <span className="text-xs text-slate-500">Lote: <span className="text-slate-600 dark:text-slate-400">{row.lot || 'N/A'}</span></span>
+                    <span className="text-xs text-slate-500">Pallets: <span className="text-slate-600 dark:text-slate-400">{row.pallets || 1}</span></span>
                   </div>
                 </div>
               ))}
@@ -118,11 +118,11 @@ export function ConsolidateDrawer({ isOpen, onClose, selectedPalletsData, onSucc
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-800/60 bg-slate-900/50">
+        <div className="p-6 border-t border-slate-200/60 dark:border-slate-800/60 bg-slate-100/50 dark:bg-slate-900/50">
           <button
             onClick={handleConsolidate}
             disabled={isLoading || uniqueRows.length < 2}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm tracking-wide transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 dark:text-white rounded-xl font-bold text-sm tracking-wide transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
           >
             {isLoading ? 'Processando...' : 'Confirmar Consolidação'}
           </button>

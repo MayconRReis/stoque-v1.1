@@ -40,10 +40,10 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
   if (waitingPallets.length === 0) {
     return (
       <div className="max-w-4xl mx-auto py-32 text-center animate-in fade-in duration-700">
-        <div className="w-24 h-24 bg-slate-900/40 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border border-slate-800">
+        <div className="w-24 h-24 bg-slate-100/40 dark:bg-slate-900/40 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-slate-800">
           <Warehouse className="w-10 h-10 text-slate-700" />
         </div>
-        <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">Tudo em ordem!</h3>
+        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter mb-2">Tudo em ordem!</h3>
         <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">Não há pallets aguardando vaga no momento.</p>
       </div>
     );
@@ -57,7 +57,7 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
         {selectedPallets.length > 0 && (
           <button 
             onClick={onSendToShipment}
-            className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
+            className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
           >
             <Send className="w-3.5 h-3.5" /> Enviar ({selectedPallets.length})
           </button>
@@ -76,7 +76,7 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
               whileHover={{ y: -5 }}
               onClick={() => onToggleSelection(row.id, idx)}
               className={`group backdrop-blur-xl rounded-[2.5rem] border hover:border-amber-500/50 transition-all p-7 relative overflow-hidden flex flex-col h-full shadow-lg ${
-                isSelected ? 'bg-fuchsia-900/30 border-fuchsia-500 shadow-fuchsia-500/10' : 'bg-slate-900/60 border-slate-800 hover:shadow-amber-500/10'
+                isSelected ? 'bg-fuchsia-900/30 border-fuchsia-500 shadow-fuchsia-500/10' : 'bg-slate-100/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:shadow-amber-500/10'
               } cursor-pointer`}
             >
               {/* Background Icon Accent */}
@@ -108,7 +108,7 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
                 {/* Product Info */}
                 <div className="flex-1 space-y-5 mb-8">
                   <div>
-                    <h4 className={`text-lg font-black uppercase tracking-tighter italic leading-[1.1] line-clamp-2 min-h-[2.5rem] transition-colors ${isSelected ? 'text-fuchsia-100' : 'text-white group-hover:text-amber-300'}`}>
+                    <h4 className={`text-lg font-black uppercase tracking-tighter italic leading-[1.1] line-clamp-2 min-h-[2.5rem] transition-colors ${isSelected ? 'text-fuchsia-100' : 'text-slate-900 dark:text-white group-hover:text-amber-300'}`}>
                       {row.description}
                     </h4>
                     {row.operatorName && (
@@ -117,25 +117,25 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                    <div className="bg-slate-50/50 dark:bg-slate-950/50 p-3.5 rounded-2xl border border-slate-200/30 dark:border-slate-800/30 group-hover:border-slate-800 transition-colors">
                       <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                         <Tag className="w-2.5 h-2.5" /> OP Origem
                       </p>
                       <p className="text-xs font-black text-blue-400 font-mono italic">{row.originOP || 'N/A'}</p>
                     </div>
-                    <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                    <div className="bg-slate-50/50 dark:bg-slate-950/50 p-3.5 rounded-2xl border border-slate-200/30 dark:border-slate-800/30 group-hover:border-slate-800 transition-colors">
                       <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                         <Layers className="w-2.5 h-2.5" /> Lote
                       </p>
                       <p className="text-xs font-black text-amber-400 font-mono italic">{row.lot || 'N/A'}</p>
                     </div>
-                    <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                    <div className="bg-slate-50/50 dark:bg-slate-950/50 p-3.5 rounded-2xl border border-slate-200/30 dark:border-slate-800/30 group-hover:border-slate-800 transition-colors">
                       <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                         <AlertCircle className="w-2.5 h-2.5" /> ID Final
                       </p>
                       <p className="text-xs font-black text-[#955251] font-mono italic">{row.loadingId || 'AGUARDANDO'}</p>
                     </div>
-                    <div className="bg-slate-950/50 p-3.5 rounded-2xl border border-slate-800/30 group-hover:border-slate-800 transition-colors">
+                    <div className="bg-slate-50/50 dark:bg-slate-950/50 p-3.5 rounded-2xl border border-slate-200/30 dark:border-slate-800/30 group-hover:border-slate-800 transition-colors">
                       <p className="text-[7px] text-slate-600 font-bold uppercase mb-1.5 tracking-widest flex items-center gap-1.5">
                         <Package className="w-2.5 h-2.5" /> Tipo
                       </p>
@@ -152,7 +152,7 @@ export const WaitingSlotsView: React.FC<WaitingSlotsViewProps> = ({
                     e.stopPropagation();
                     onAssignSlot(row, idx);
                   }}
-                  className={`w-full py-4 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.25em] transition-all shadow-xl active:scale-95 flex items-center justify-center relative overflow-hidden ${isSelected ? 'bg-fuchsia-600 hover:bg-fuchsia-500 shadow-fuchsia-900/40 border border-fuchsia-500' : 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-amber-900/40 border border-transparent'}`}
+                  className={`w-full py-4 text-slate-900 dark:text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.25em] transition-all shadow-xl active:scale-95 flex items-center justify-center relative overflow-hidden ${isSelected ? 'bg-fuchsia-600 hover:bg-fuchsia-500 shadow-fuchsia-900/40 border border-fuchsia-500' : 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-amber-900/40 border border-transparent'}`}
                 >
                   ESCOLHER VAGA
                 </button>

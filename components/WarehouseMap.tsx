@@ -31,12 +31,12 @@ const RackView: React.FC<{
       case SlotContent.CONTAINER_SJ: return 'text-rose-500';
       case SlotContent.CONTAINER_LP: return 'text-blue-500';
       case SlotContent.CONTAINER_CP: return 'text-indigo-500';
-      default: return 'text-slate-400';
+      default: return 'text-slate-600 dark:text-slate-400';
     }
   };
 
   return (
-    <div className="bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-800/50 shadow-xl overflow-hidden mb-6">
+    <div className="bg-slate-100/40 dark:bg-slate-900/40 p-5 md:p-8 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800/50 shadow-xl overflow-hidden mb-6">
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
            <div className={`w-1.5 h-8 rounded-full ${
@@ -46,22 +46,22 @@ const RackView: React.FC<{
              'bg-amber-600'
            }`}></div>
            <div className="flex flex-col">
-              <h4 className="text-lg font-black text-white uppercase tracking-tighter flex items-center gap-2 italic">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter flex items-center gap-2 italic">
                 Porta Pallet {rack} <span className="text-slate-500 font-medium text-sm">/ {rackTitles[rack]}</span>
               </h4>
               <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Layout de Armazenagem G0</p>
            </div>
         </div>
         
-        <div className="bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-800/50 flex items-center gap-6">
+        <div className="bg-slate-50/50 dark:bg-slate-950/50 px-4 py-2 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex items-center gap-6">
           <div className="flex flex-col items-center">
             <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Disponíveis</span>
             <span className="text-sm font-black text-blue-500">{freeCount}</span>
           </div>
-          <div className="w-px h-6 bg-slate-800/50"></div>
+          <div className="w-px h-6 bg-slate-200/50 dark:bg-slate-800/50"></div>
           <div className="flex flex-col items-center">
             <span className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Capacidade</span>
-            <span className="text-sm font-black text-white">{totalCount}</span>
+            <span className="text-sm font-black text-slate-900 dark:text-white">{totalCount}</span>
           </div>
         </div>
       </div>
