@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import Papa from 'papaparse';
+import { disableSupabase } from './lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -511,8 +512,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       setShipmentCounts(countsData);
       setWarehouseDiagnostic(diagnostic);
       setHasMoreInventory(invResult.data.length < invResult.count);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing data:', error);
+      if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+        console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
+        disableSupabase();
+        setTimeout(() => refreshCombinedData(), 100);
+      }
     }
   }, [inventoryPage, inventorySearch, inventoryTypeFilter]);
 
@@ -670,9 +676,15 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         } else {
           setSlots(slotData);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading data from Supabase:', error);
-        showNotification('Erro ao carregar dados do servidor Supabase.', 'error');
+        if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+          console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
+          disableSupabase();
+          setTimeout(() => loadData(), 100);
+        } else {
+          showNotification('Erro ao carregar dados do servidor Supabase.', 'error');
+        }
       }
     };
 

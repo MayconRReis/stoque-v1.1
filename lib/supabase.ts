@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Ensure it's a valid url and not a placeholder
-export const isSupabaseConfigured = Boolean(
+export let isSupabaseConfigured = Boolean(
   supabaseUrl && 
   supabaseAnonKey && 
   supabaseUrl.startsWith('http') &&
@@ -12,6 +12,11 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes('placeholder.supabase.co') &&
   supabaseAnonKey !== 'your-anon-key'
 );
+
+export function disableSupabase() {
+  isSupabaseConfigured = false;
+  console.warn('Supabase has been disabled at runtime (e.g. due to fetch error). Falling back to offline mode.');
+}
 
 if (!isSupabaseConfigured) {
   console.warn('Supabase credentials missing or using placeholders. The app will run in offline mode (LocalStorage).');

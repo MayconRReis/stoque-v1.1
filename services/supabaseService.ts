@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, disableSupabase } from '../lib/supabase';
 import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES } from '../types';
 
 /**
@@ -1010,12 +1010,30 @@ export const supabaseService = {
 
     // We append a domain to the username to use Supabase Auth's email system
     const email = `${(username || '').toLowerCase().trim()}@stoqueplus.com`;
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      if (error?.message === 'Failed to fetch' || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+        disableSupabase();
+        // Return mock login
+        const mockUser = {
+          id: 'offline-user',
+          email: `${username}@stoqueplus.com`,
+        };
+        localStorage.setItem('stoque_plus_logged_user', JSON.stringify({
+          id: mockUser.id,
+          name: username,
+          role: (username || '').toLowerCase() === 'admin' ? 'admin' : 'operator'
+        }));
+        return { user: mockUser, session: { access_token: 'mock-token' } };
+      }
+      throw error;
+    }
   },
 
   async signOut() {
@@ -1023,8 +1041,17 @@ export const supabaseService = {
       localStorage.removeItem('stoque_plus_logged_user');
       return;
     }
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error: any) {
+      if (error?.message === 'Failed to fetch' || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+        disableSupabase();
+        localStorage.removeItem('stoque_plus_logged_user');
+        return;
+      }
+      throw error;
+    }
   },
 
   async getCurrentUser() {
@@ -1073,8 +1100,17 @@ export const supabaseService = {
         name: profile.name || user.email?.split('@')[0] || 'Usuário',
         role: profile.role || 'operator'
       } as User;
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('stole it') || error?.message?.includes('lock')) {
+        console.warn('Supabase Auth lock warning ignored:', error);
+        return null;
+      }
       console.error('Error in getCurrentUser:', error);
+      if (error?.message === 'Failed to fetch' || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+        disableSupabase();
+        const localUser = localStorage.getItem('stoque_plus_logged_user');
+        return localUser ? JSON.parse(localUser) : null;
+      }
       return null;
     }
   },
