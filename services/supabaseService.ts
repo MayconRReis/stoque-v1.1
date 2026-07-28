@@ -1297,6 +1297,20 @@ export const supabaseService = {
     })) as SheetRow[];
   },
 
+  
+  async getPendingEditRequestsCount(): Promise<number> {
+    if (!isSupabaseConfigured) return 0;
+    const { count, error } = await supabase
+      .from('inventory_edit_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    if (error) {
+      console.error('Error fetching pending edit requests count:', error);
+      return 0;
+    }
+    return count || 0;
+  },
   async getEditRequests(): Promise<any[]> {
     if (!isSupabaseConfigured) return [];
     
@@ -1896,6 +1910,14 @@ export const supabaseService = {
       .subscribe();
   },
 
+  
+  subscribeToEditRequests(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    return supabase
+      .channel('edit-requests-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_edit_requests' }, callback)
+      .subscribe();
+  },
   subscribeToShipments(callback: (payload: any) => void) {
     return supabase
       .channel('shipment-changes')

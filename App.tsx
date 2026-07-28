@@ -9,7 +9,7 @@ import {
   ArrowLeftRight, 
   History, 
   FileUp, 
-  ClipboardCheck, 
+  ClipboardCheck, Bell, 
   LogOut, 
   Menu, 
   X, 
@@ -179,6 +179,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [data, setData] = useState<SheetRow[]>([]);
   const [pendingRows, setPendingRows] = useState<SheetRow[]>([]);
   const [waitingRows, setWaitingRows] = useState<SheetRow[]>([]);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [stats, setStats] = useState<DashboardStats>({
     freeSlots: 0,
     pendingEntries: 0,
@@ -211,6 +212,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     });
   }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [movementInitialContext, setMovementInitialContext] = useState<{
@@ -494,7 +496,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   const refreshCombinedData = useCallback(async () => {
     // Refresh current page of inventory, global stats, pending and waiting rows
     try {
-      const [invResult, globalStats, pendingRes, waitingRes, countsData, diagnostic] = await Promise.all([
+      const [invResult, globalStats, pendingRes, waitingRes, countsData, diagnostic, approvalsCount] = await Promise.all([
         supabaseService.getInventoryPaginated(0, (inventoryPage + 1) * PAGE_SIZE, { 
           searchTerm: inventorySearch, 
           typeFilter: inventoryTypeFilter 
@@ -502,15 +504,17 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         supabaseService.getGlobalStats(),
         supabaseService.getPendingInventory(),
         supabaseService.getWaitingInventory(),
-        supabaseService.getShipmentPalletCounts(),
-        supabaseService.getWarehouseDiagnostic()
+        supabaseService.getShipmentPalletCounts(), supabaseService.getPendingEditRequestsCount(),
+        supabaseService.getWarehouseDiagnostic(), supabaseService.getPendingEditRequestsCount()
       ]);
       setData(invResult.data);
       setStats(globalStats);
       setPendingRows(pendingRes);
       setWaitingRows(waitingRes);
       setShipmentCounts(countsData);
+        setPendingApprovalsCount(approvalsCount);
       setWarehouseDiagnostic(diagnostic);
+      setPendingApprovalsCount(approvalsCount);
       setHasMoreInventory(invResult.data.length < invResult.count);
     } catch (error: any) {
       console.error('Error refreshing data:', error);
@@ -637,7 +641,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
 
     const loadData = async () => {
       try {
-        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData] = await Promise.all([
+        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData, approvalsCount] = await Promise.all([
           supabaseService.getInventoryPaginated(0, PAGE_SIZE, { 
             searchTerm: inventorySearch, 
             typeFilter: inventoryTypeFilter 
@@ -648,7 +652,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           supabaseService.getGlobalStats(),
           supabaseService.getPendingInventory(),
           supabaseService.getWaitingInventory(),
-          supabaseService.getShipmentPalletCounts()
+          supabaseService.getShipmentPalletCounts(), supabaseService.getPendingEditRequestsCount()
         ]);
 
         setData(invPaginatied.data);
@@ -698,11 +702,41 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           if (prev.find(r => r.id === newItem.id)) return prev;
           return [newItem, ...prev];
         });
+        if (newItem.status === 'PENDING') {
+          setPendingRows(prev => [newItem, ...prev]);
+          showNotification('Novo pallet aguardando análise', 'info');
+        }
       } else if (payload.eventType === 'UPDATE') {
         const updatedItem = mapInventoryItem(payload.new);
         setData(prev => prev.map(r => r.id === updatedItem.id ? updatedItem : r));
+        if (updatedItem.status === 'PENDING') {
+          setPendingRows(prev => {
+            if (prev.find(r => r.id === updatedItem.id)) return prev.map(r => r.id === updatedItem.id ? updatedItem : r);
+            return [updatedItem, ...prev];
+          });
+        } else {
+          setPendingRows(prev => prev.filter(r => r.id !== updatedItem.id));
+        }
       } else if (payload.eventType === 'DELETE') {
         setData(prev => prev.filter(r => r.id !== payload.old.id));
+        setPendingRows(prev => prev.filter(r => r.id !== payload.old.id));
+      }
+    });
+
+    const editRequestsChannel = supabaseService.subscribeToEditRequests((payload) => {
+      if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
+        setPendingApprovalsCount(prev => prev + 1);
+        if (user?.role === 'admin') {
+          showNotification('Nova solicitação de aprovação', 'info');
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
+          setPendingApprovalsCount(prev => Math.max(0, prev - 1));
+        } else if (payload.old.status !== 'pending' && payload.new.status === 'pending') {
+          setPendingApprovalsCount(prev => prev + 1);
+        }
+      } else if (payload.eventType === 'DELETE' && payload.old.status === 'pending') {
+        setPendingApprovalsCount(prev => Math.max(0, prev - 1));
       }
     });
 
@@ -720,12 +754,16 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       }
     });
 
-    const shipmentsChannel = supabaseService.subscribeToShipments(() => {
+    const shipmentsChannel = supabaseService.subscribeToShipments((payload) => {
       supabaseService.getShipments().then(setShipments);
+      if (payload && payload.eventType === 'INSERT' && payload.new.status === 'OPEN') {
+        showNotification('Novo carregamento criado', 'info');
+      }
     });
 
     return () => {
       inventoryChannel.unsubscribe();
+      editRequestsChannel.unsubscribe();
       slotsChannel.unsubscribe();
       shipmentsChannel.unsubscribe();
     };
@@ -2201,7 +2239,16 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     return sorted;
   }, [data, inventorySearch, inventoryTypeFilter, activeTab, isBulkConfirmOpen]);
 
+  
+  const appNotifications = [
+    ...(user?.role === 'admin' && pendingApprovalsCount > 0 ? [{ id: 'approvals', label: 'Aprovações Pendentes', count: pendingApprovalsCount, tab: 'approvals', icon: ClipboardCheck }] : []),
+    ...(pendingRows.length > 0 ? [{ id: 'analysis', label: 'Análises Pendentes', count: pendingRows.length, tab: 'analysis', icon: ClipboardCheck }] : []),
+    ...(shipments.filter(s => s.status === ShipmentStatus.OPEN).length > 0 ? [{ id: 'shipments', label: 'Carregamentos Abertos', count: shipments.filter(s => s.status === ShipmentStatus.OPEN).length, tab: 'shipments', icon: Truck }] : [])
+  ];
+  const totalAppNotifications = appNotifications.reduce((acc, n) => acc + n.count, 0);
+
   if (isAuthLoading) {
+
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -2338,11 +2385,11 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
             <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" isActive={activeTab === 'map'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="import" icon={FileUp} label="Importar CSV" isActive={activeTab === 'import'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={data.filter(r => r.status === StockStatus.PENDING).length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={pendingRows.length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             {user?.role === 'admin' && (
               <>
-                <NavItem tab="approvals" icon={ClipboardCheck} label="Aprovações" isActive={activeTab === 'approvals'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+                <NavItem tab="approvals" icon={ClipboardCheck} label="Aprovações" badge={pendingApprovalsCount} isActive={activeTab === 'approvals'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
                 <NavItem tab="users" icon={Users} label="Usuários" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
               </>
             )}
@@ -2433,9 +2480,81 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
                  Acessar App
                </button>
              )}
-             <div className="flex items-center justify-center w-10 h-6 bg-slate-100 dark:bg-slate-900/50 rounded-full border border-slate-300 dark:border-slate-800/50">
-               <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-             </div>
+             
+            {!isPublicView && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className="flex items-center justify-center w-10 h-10 bg-slate-100 dark:bg-slate-900/50 hover:bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-800/50 rounded-full text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-all active:scale-95 shadow-sm relative"
+                  title="Notificações"
+                >
+                  <Bell className="w-4 h-4" />
+                  {totalAppNotifications > 0 && (
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-950 animate-pulse">
+                      {totalAppNotifications > 9 ? '9+' : totalAppNotifications}
+                    </span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsNotificationsOpen(false)}
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden"
+                      >
+                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+                          <h3 className="font-bold text-slate-800 dark:text-white text-sm">Notificações</h3>
+                          {totalAppNotifications > 0 && (
+                            <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                              {totalAppNotifications}
+                            </span>
+                          )}
+                        </div>
+                        <div className="max-h-[60vh] overflow-y-auto relative z-50">
+                          {appNotifications.length > 0 ? (
+                            <div className="p-2 space-y-1">
+                              {appNotifications.map((n) => (
+                                <button
+                                  key={n.id}
+                                  onClick={() => {
+                                    navigateToTab(n.tab);
+                                    setIsNotificationsOpen(false);
+                                  }}
+                                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
+                                >
+                                  <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                    <n.icon className="w-5 h-5" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-white">{n.label}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.count} {n.count === 1 ? 'item pendente' : 'itens pendentes'}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-sm flex flex-col items-center">
+                              <Bell className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2" />
+                              <p>Nenhuma notificação</p>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         </header>
 
