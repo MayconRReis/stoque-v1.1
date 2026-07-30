@@ -205,7 +205,7 @@ export const ShipmentModal: React.FC<ShipmentModalProps> = ({
                             <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter ${shipment.type === ShipmentType.THIRD_PARTY ? 'bg-fuchsia-500/20 text-fuchsia-400' : 'bg-pink-500/20 text-pink-400'}`}>
                               {shipment.type === ShipmentType.THIRD_PARTY ? 'Terceirista' : 'Próprio'}
                             </span>
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Envio: {new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Envio: {(shipment.scheduledDate ? new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data não definida')}</span>
                           </div>
                         </div>
                         {selectedShipmentId === shipment.id && <CheckCircle2 className="w-4 h-4 text-fuchsia-500" />}

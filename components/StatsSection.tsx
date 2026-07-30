@@ -35,7 +35,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats, isPublicView, onNavi
             </div>
           </div>
           <div className="flex items-baseline gap-4">
-            <p className="text-6xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{stats.totalBottles.toLocaleString()}</p>
+            <p className="text-6xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">{(stats?.totalBottles || 0).toLocaleString()}</p>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Unidades</p>
           </div>
         </div>

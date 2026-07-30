@@ -2,6 +2,13 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import Papa from 'papaparse';
 import { disableSupabase } from './lib/supabase';
+import { useNotifications } from './hooks/useNotifications';
+import { useTheme } from './hooks/useTheme';
+import { useAuth } from './hooks/useAuth';
+import { useInventoryFilters, PAGE_SIZE } from './hooks/useInventoryFilters';
+import { usePalletSelection } from './hooks/usePalletSelection';
+import { useShipments } from './hooks/useShipments';
+import { useWarehouseData, generateSlots } from './hooks/useWarehouseData';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -94,28 +101,6 @@ const hasRecoveryPayload = (details: string) => details.includes(RECOVERY_DATA_M
 
 const stripRecoveryPayload = (details: string) => details.split(RECOVERY_DATA_MARKER)[0].trim();
 
-const generateSlots = (): WarehouseSlot[] => {
-  const slots: WarehouseSlot[] = [];
-  const racks: ('A' | 'B' | 'C' | 'D' | 'E' | 'F')[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-  racks.forEach(rack => {
-    let levels = 3;
-    let positions = 16;
-    
-    if (rack === 'D') {
-      positions = 18;
-    } else if (rack === 'E' || rack === 'F') {
-      levels = 5;
-      positions = 9;
-    }
-    
-    for (let l = 1; l <= levels; l++) {
-      for (let p = 1; p <= positions; p++) {
-        slots.push({ id: `${rack}.${l}.${p}`, rack, level: l, position: p, status: SlotContent.EMPTY });
-      }
-    }
-  });
-  return slots;
-};
 
 const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
   const isSm = size === 'sm';
@@ -157,49 +142,9 @@ const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, act
 ));
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<AppUser | null>(null);
   
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
-  });
+  const { theme, setTheme } = useTheme();
 
-  useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isPublicView, setIsPublicView] = useState(false);
-  const [data, setData] = useState<SheetRow[]>([]);
-  const [pendingRows, setPendingRows] = useState<SheetRow[]>([]);
-  const [waitingRows, setWaitingRows] = useState<SheetRow[]>([]);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
-  const [stats, setStats] = useState<DashboardStats>({
-    freeSlots: 0,
-    pendingEntries: 0,
-    occupancyRate: 0,
-    dailyMovements: 0,
-    totalSlots: 264,
-    occupiedSlots: 0,
-    totalBottles: 0,
-    waitingPallets: 0,
-    finishedShipments24h: 0,
-    openShipmentsCount: 0,
-    productDistribution: {},
-    containerTotalSlots: 0,
-    containerOccupiedSlots: 0,
-    containerFreeSlots: 0,
-    containerOccupancyRate: 0
-  });
-  const [warehouseDiagnostic, setWarehouseDiagnostic] = useState<WarehouseDiagnostic | null>(null);
-  const [isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen] = useState(false);
-  const [slots, setSlots] = useState<WarehouseSlot[]>(generateSlots());
   const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
   
@@ -222,125 +167,72 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   } | null>(null);
   
   // Selection and Search State
-  const [inventorySearch, setInventorySearch] = useState('');
-  const [inventoryTypeFilter, setInventoryTypeFilter] = useState<SlotContent | 'ALL' | 'CONTAINER' | 'SEM_SELO'>('ALL');
-  const [isInventoryFilterOpen, setIsInventoryFilterOpen] = useState(false);
-  const [selectedPallets, setSelectedPallets] = useState<string[]>([]); // Format: "rowId::palletIdx"
-  const [isConsolidateDrawerOpen, setIsConsolidateDrawerOpen] = useState(false);
-  const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
-  const [selectedPalletsData, setSelectedPalletsData] = useState<{ row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string }[]>([]);
 
-  useEffect(() => {
-    if ((isBulkConfirmOpen || isConsolidateDrawerOpen) && selectedPallets.length > 0) {
-      const fetchSelectedData = async () => {
-        const rowIds = Array.from(new Set(selectedPallets.map(key => key.split('::').slice(0, -1).join('::'))));
-        try {
-          const items = await supabaseService.getInventoryItemsByIds(rowIds as string[]);
-          const mapped = selectedPallets.map(key => {
-            const parts = key.split('::');
-            const rowId = parts.slice(0, parts.length - 1).join('::');
-            const palletIdx = parseInt(parts[parts.length - 1]);
-            const row = items.find(r => r.id === rowId);
-            if (!row || !row.inspections || !row.inspections[palletIdx]) return null;
-            return { row, inspection: row.inspections[palletIdx], idx: palletIdx, selectionKey: key };
-          }).filter((p): p is { row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string } => p !== null);
-          setSelectedPalletsData(mapped);
-        } catch (error) {
-          console.error('Error fetching selected pallets data:', error);
-        }
-      };
-      fetchSelectedData();
-    } else if (!isBulkConfirmOpen && !isConsolidateDrawerOpen) {
-      setSelectedPalletsData([]);
-    }
-  }, [isBulkConfirmOpen, isConsolidateDrawerOpen, selectedPallets]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historySearch, setHistorySearch] = useState('');
 
   const [deleteContext, setDeleteContext] = useState<{ type: 'row' | 'pallet', rowId: string, palletIdx?: number } | null>(null);
   const [matrixConfirmContext, setMatrixConfirmContext] = useState<{ rowId: string, palletIdx: number, slotId?: string } | null>(null);
-  const [notifications, setNotifications] = useState<{ id: string, message: string, type?: 'info' | 'error' | 'success' }[]>([]);
+  const { notifications, setNotifications, showNotification } = useNotifications();
+  const setDataRef = React.useRef<any>(null);
+  const handleSetData = React.useCallback((val: any) => setDataRef.current?.(val), []);
+  const { user, setUser, isAuthLoading, isPublicView, setIsPublicView } = useAuth(showNotification);
+  const {
+    inventorySearch, setInventorySearch,
+    inventoryTypeFilter, setInventoryTypeFilter,
+    isInventoryFilterOpen, setIsInventoryFilterOpen,
+    inventoryPage, setInventoryPage,
+    hasMoreInventory, setHasMoreInventory,
+    isLoadingMore, setIsLoadingMore,
+    loadMoreInventory
+  } = useInventoryFilters(user, isPublicView, showNotification, handleSetData);
+  const {
+    selectedPallets, setSelectedPallets,
+    isConsolidateDrawerOpen, setIsConsolidateDrawerOpen,
+    isBulkConfirmOpen, setIsBulkConfirmOpen,
+    selectedPalletsData, setSelectedPalletsData
+  } = usePalletSelection(showNotification);
+  const {
+    shipments, setShipments,
+    isShipmentModalOpen, setIsShipmentModalOpen,
+    shipmentCounts, setShipmentCounts,
+    shipmentDetailContext, setShipmentDetailContext,
+    shipmentDetailPallets, setShipmentDetailPallets,
+    isDetailLoading, setIsDetailLoading,
+    fetchShipmentDetailPallets,
+    handleOpenShipmentDetail
+  } = useShipments(history, showNotification);
+  const {
+    data, setData,
+    pendingRows, setPendingRows,
+    waitingRows, setWaitingRows,
+    pendingApprovalsCount, setPendingApprovalsCount,
+    stats, setStats,
+    warehouseDiagnostic, setWarehouseDiagnostic,
+    isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen,
+    slots, setSlots,
+    refreshCombinedData
+  } = useWarehouseData(
+    inventoryPage,
+    PAGE_SIZE,
+    inventorySearch,
+    inventoryTypeFilter,
+    setHasMoreInventory,
+    setShipmentCounts,
+    showNotification
+  );
   
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletMode, setEditPalletMode] = useState<'edit' | 'assign'>('edit');
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
-  const [shipmentCounts, setShipmentCounts] = useState<Record<string, number>>({});
-  const [shipmentDetailContext, setShipmentDetailContext] = useState<Shipment | null>(null);
-  const [shipmentDetailPallets, setShipmentDetailPallets] = useState<SheetRow[]>([]);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [recoveryContext, setRecoveryContext] = useState<HistoryEntry | null>(null);
   const [isRecovering, setIsRecovering] = useState(false);
 
-  const fetchShipmentDetailPallets = async (shipmentId: string) => {
-    setIsDetailLoading(true);
-    try {
-      const shipment = shipments.find(s => s.id === shipmentId);
-      
-      if (shipment?.status === ShipmentStatus.CLOSED) {
-        // Use local history state to quickly show the pallets
-        const localHistoryMatches = history.filter(h => h.details?.includes(`Finalização de Carregamento ${shipmentId}`));
-        
-        let histToUse = localHistoryMatches;
-        
-        // If not in local history (might be an old shipment), fetch from server
-        if (localHistoryMatches.length === 0) {
-          const remoteHist = await supabaseService.getHistory();
-          histToUse = remoteHist.filter(h => h.details?.includes(`Finalização de Carregamento ${shipmentId}`));
-        }
-        
-        const linked = histToUse.map((h, idx) => ({
-          id: `history-${h.id}-${idx}`,
-          loadingId: h.loadingId,
-          originOP: h.op,
-          description: h.description,
-          lot: h.lot,
-          pallets: h.totalPallets,
-          date: h.timestamp,
-          status: StockStatus.INSPECTED as StockStatus,
-          operatorName: h.operatorName,
-          inspections: [{
-             bottles: 0, caps: 0, boxes: 0, cradles: 0, contentType: SlotContent.FINISHED_PRODUCT as SlotContent,
-             assignedSlot: h.slot, palletNumber: h.palletNumber, shipmentId: shipmentId
-          }]
-        } as SheetRow));
-        setShipmentDetailPallets(linked);
-      } else {
-        const items = await supabaseService.getInventoryItemsByShipmentId(shipmentId);
-        const linked = items.flatMap(row => 
-          (row.inspections || [])
-            .map((insp, idx) => {
-              const sId = insp.shipmentId || (insp as any).shipment_id;
-              if (sId === shipmentId) {
-                return { ...row, inspections: [insp], id: `${row.id}::${idx}` } as SheetRow;
-              }
-              return null;
-            })
-            .filter((p): p is SheetRow => p !== null)
-        );
-        setShipmentDetailPallets(linked);
-      }
-    } catch (error) {
-      console.error('Error fetching detail pallets:', error);
-      showNotification('Erro ao carregar pallets do carregamento', 'error');
-    } finally {
-      setIsDetailLoading(false);
-    }
-  };
 
-  const handleOpenShipmentDetail = async (shipment: Shipment) => {
-    setShipmentDetailContext(shipment);
-    await fetchShipmentDetailPallets(shipment.id);
-  };
 
   // Pagination State for Inventory
-  const [inventoryPage, setInventoryPage] = useState(0);
-  const [hasMoreInventory, setHasMoreInventory] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const PAGE_SIZE = 50;
 
   // Helper to map Supabase data to SheetRow
   const mapInventoryItem = useCallback((item: any): SheetRow => ({
@@ -415,13 +307,6 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     activeTab
   ]);
 
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setNotifications(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 4000);
-  };
 
   const addToHistory = useCallback(async (entry: HistoryEntry, silent: boolean = false) => {
     try {
@@ -484,102 +369,9 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     }
   }, [activeTab, isPublicView, setActiveTab]);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const globalStats = await supabaseService.getGlobalStats();
-      setStats(globalStats);
-    } catch (error) {
-      console.error('Error loading global stats:', error);
-    }
-  }, []);
 
-  const refreshCombinedData = useCallback(async () => {
-    // Refresh current page of inventory, global stats, pending and waiting rows
-    try {
-      const [invResult, globalStats, pendingRes, waitingRes, countsData, diagnostic, approvalsCount] = await Promise.all([
-        supabaseService.getInventoryPaginated(0, (inventoryPage + 1) * PAGE_SIZE, { 
-          searchTerm: inventorySearch, 
-          typeFilter: inventoryTypeFilter 
-        }),
-        supabaseService.getGlobalStats(),
-        supabaseService.getPendingInventory(),
-        supabaseService.getWaitingInventory(),
-        supabaseService.getShipmentPalletCounts(), supabaseService.getPendingEditRequestsCount(),
-        supabaseService.getWarehouseDiagnostic(), supabaseService.getPendingEditRequestsCount()
-      ]);
-      setData(invResult.data);
-      setStats(globalStats);
-      setPendingRows(pendingRes);
-      setWaitingRows(waitingRes);
-      setShipmentCounts(countsData);
-        setPendingApprovalsCount(approvalsCount);
-      setWarehouseDiagnostic(diagnostic);
-      setPendingApprovalsCount(approvalsCount);
-      setHasMoreInventory(invResult.data.length < invResult.count);
-    } catch (error: any) {
-      console.error('Error refreshing data:', error);
-      if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
-        console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
-        disableSupabase();
-        setTimeout(() => refreshCombinedData(), 100);
-      }
-    }
-  }, [inventoryPage, inventorySearch, inventoryTypeFilter]);
 
-  const loadMoreInventory = async () => {
-    if (isLoadingMore || !hasMoreInventory) return;
-    
-    setIsLoadingMore(true);
-    try {
-      const nextPage = inventoryPage + 1;
-      const result = await supabaseService.getInventoryPaginated(nextPage, PAGE_SIZE, {
-        searchTerm: inventorySearch,
-        typeFilter: inventoryTypeFilter
-      });
-      
-      setData(prev => {
-        const existingIds = new Set(prev.map(i => i.id));
-        const newItems = result.data.filter(i => !existingIds.has(i.id));
-        const combined = [...prev, ...newItems];
-        setHasMoreInventory(combined.length < result.count);
-        return combined;
-      });
-      setInventoryPage(nextPage);
-    } catch (error) {
-      console.error('Error loading more inventory:', error);
-      showNotification('Erro ao carregar mais itens.', 'error');
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
 
-  // Debounced search for server-side filtering
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const fetchFilteredData = async () => {
-        setIsLoadingMore(true);
-        try {
-          const result = await supabaseService.getInventoryPaginated(0, PAGE_SIZE, {
-            searchTerm: inventorySearch,
-            typeFilter: inventoryTypeFilter
-          });
-          setData(result.data);
-          setHasMoreInventory(result.data.length < result.count);
-          setInventoryPage(0);
-        } catch (error) {
-          console.error('Error searching inventory:', error);
-        } finally {
-          setIsLoadingMore(false);
-        }
-      };
-      
-      if (user || isPublicView) {
-        fetchFilteredData();
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [inventorySearch, inventoryTypeFilter, user, isPublicView]);
 
   useEffect(() => {
     const anyModalOpen = 
@@ -614,34 +406,13 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
   ]);
 
   // Load data from Supabase
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Check if we are in public view mode via URL param
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('view') === 'public') {
-          setIsPublicView(true);
-          setIsAuthLoading(false);
-          return;
-        }
-
-        const currentUser = await supabaseService.getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Auth check error:', error);
-      } finally {
-        setIsAuthLoading(false);
-      }
-    };
-    checkAuth();
-  }, []);
 
   useEffect(() => {
     if (!user && !isPublicView) return;
 
     const loadData = async () => {
       try {
-        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData, approvalsCount] = await Promise.all([
+        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData, approvalsCount, diagnostic] = await Promise.all([
           supabaseService.getInventoryPaginated(0, PAGE_SIZE, { 
             searchTerm: inventorySearch, 
             typeFilter: inventoryTypeFilter 
@@ -652,9 +423,10 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           supabaseService.getGlobalStats(),
           supabaseService.getPendingInventory(),
           supabaseService.getWaitingInventory(),
-          supabaseService.getShipmentPalletCounts(), supabaseService.getPendingEditRequestsCount()
+          supabaseService.getShipmentPalletCounts(),
+          supabaseService.getPendingEditRequestsCount(),
+          supabaseService.getWarehouseDiagnostic()
         ]);
-
         setData(invPaginatied.data);
         setHasMoreInventory(invPaginatied.data.length < invPaginatied.count);
         setInventoryPage(0);
@@ -662,7 +434,8 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         setPendingRows(pendingRes);
         setWaitingRows(waitingRes);
         setShipmentCounts(countsData);
-        
+        setPendingApprovalsCount(approvalsCount);
+        setWarehouseDiagnostic(diagnostic);        
         setHistory(historyData);
         setShipments(shipData);
         
@@ -943,6 +716,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
         console.log(`Ponte: Reorganização de pilhas E/F concluída. ${invUpdates.length} itens movidos.`);
       } catch (error) {
         console.error('Stack reorganization failed:', error);
+        showNotification('Erro ao reorganizar pilhas E/F. Verifique o estoque manualmente.', 'error');
       }
     }
   };
@@ -1000,6 +774,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
       showNotification('Sessão encerrada com sucesso.');
     } catch (error) {
       console.error('Logout error:', error);
+      showNotification('Erro ao encerrar sessão. Tente novamente.', 'error');
     }
   };
 
@@ -2245,7 +2020,7 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
     ...(pendingRows.length > 0 ? [{ id: 'analysis', label: 'Análises Pendentes', count: pendingRows.length, tab: 'analysis', icon: ClipboardCheck }] : []),
     ...(shipments.filter(s => s.status === ShipmentStatus.OPEN).length > 0 ? [{ id: 'shipments', label: 'Carregamentos Abertos', count: shipments.filter(s => s.status === ShipmentStatus.OPEN).length, tab: 'shipments', icon: Truck }] : [])
   ];
-  const totalAppNotifications = appNotifications.reduce((acc, n) => acc + n.count, 0);
+  const totalAppNotifications = appNotifications.length;
 
   if (isAuthLoading) {
 
@@ -2466,10 +2241,10 @@ const [isAuthLoading, setIsAuthLoading] = useState(true);
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <button
               onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-              className="flex items-center justify-center w-10 h-6 bg-slate-100 dark:bg-slate-900/50 hover:bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-800/50 rounded-full text-slate-600 dark:text-slate-500 hover:text-slate-700 dark:text-slate-300 transition-all active:scale-95 group"
+              className="flex items-center justify-center w-10 h-10 bg-slate-100 dark:bg-slate-900/50 hover:bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-800/50 rounded-full text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-all active:scale-95 shadow-sm group"
               title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
             >
-              {theme === 'dark' ? <Sun className="w-3 h-3 group-hover:rotate-90 transition-transform duration-500" /> : <Moon className="w-3 h-3 group-hover:-rotate-12 transition-transform duration-500" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4 group-hover:rotate-90 transition-transform duration-500" /> : <Moon className="w-4 h-4 group-hover:-rotate-12 transition-transform duration-500" />}
             </button>
 
              {isPublicView && (

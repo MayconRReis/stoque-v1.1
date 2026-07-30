@@ -101,7 +101,7 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
                         <Calendar className="w-3.5 h-3.5 text-fuchsia-500/70" />
                         <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Data de Envio</p>
                       </div>
-                      <p className="text-sm font-black text-slate-900 dark:text-white italic ml-6.5">{new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-white italic ml-6.5">{(shipment.scheduledDate ? new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data não definida')}</p>
                     </div>
 
                     <div className="px-4">
@@ -145,7 +145,7 @@ export const ShipmentPage: React.FC<ShipmentPageProps> = ({ shipments, inventory
                       {shipment.type === ShipmentType.THIRD_PARTY ? 'T' : 'P'}
                     </span>
                   </div>
-                  <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase italic">Enviado em {new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                  <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase italic">Enviado em {(shipment.scheduledDate ? new Date(shipment.scheduledDate.includes('T') ? shipment.scheduledDate : shipment.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'Data não definida')}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5 bg-slate-50/60 dark:bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
