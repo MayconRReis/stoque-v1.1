@@ -223,6 +223,10 @@ const App: React.FC = () => {
     showNotification
   );
   
+  React.useEffect(() => {
+    setDataRef.current = setData;
+  }, [setData]);
+
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletMode, setEditPalletMode] = useState<'edit' | 'assign'>('edit');
