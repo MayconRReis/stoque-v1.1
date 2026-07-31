@@ -1730,7 +1730,7 @@ export const supabaseService = {
 
       if (safeToMarkOccupied.length > 0) {
         // We need to fetch the inventory again to get the content type for these slots
-        const inventory = await this.getInventory();
+        const inventory = await this.getAllInventoryForExport({ includeGrouped: true });
         
         for (const slotId of safeToMarkOccupied) {
           const itemWithSlot = inventory.find(item => 
