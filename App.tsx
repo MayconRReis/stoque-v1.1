@@ -2022,7 +2022,9 @@ const App: React.FC = () => {
   const appNotifications = [
     ...(user?.role === 'admin' && pendingApprovalsCount > 0 ? [{ id: 'approvals', label: 'Aprovações Pendentes', count: pendingApprovalsCount, tab: 'approvals', icon: ClipboardCheck }] : []),
     ...(pendingRows.length > 0 ? [{ id: 'analysis', label: 'Análises Pendentes', count: pendingRows.length, tab: 'analysis', icon: ClipboardCheck }] : []),
-    ...(shipments.filter(s => s.status === ShipmentStatus.OPEN).length > 0 ? [{ id: 'shipments', label: 'Carregamentos Abertos', count: shipments.filter(s => s.status === ShipmentStatus.OPEN).length, tab: 'shipments', icon: Truck }] : [])
+    ...(shipments.filter(s => s.status === ShipmentStatus.OPEN).length > 0 ? [{ id: 'shipments', label: 'Carregamentos Abertos', count: shipments.filter(s => s.status === ShipmentStatus.OPEN).length, tab: 'shipments', icon: Truck }] : []),
+    ...(warehouseDiagnostic && warehouseDiagnostic.slotConflicts > 0 ? [{ id: 'conflicts', label: 'Vagas em Conflito', count: warehouseDiagnostic.slotConflicts, tab: 'map', icon: AlertCircle, action: () => setIsDiagnosticDetailsOpen(true) }] : []),
+    ...(warehouseDiagnostic && warehouseDiagnostic.freeSlotsWithPallets > 0 ? [{ id: 'free-slots', label: 'Vagas Não Marcadas', count: warehouseDiagnostic.freeSlotsWithPallets, tab: 'map', icon: AlertCircle, action: () => setIsDiagnosticDetailsOpen(true) }] : [])
   ];
   const totalAppNotifications = appNotifications.length;
 
@@ -2306,7 +2308,11 @@ const App: React.FC = () => {
                                 <button
                                   key={n.id}
                                   onClick={() => {
-                                    navigateToTab(n.tab);
+                                    if ((n as any).action) {
+                                      (n as any).action();
+                                    } else {
+                                      navigateToTab(n.tab);
+                                    }
                                     setIsNotificationsOpen(false);
                                   }}
                                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
