@@ -359,7 +359,7 @@ export const supabaseService = {
       try {
         
         // Adding limit to avoid missing rows if >1000, or maybe we just do a text search
-        const { data: searchData, error: searchErr } = await supabase.from('inventory').select('id, parent_group_id, origin_op, description, lot, loading_id, inspections').limit(10000);
+        const { data: searchData, error: searchErr } = await supabase.from('inventory').select('id, parent_group_id, origin_op, description, lot, loading_id, inspections').limit(1500);
         if (searchErr) console.error("Search fetch error:", searchErr);
 
         if (searchData) {
@@ -390,7 +390,7 @@ export const supabaseService = {
             
             const idsArray = Array.from(matchedRootIds);
             // Limit to 100 to prevent URI Too Long (Failed to fetch)
-            query = query.in('id', idsArray.slice(0, 100));
+            query = query.in('id', idsArray.slice(0, 30));
 
           } else {
             query = query.eq('id', 'none_found_' + Date.now());
@@ -435,7 +435,7 @@ export const supabaseService = {
           
             const idsArray = Array.from(matchedRootIds);
             // Limit to 100 to prevent URI Too Long (Failed to fetch)
-            query = query.in('id', idsArray.slice(0, 100));
+            query = query.in('id', idsArray.slice(0, 30));
 
         } else {
           query = query.eq('id', 'none_found_' + Date.now());
@@ -559,7 +559,7 @@ export const supabaseService = {
             ).map(p => p.id);
 
             if (palletsInTargetSlots.length > 0) {
-              orClause += `,id.in.(${palletsInTargetSlots.join(',')})`;
+              orClause += `,id.in.(${palletsInTargetSlots.slice(0, 30).join(',')})`;
             }
           }
         } catch (e) {

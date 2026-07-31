@@ -24,20 +24,40 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+
+  const sanitizeString = (str: string) => {
+    if (!str) return '';
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\ufffd/g, '') // Remove unrecognized characters
+      .trim();
+  };
+
+  const sanitizeLote = (str: string) => {
+    if (!str) return '';
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\ufffd/g, '')
+      .replace(/\s+/g, ''); // Remove spaces
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     Papa.parse(file, {
       header: true,
+      encoding: "ISO-8859-1",
       skipEmptyLines: true,
       complete: (results) => {
         const parsedData = results.data as any[];
         
         const mappedItems = parsedData.map((row, index) => {
-          const op = formatOP(row.op || row.OP || '');
-          const nome = (row.nome || row.NOME || row.description || '').toUpperCase();
-          const lote = (row.lote || row.LOTE || '').toUpperCase();
+          const op = formatOP(sanitizeLote(row.op || row.OP || ''));
+          const nome = sanitizeString(row.nome || row.NOME || row.description || '').toUpperCase().replace(/\s+/g, ' ');
+          const lote = sanitizeLote(row.lote || row.LOTE || '').toUpperCase();
           const quantidade = row.quantidade || row.QUANTIDADE || '1';
           const tipo = (row.tipo || row.TIPO || '').toUpperCase();
 
