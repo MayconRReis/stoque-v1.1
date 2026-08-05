@@ -32,7 +32,7 @@ export function useVersionCheck() {
           }
         }
       } catch (error) {
-        console.error('Error checking for updates:', error);
+        // Silenced fetch error
       }
     };
 

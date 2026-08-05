@@ -459,17 +459,16 @@ const App: React.FC = () => {
           setSlots(slotData);
         }
       } catch (error: any) {
-        console.error('Error loading data from Supabase:', error);
         if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
           console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
           disableSupabase();
           setTimeout(() => loadData(), 100);
         } else {
+          console.error('Error loading data from Supabase:', error);
           showNotification('Erro ao carregar dados do servidor Supabase.', 'error');
         }
       }
     };
-
     loadData();
 
     // Set up real-time subscriptions

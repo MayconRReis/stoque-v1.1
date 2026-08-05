@@ -49,6 +49,7 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   slot TEXT,
  *   details TEXT,
  *   operator_name TEXT,
+ *   pallet_type TEXT,
  *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
  * );
  * 
@@ -84,6 +85,7 @@ import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, Histor
  *   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
  *   scheduled_date TEXT,
  *   operator_name TEXT,
+ *   pallet_type TEXT,
  *   closed_at TIMESTAMP WITH TIME ZONE
  * );
  * 
@@ -846,7 +848,8 @@ export const supabaseService = {
       totalPallets: entry.total_pallets,
       slot: entry.slot,
       details: entry.details,
-      operatorName: entry.operator_name
+      operatorName: entry.operator_name,
+      palletType: entry.pallet_type
     }));
     localStorageHelper.save('history', history);
     return history;
@@ -868,12 +871,38 @@ export const supabaseService = {
           total_pallets: entry.totalPallets,
           slot: entry.slot,
           details: entry.details,
-          operator_name: entry.operatorName
+          operator_name: entry.operatorName,
+          pallet_type: entry.palletType
         });
       
       if (error) {
-        console.error('Supabase addHistoryEntry error:', error);
-        throw error;
+        if (error.code === '42703' && error.message.includes('pallet_type')) {
+          console.warn('Column pallet_type missing, retrying without it');
+          const { error: retryError } = await supabase
+            .from('history')
+            .insert({
+              id: entry.id,
+              type: entry.type,
+              timestamp: entry.timestamp,
+              loading_id: entry.loadingId,
+              description: entry.description,
+              op: entry.op,
+              lot: entry.lot,
+              pallet_number: entry.palletNumber,
+              total_pallets: entry.totalPallets,
+              slot: entry.slot,
+              details: entry.details,
+              operator_name: entry.operatorName
+            });
+            
+          if (retryError) {
+             console.error('Supabase addHistoryEntry retry error:', retryError);
+             throw retryError;
+          }
+        } else {
+          console.error('Supabase addHistoryEntry error:', error);
+          throw error;
+        }
       }
     }
     localStorageHelper.add('history', entry);
