@@ -2440,7 +2440,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Occupancy Progress Bar Area */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                   {/* General Occupancy (A-D) */}
                   <div className="bg-slate-100 dark:bg-slate-900/40 p-6 rounded-[2rem] border border-slate-300 dark:border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
                     <div className="flex justify-between items-end">
@@ -2485,38 +2485,7 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Container Occupancy (E-F) */}
-                  <div className="bg-slate-100 dark:bg-slate-900/40 p-6 rounded-[2rem] border border-slate-300 dark:border-slate-800/50 shadow-xl space-y-3 relative overflow-hidden">
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Área de Containers (E-F)</h4>
-                        <p className="text-[9px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">Posições Específicas</p>
-                      </div>
-                      <div className="text-right flex items-center gap-4">
-                        <span className="text-2xl font-black text-indigo-500 italic">{stats.containerOccupancyRate}%</span>
-                      </div>
-                    </div>
-                    <div className="h-3 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(stats.containerOccupancyRate, 100)}%` }}
-                        transition={{ duration: 1.5, ease: "easeOut" }}
-                        className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(99,102,241,0.2)] ${
-                          stats.containerOccupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
-                          stats.containerOccupancyRate > 80 ? 'bg-amber-500' : 
-                          'bg-indigo-600'
-                        }`}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                      <span>Livre</span>
-                      <span className="text-slate-600 dark:text-slate-500">
-                        Em uso: {stats.containerOccupiedSlots} / {stats.containerTotalSlots} unidades
-                      </span>
-                      <span>Ocupado</span>
-                    </div>
                   </div>
-                </div>
 
                 {/* Stats Section */}
                 <StatsSection stats={stats} isPublicView={isPublicView} onNavigate={navigateToTab} />

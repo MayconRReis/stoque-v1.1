@@ -611,7 +611,7 @@ export const supabaseService = {
     if (!isSupabaseConfigured) {
       // Basic mock fallback for offline
       return {
-        totalSlots: 264,
+        totalSlots: 198,
         freeSlots: 200,
         pendingEntries: 0,
         occupancyRate: 24,
@@ -620,56 +620,59 @@ export const supabaseService = {
         totalBottles: 0,
         waitingPallets: 0,
         finishedShipments24h: 0,
-        openShipmentsCount: 0,
         productDistribution: {},
-        containerTotalSlots: 40,
-        containerOccupiedSlots: 10,
-        containerFreeSlots: 30,
-        containerOccupancyRate: 25
+        uniqueSkuCount: 0
       };
     }
 
     const results = await Promise.all([
       supabase.from('warehouse_slots').select('id, status'),
       applyInventoryFilter(supabase.from('inventory').select('*', { count: 'exact', head: true }), 'ROOT_ONLY').eq('status', 'PENDING'),
-      supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
       supabase.from('history').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'CLOSED').gte('closed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-      applyInventoryFilter(supabase.from('inventory').select('inspections, parent_group_id'), 'ROOT_ONLY') 
+      applyInventoryFilter(supabase.from('inventory').select('inspections, parent_group_id, origin_op'), 'ROOT_ONLY') 
     ]);
 
     const allSlots = results[0].data || [];
     const pendingCount = results[1].count || 0;
-    const openShipments = results[2].count || 0;
-    const movements24h = results[3].count || 0;
-    const finishedShipments = results[4].count || 0;
-    const allInspections = (results[5].data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
+    const movements24h = results[2].count || 0;
+    const finishedShipments = results[3].count || 0;
+    const allInspections = (results[4].data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
     // Filter slots by category
     const generalSlots = allSlots.filter(s => s.id.startsWith('A') || s.id.startsWith('B') || s.id.startsWith('C') || s.id.startsWith('D'));
-    const containerSlots = allSlots.filter(s => s.id.startsWith('E') || s.id.startsWith('F'));
 
     const totalGeneral = generalSlots.length;
     const occupiedGeneralPhysical = generalSlots.filter(s => s.status !== 'EMPTY').length;
     
-    const totalContainer = containerSlots.length;
-    const occupiedContainerPhysical = containerSlots.filter(s => s.status !== 'EMPTY').length;
-
     let totalBottles = 0;
     let waitingPallets = 0;
     let waitingPalletsGeneral = 0;
-    let waitingPalletsContainer = 0;
     const productDistribution: Record<string, number> = {};
+    const uniqueOps = new Set<string>();
+
+    const opRegex = /\b\d{3}-\d{3}\b/;
 
     allInspections.forEach(item => {
+      // Find OPs
+      const hasPackagingMaterial = (item.inspections || []).some((insp: any) => {
+        const type = insp.contentType;
+        return type !== 'FINISHED_PRODUCT' && type !== 'CONTAINER_SJ' && type !== 'CONTAINER_LP' && type !== 'CONTAINER_CP';
+      });
+
+      if (hasPackagingMaterial && item.origin_op) {
+        const match = item.origin_op.match(opRegex);
+        if (match) {
+          uniqueOps.add(match[0]);
+        }
+      }
+
       (item.inspections || []).forEach((insp: any) => {
         totalBottles += (insp.bottles || 0);
         if (insp.assignedSlot === 'AGUARDANDO') {
           waitingPallets += 1;
           const type = insp.contentType || 'OTHER';
-          if (['CONTAINER_SJ', 'CONTAINER_LP', 'CONTAINER_CP'].includes(type)) {
-            waitingPalletsContainer += 1;
-          } else {
+          if (!['CONTAINER_SJ', 'CONTAINER_LP', 'CONTAINER_CP'].includes(type)) {
             waitingPalletsGeneral += 1;
           }
         }
@@ -686,18 +689,13 @@ export const supabaseService = {
       freeSlots: totalGeneral - occupiedGeneralPhysical,
       occupancyRate: totalGeneral > 0 ? Math.round(((occupiedGeneralPhysical + waitingPalletsGeneral) / totalGeneral) * 100) : 0,
       
-      containerTotalSlots: totalContainer,
-      containerOccupiedSlots: occupiedContainerPhysical + waitingPalletsContainer,
-      containerFreeSlots: totalContainer - occupiedContainerPhysical,
-      containerOccupancyRate: totalContainer > 0 ? Math.round(((occupiedContainerPhysical + waitingPalletsContainer) / totalContainer) * 100) : 0,
-
       pendingEntries: pendingCount,
-      openShipmentsCount: openShipments,
       dailyMovements: movements24h,
       finishedShipments24h: finishedShipments,
       totalBottles,
-      waitingPallets,
-      productDistribution
+      waitingPallets: waitingPalletsGeneral,
+      productDistribution,
+      uniqueSkuCount: uniqueOps.size
     };
   },
 

@@ -9,7 +9,7 @@ interface RackDistributionChartProps {
 
 const RackDistributionChart: React.FC<RackDistributionChartProps> = ({ slots, waitingPallets }) => {
   const rackData = useMemo(() => {
-    return (['A', 'B', 'C', 'D', 'E', 'F'] as const).map(rack => {
+    return (['A', 'B', 'C', 'D'] as const).map(rack => {
       const rackSlots = slots.filter(s => s.rack === rack);
       const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
       const totalCapacities: Record<string, number> = {

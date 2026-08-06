@@ -50,17 +50,13 @@ export function useWarehouseData(
     pendingEntries: 0,
     occupancyRate: 0,
     dailyMovements: 0,
-    totalSlots: 600,
+    totalSlots: 198,
     occupiedSlots: 0,
     totalBottles: 0,
     waitingPallets: 0,
     finishedShipments24h: 0,
-    openShipmentsCount: 0,
     productDistribution: {},
-    containerTotalSlots: 0,
-    containerOccupiedSlots: 0,
-    containerFreeSlots: 0,
-    containerOccupancyRate: 0
+    uniqueSkuCount: 0
   });
   const [warehouseDiagnostic, setWarehouseDiagnostic] = useState<WarehouseDiagnostic | null>(null);
   const [isDiagnosticDetailsOpen, setIsDiagnosticDetailsOpen] = useState(false);

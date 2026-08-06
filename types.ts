@@ -135,13 +135,8 @@ export interface DashboardStats {
   totalBottles: number;
   waitingPallets: number;
   finishedShipments24h: number;
-  openShipmentsCount: number;
   productDistribution: Record<string, number>;
-  // Container specific stats
-  containerTotalSlots: number;
-  containerOccupiedSlots: number;
-  containerFreeSlots: number;
-  containerOccupancyRate: number;
+  uniqueSkuCount: number;
 }
 
 export interface WarehouseDiagnostic {
