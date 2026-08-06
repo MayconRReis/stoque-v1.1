@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../types';
 import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatOP } from '../lib/formatters';
 
 interface AnalysisPageProps {
   pendingItems: SheetRow[];
@@ -103,7 +104,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
         finalId.toUpperCase(),
         {
           description: description.toUpperCase(),
-          originOP: op.toUpperCase(),
+          originOP: formatOP(op),
           lot: lot.toUpperCase()
         },
         {

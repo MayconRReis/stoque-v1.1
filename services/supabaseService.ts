@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, disableSupabase } from '../lib/supabase';
 import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES } from '../types';
+import { formatOP } from '../lib/formatters';
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -651,19 +652,16 @@ export const supabaseService = {
     const productDistribution: Record<string, number> = {};
     const uniqueOps = new Set<string>();
 
-    const opRegex = /\b\d{3}-\d{3}\b/;
-
     allInspections.forEach(item => {
       // Find OPs
-      const hasPackagingMaterial = (item.inspections || []).some((insp: any) => {
-        const type = insp.contentType;
-        return type !== 'FINISHED_PRODUCT' && type !== 'CONTAINER_SJ' && type !== 'CONTAINER_LP' && type !== 'CONTAINER_CP';
+      const hasRelevantMaterial = (item.inspections || []).some((insp: any) => {
+        return insp.contentType === 'BOTTLES' || insp.contentType === 'SUPPLIES';
       });
 
-      if (hasPackagingMaterial && item.origin_op) {
-        const match = item.origin_op.match(opRegex);
-        if (match) {
-          uniqueOps.add(match[0]);
+      if (hasRelevantMaterial && item.origin_op) {
+        const normalizedOp = formatOP(item.origin_op);
+        if (normalizedOp) {
+          uniqueOps.add(normalizedOp);
         }
       }
 
