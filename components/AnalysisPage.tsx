@@ -4,6 +4,7 @@ import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../t
 import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
+import { ImportPage } from './ImportPage';
 
 interface AnalysisPageProps {
   pendingItems: SheetRow[];
@@ -11,9 +12,10 @@ interface AnalysisPageProps {
   allSlots: WarehouseSlot[];
   onConfirm: (rowId: string, slotId: string, finalId: string, updatedFields?: any, updatedInspection?: any) => Promise<void>;
   onReject: (rowId: string) => Promise<void>;
+  onImport?: (entries: { row: SheetRow, slotId: string }[]) => Promise<void>;
 }
 
-export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, allSlots, onConfirm, onReject, onEdit }) => {
+export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availableSlots, allSlots, onConfirm, onReject, onImport }) => {
   const [selectedItem, setSelectedItem] = useState<SheetRow | null>(null);
   const [slotId, setSlotId] = useState('');
   const [finalId, setFinalId] = useState('');
@@ -154,6 +156,12 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+      {onImport && (
+        <div className="mb-12">
+          <ImportPage availableSlots={availableSlots} onProcess={onImport} />
+        </div>
+      )}
+
       {pendingItems.length === 0 ? (
         <div className="py-32 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[2.5rem]">
           <div className="w-16 h-16 bg-slate-100/50 dark:bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-slate-800">
