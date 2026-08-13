@@ -303,7 +303,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Digite a VAGA (Ex: E.1.3), Produto ou Tipo..."
-            className="w-full bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl px-12 py-4 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-700"
+            className="w-full bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl px-12 py-4 text-slate-900 dark:text-white font-bold text-base focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-700"
           />
         </div>
         <div className="flex gap-2 bg-slate-100/60 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -379,7 +379,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Saldo</p>
-                        <p className={`text-lg font-black italic transition-colors ${
+                        <p className={`text-base font-black italic transition-colors ${
                           getProductLimit(item.productName) && item.quantity <= (getProductLimit(item.productName)! / 2) ? 'text-red-500' : 'text-slate-900 dark:text-white'
                         }`}>
                           {item.quantity} <span className="text-[10px] text-slate-600 px-1 font-normal tracking-normal not-italic">Un</span>
@@ -440,7 +440,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-base focus:border-blue-500 outline-none transition-all outline-none"
                     placeholder="Ex: Frasco 500ml"
                   />
                 </div>
@@ -470,7 +470,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                     type="number"
                     value={quantity || ''}
                     onChange={(e) => setQuantity(parseInt(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-base focus:border-blue-500 outline-none transition-all outline-none"
                     placeholder="Quantidade de unidades"
                   />
                 </div>
@@ -480,12 +480,13 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                   <select
                     value={selectedSlotId}
                     onChange={(e) => setSelectedSlotId(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-500 outline-none transition-all outline-none appearance-none"
+                    className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-5 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none transition-all appearance-none"
                   >
-                    <option value="">Selecione uma vaga...</option>
+                    <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-base">SELECIONAR</option>
+                    <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-base">AGUARDANDO VAGA</option>
                     {availableSlots.map(s => (
-                      <option key={s.id} value={s.id}>
-                        Vaga {s.id}
+                      <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120] text-base">
+                        {s.id}
                       </option>
                     ))}
                   </select>
@@ -531,7 +532,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
                 }`}>
                   {selectedItemForAction.action === 'add' ? <Plus className="w-7 h-7" /> : <Minus className="w-7 h-7" />}
                 </div>
-                <h3 className="text-slate-900 dark:text-white font-black uppercase text-lg italic tracking-tight leading-tight">
+                <h3 className="text-slate-900 dark:text-white font-black uppercase text-base italic tracking-tight leading-tight">
                   {selectedItemForAction.action === 'add' ? 'Adicionar Saldo' : 'Retirar Saldo'}
                 </h3>
                 <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{selectedItemForAction.item.productName}</p>

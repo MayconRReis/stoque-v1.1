@@ -287,7 +287,7 @@ const DataPreview = ({ data, baseColor, isChanged, comparison }: { data: any, ba
     { key: 'originOP', label: 'OP Origem' },
     { key: 'lot', label: 'Lote' },
     { key: 'pallets', label: 'Qtd (Pallets)' },
-    { key: 'loadingId', label: 'ID Final' },
+    { key: 'assignedSlot', label: 'Vaga' },
     { key: 'status', label: 'Status' }
   ];
 
@@ -295,8 +295,8 @@ const DataPreview = ({ data, baseColor, isChanged, comparison }: { data: any, ba
     <div className={`p-5 rounded-3xl bg-slate-50/40 dark:bg-slate-950/40 border ${isChanged ? 'border-purple-500/20' : 'border-slate-200/40 dark:border-slate-800/40'} space-y-4`}>
       <div className="grid grid-cols-2 gap-4">
         {fields.map(field => {
-          const val = data[field.key as keyof any];
-          const prevVal = comparison ? comparison[field.key as keyof any] : undefined;
+          const val = field.key === 'assignedSlot' ? data.inspections?.[0]?.assignedSlot : data[field.key as keyof any];
+          const prevVal = comparison ? (field.key === 'assignedSlot' ? comparison.inspections?.[0]?.assignedSlot : comparison[field.key as keyof any]) : undefined;
           const hasChanged = isChanged && comparison && JSON.stringify(val) !== JSON.stringify(prevVal);
 
           return (

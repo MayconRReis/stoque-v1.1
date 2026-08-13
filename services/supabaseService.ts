@@ -872,7 +872,7 @@ export const supabaseService = {
         });
       
       if (error) {
-        if (error.code === '42703' && error.message.includes('pallet_type')) {
+        if ((error.code === '42703' || error.code === 'PGRST204') && error.message.includes('pallet_type')) {
           console.warn('Column pallet_type missing, retrying without it');
           const { error: retryError } = await supabase
             .from('history')
@@ -893,11 +893,11 @@ export const supabaseService = {
             
           if (retryError) {
              console.error('Supabase addHistoryEntry retry error:', retryError);
-             throw retryError;
+             // don't throw, we want local state to update
           }
         } else {
           console.error('Supabase addHistoryEntry error:', error);
-          throw error;
+          // don't throw, we want local state to update
         }
       }
     }
@@ -1336,6 +1336,52 @@ export const supabaseService = {
           operator_name: adminName
         });
       } else {
+        // Handle potential slot changes
+        const oldSlot = request.before_data.inspections?.[0]?.assignedSlot;
+        const newSlot = request.after_data.inspections?.[0]?.assignedSlot;
+
+        if (oldSlot !== newSlot) {
+          // Free old slot if it was the only one
+          if (oldSlot && oldSlot !== 'AGUARDANDO') {
+            const { data: otherItemsInOldSlot } = await supabase
+              .from('inventory')
+              .select('id')
+              .contains('inspections', [{ assignedSlot: oldSlot }])
+              .neq('id', request.inventory_id);
+              
+            if (!otherItemsInOldSlot || otherItemsInOldSlot.length === 0) {
+              await supabase.from('slots').update({ status: 'VAZIO', occupied_by: null }).eq('id', oldSlot);
+            }
+          }
+
+          // Occupy new slot if not aguardando
+          if (newSlot && newSlot !== 'AGUARDANDO') {
+            await supabase.from('slots').update({ 
+              status: request.after_data.inspections[0].contentType,
+              occupied_by: request.after_data.description
+            }).eq('id', newSlot);
+          }
+          
+          // Add history for transfer if changed slot
+          if (oldSlot && oldSlot !== 'AGUARDANDO' && newSlot && newSlot !== 'AGUARDANDO') {
+            const { data: adminProfile } = await supabase.from('profiles').select('name').eq('id', adminId).single();
+            await supabase.from('history').insert({
+              id: request.after_data.id + '-TRANS-' + Math.random().toString(36).substring(2, 5),
+              type: 'TRANSFER',
+              timestamp: new Date().toISOString(),
+              loading_id: request.after_data.loadingId,
+              description: request.after_data.description,
+              op: request.after_data.originOP || '',
+              lot: request.after_data.lot || '',
+              pallet_number: 1,
+              total_pallets: request.after_data.pallets,
+              slot: newSlot,
+              details: `TRANSFERÊNCIA DA VAGA ${oldSlot} PARA ${newSlot}. Aprovado por: ${adminProfile?.name || 'Admin'} - Motivo: ${request.reason}`,
+              operator_name: adminProfile?.name || 'Admin'
+            });
+          }
+        }
+
         const { error: updateError } = await supabase
           .from('inventory')
           .update({

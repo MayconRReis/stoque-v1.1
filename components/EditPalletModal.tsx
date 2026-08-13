@@ -195,7 +195,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
               <Pencil className="text-slate-900 dark:text-white w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-lg italic uppercase tracking-tighter text-slate-900 dark:text-white">
+              <h3 className="font-black text-base italic uppercase tracking-tighter text-slate-900 dark:text-white">
                 {mode === 'assign' ? 'Alocar Pallet' : (isOperatorEdit ? 'Solicitar Alteração' : 'Editar Pallet')}
               </h3>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
@@ -229,14 +229,14 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
           )}
 
           {/* DESTINATION SLOT */}
-          {(pallet.inspection.assignedSlot === 'AGUARDANDO' || !pallet.inspection.assignedSlot) && (
+          {(pallet.inspection.assignedSlot === 'AGUARDANDO' || !pallet.inspection.assignedSlot || mode === 'edit' || mode === 'assign') && (
             <div className="space-y-3 p-5 bg-purple-600/10 rounded-3xl border border-purple-500/30 shadow-lg shadow-purple-900/10">
               <div className="flex items-center gap-2 mb-1">
                 <Warehouse className="w-4 h-4 text-purple-500" />
-                <h4 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Escolher Vaga de Destino</h4>
+                <h4 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Escolher Vaga / Transferir</h4>
               </div>
               <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-2 leading-relaxed">
-                Selecione uma vaga disponível para remover este pallet do estado de espera.
+                Selecione uma vaga disponível para alocar ou transferir este pallet.
               </p>
               
               <div className="relative">
@@ -244,14 +244,15 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 <select
                   value={assignedSlot}
                   onChange={(e) => setAssignedSlot(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 text-slate-900 dark:text-white font-bold text-[10px] uppercase focus:border-purple-600 outline-none appearance-none transition-all"
+                  className="w-full bg-[#0B1120] border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-base uppercase focus:border-purple-600 outline-none appearance-none transition-all"
                 >
-                  <option value="AGUARDANDO">MANTER AGUARDANDO VAGA</option>
+                  <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-base">SELECIONAR</option>
+                  <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-base">AGUARDANDO VAGA</option>
                   {computedAvailableSlots
                     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
                     .map(slot => (
-                      <option key={slot.id} value={slot.id}>
-                        VAGA {slot.id} ({slot.rack}.{slot.level}.{slot.position})
+                      <option key={slot.id} value={slot.id} className="text-slate-200 bg-[#0B1120] text-base">
+                        {slot.id}
                       </option>
                     ))}
                 </select>
@@ -280,7 +281,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   <select
                     value={contentType}
                     onChange={(e) => setContentType(e.target.value as SlotContent)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm uppercase focus:border-blue-600 outline-none appearance-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-base uppercase focus:border-blue-600 outline-none appearance-none transition-all"
                   >
                     {[
                       { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo' },
@@ -479,7 +480,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 rows={3}
-                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-amber-500 outline-none transition-all resize-none placeholder:text-amber-500/20 shadow-inner"
+                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-base focus:border-amber-500 outline-none transition-all resize-none placeholder:text-amber-500/20 shadow-inner"
                 placeholder="Explique por que esta alteração é necessária..."
                 required
               />

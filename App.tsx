@@ -73,6 +73,8 @@ import {
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
 import { EditPalletModal } from './components/EditPalletModal';
+import { ManualPalletModal } from "./components/ManualPalletModal";
+import { MovementModal } from "./components/MovementModal";
 import { ShipmentPage } from './components/ShipmentPage';
 import { ShipmentModal } from './components/ShipmentModal';
 import { ShipmentDetailModal } from './components/ShipmentDetailModal';
@@ -81,8 +83,8 @@ import { Login } from './components/Login';
 import { UserManager } from './components/UserManager';
 import ApprovalsPage from './components/ApprovalsPage';
 import QuickSearch from './components/QuickSearch';
-import { MovementModal } from './components/MovementModal';
-import { ImportPage } from './components/ImportPage';
+
+
 import { AnalysisPage } from './components/AnalysisPage';
 import { RotativeStockManager } from './components/RotativeStockManager';
 import { WaitingSlotsView } from './components/WaitingSlotsView';
@@ -146,7 +148,7 @@ const App: React.FC = () => {
   const { updateAvailable, reloadPage } = useVersionCheck();
   const { theme, setTheme } = useTheme();
 
-  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'movement' | 'map' | 'history' | 'import' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
+  const [activeTab, setActiveTabInternal] = useState<'dashboard' | 'inventory' | 'map' | 'history' | 'analysis' | 'shipments' | 'rotative' | 'waiting' | 'users' | 'approvals' | 'quicksearch'>('dashboard');
   const [isPending, startTransition] = React.useTransition();
   
   const setActiveTab = useCallback((tab: typeof activeTab) => {
@@ -160,7 +162,9 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
+  const [isManualAddModalOpen, setIsManualAddModalOpen] = useState(false);
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
+  
   const [movementInitialContext, setMovementInitialContext] = useState<{
     type: 'entry' | 'transfer' | 'exit';
     id?: string;
@@ -255,7 +259,7 @@ const App: React.FC = () => {
 
   // Helper to close all modals and sidebar
   const closeAllModals = () => {
-    setIsMovementModalOpen(false);
+    
     setDeleteContext(null);
     setMatrixConfirmContext(null);
     setDetailContext(null);
@@ -272,7 +276,7 @@ const App: React.FC = () => {
     const handlePopState = (event: PopStateEvent) => {
       // If there's a modal open, the back button should close it first
       const anyModalOpen = 
-        isMovementModalOpen || 
+         
         !!deleteContext || 
         !!matrixConfirmContext || 
         !!detailContext || 
@@ -301,7 +305,7 @@ const App: React.FC = () => {
 
     return () => window.removeEventListener('popstate', handlePopState);
   }, [
-    isMovementModalOpen, 
+     
     deleteContext, 
     matrixConfirmContext, 
     detailContext, 
@@ -380,7 +384,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const anyModalOpen = 
-      isMovementModalOpen || 
+       
       !!deleteContext || 
       !!matrixConfirmContext || 
       !!detailContext || 
@@ -399,7 +403,7 @@ const App: React.FC = () => {
       }
     }
   }, [
-    isMovementModalOpen, 
+     
     !!deleteContext, 
     !!matrixConfirmContext, 
     !!detailContext, 
@@ -782,95 +786,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleMovementEntry = async (entryData: any) => {
-    try {
-      // 1. Pre-validation: check if slot is still free or shareable
-      const isWaiting = entryData.slotId === 'AGUARDANDO';
-      if (!isWaiting) {
-        const currentSlot = await supabaseService.getSlotById(entryData.slotId);
-        if (currentSlot && currentSlot.status !== SlotContent.EMPTY) {
-          // If the slot is occupied, check if both the occupying item and new item are shareable
-          const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(currentSlot.status);
-          const isNewItemShareable = SHAREABLE_SLOT_TYPES.includes(entryData.contentType);
-          
-          if (!isOccupantShareable || !isNewItemShareable) {
-            showNotification(`A vaga ${entryData.slotId} já está ocupada por um item que não permite compartilhamento.`, 'error');
-            refreshCombinedData();
-            return;
-          }
-        }
-      }
-
-      const newEntry: SheetRow = {
-        id: entryData.id,
-        loadingId: entryData.id,
-        originOP: entryData.op || 'N/A',
-        description: entryData.name,
-        lot: entryData.lot || 'N/A',
-        pallets: entryData.quantity,
-        date: new Date().toLocaleDateString(),
-        status: StockStatus.INSPECTED,
-        operatorName: user?.name,
-        inspections: [{
-          bottles: entryData.supplyDetails?.bottles || 0,
-          caps: entryData.supplyDetails?.caps || 0,
-          boxes: entryData.supplyDetails?.boxes || 0,
-          cradles: entryData.supplyDetails?.cradles || 0,
-          supplyDescription: entryData.supplyDetails?.description || '',
-          assignedSlot: entryData.slotId,
-          contentType: entryData.contentType,
-          palletNumber: 1
-        }]
-      };
-
-      // Update Slot
-      if (!isWaiting) {
-        const targetSlot = slots.find(s => s.id === entryData.slotId);
-        if (targetSlot) {
-          const updatedSlot: WarehouseSlot = {
-            ...targetSlot,
-            status: entryData.contentType,
-            occupiedBy: entryData.op || entryData.name
-          };
-          await supabaseService.updateSlot(updatedSlot);
-          setSlots(prev => prev.map(s => s.id === entryData.slotId ? updatedSlot : s));
-        }
-      }
-
-      // Save Inventory
-      await supabaseService.saveInventoryItem(newEntry);
-      setData(prev => [newEntry, ...prev]);
-
-      // Add History
-      await addToHistory({
-        id: Math.random().toString(36).substring(2, 9),
-        type: HistoryType.ENTRY,
-        timestamp: new Date().toLocaleString(),
-        loadingId: entryData.id,
-        description: entryData.name,
-        op: entryData.op || 'N/A',
-        lot: entryData.lot || 'N/A',
-        palletNumber: 1,
-        totalPallets: entryData.quantity,
-        slot: entryData.slotId,
-        details: `Entrada manual por ${user?.name || 'Operador'}. ID Gerado: ${entryData.id}${isWaiting ? ' (Aguardando Vaga)' : ''}`,
-        operatorName: user?.name
-      });
-
-      showNotification(`Entrada realizada com sucesso! ID: ${entryData.id}`);
-      setIsMovementModalOpen(false);
-      
-      // Auto-reorganize E/F stacks
-      performStackReorganization([newEntry, ...data], slots.map(s => s.id === entryData.slotId ? { ...s, status: entryData.contentType, occupiedBy: entryData.op || entryData.name } : s));
-      
-      refreshCombinedData();
-    } catch (error: any) {
-      console.error('Entry error:', error);
-      const errorMessage = error?.message || error?.details || 'Erro desconhecido';
-      showNotification(`Erro ao realizar entrada: ${errorMessage}`, 'error');
-    }
-  };
-
   const handleImportProcess = async (entries: { row: SheetRow, slotId: string }[]) => {
     try {
       // 1. Pre-validation: check if any of the target slots are occupied
@@ -1071,160 +986,6 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error('Analysis rejection error:', error);
       showNotification(`Erro ao rejeitar pallet: ${error.message}`, 'error');
-    }
-  };
-
-  const handleMovementTransfer = async (transferData: any) => {
-    try {
-      // 1. Get the item, either from the passed data or by searching
-      const item = transferData.pallet || await supabaseService.findPalletByLoadingId(transferData.id);
-      if (!item) {
-        showNotification('Produto não encontrado no sistema.', 'error');
-        return;
-      }
-
-      // 2. Pre-validation: check if destination is still free or shareable
-      const isWaitingDestination = transferData.toSlot === 'AGUARDANDO';
-      if (!isWaitingDestination) {
-        const targetSlotStatus = await supabaseService.getSlotById(transferData.toSlot);
-        if (targetSlotStatus && targetSlotStatus.status !== SlotContent.EMPTY) {
-          const isOccupantShareable = SHAREABLE_SLOT_TYPES.includes(targetSlotStatus.status);
-          const isNewItemShareable = item.inspections?.[0]?.contentType ? SHAREABLE_SLOT_TYPES.includes(item.inspections[0].contentType) : false;
-
-          if (!isOccupantShareable || !isNewItemShareable) {
-            showNotification(`A vaga de destino ${transferData.toSlot} já está ocupada por um item que não permite compartilhamento.`, 'error');
-            refreshCombinedData();
-            return;
-          }
-        }
-      }
-
-      // 3. Resolve actual source slot
-      const actualOrigin = item.inspections?.[0]?.assignedSlot;
-      const expectedOrigin = transferData.fromSlot || actualOrigin;
-
-      // Only check divergence if we have an explicit expected origin
-      if (transferData.fromSlot && actualOrigin !== expectedOrigin) {
-        showNotification(`Divergência de posição: O pallet não está mais na vaga esperada (${expectedOrigin}). Ele parece estar em ${actualOrigin}.`, 'error');
-        refreshCombinedData();
-        return;
-      }
-
-      // 4. Update From Slot (Free it up ONLY if it's the only item there)
-      if (actualOrigin && actualOrigin !== 'AGUARDANDO') {
-        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(actualOrigin);
-        // Only free the slot if this item is the ONLY one there
-        if (otherPalletsInSlot.length <= 1) {
-          const fromSlotObj = slots.find(s => s.id === actualOrigin);
-          if (fromSlotObj) {
-            const updatedFrom: WarehouseSlot = { ...fromSlotObj, status: SlotContent.EMPTY, occupiedBy: undefined };
-            await supabaseService.updateSlot(updatedFrom);
-            setSlots(prev => prev.map(s => s.id === actualOrigin ? updatedFrom : s));
-          }
-        }
-      }
-
-      // 5. Update To Slot (Occupy it)
-      if (!isWaitingDestination) {
-        const toSlotObj = slots.find(s => s.id === transferData.toSlot);
-        if (toSlotObj) {
-          const updatedTo: WarehouseSlot = { 
-            ...toSlotObj, 
-            status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, 
-            occupiedBy: item.originOP || item.description 
-          };
-          await supabaseService.updateSlot(updatedTo);
-          setSlots(prev => prev.map(s => s.id === transferData.toSlot ? updatedTo : s));
-        }
-      }
-
-      // 6. Update Inventory Item Record
-      const updatedItem = {
-        ...item,
-        inspections: item.inspections?.map(ins => ({ ...ins, assignedSlot: transferData.toSlot }))
-      };
-      await supabaseService.saveInventoryItem(updatedItem);
-      setData(prev => prev.map(d => d.id === item.id ? updatedItem : d));
-
-      // 7. Add History
-      await addToHistory({
-        id: Math.random().toString(36).substring(2, 9),
-        type: HistoryType.TRANSFER,
-        timestamp: new Date().toLocaleString(),
-        loadingId: item.loadingId || item.id,
-        description: item.description,
-        op: item.originOP,
-        lot: item.lot,
-        palletNumber: 1,
-        totalPallets: item.pallets,
-        slot: transferData.toSlot,
-        details: `Transferência por ${user?.name || 'Operador'} de ${actualOrigin || 'N/A'} para ${transferData.toSlot}${isWaitingDestination ? ' (Aguardando Vaga)' : ''}`,
-        operatorName: user?.name
-      });
-
-      showNotification('Transferência concluída com sucesso.');
-      setIsMovementModalOpen(false);
-      refreshCombinedData();
-      
-      // Auto-reorganize stack positions if applicable
-      const finalData = data.map(d => d.id === item.id ? updatedItem : d);
-      const finalSlots = slots.map(s => {
-        if (s.id === actualOrigin) return { ...s, status: SlotContent.EMPTY, occupiedBy: undefined };
-        if (s.id === transferData.toSlot && !isWaitingDestination) {
-           return { ...s, status: item.inspections?.[0]?.contentType || SlotContent.BOTTLES, occupiedBy: item.originOP || item.description };
-        }
-        return s;
-      });
-      performStackReorganization(finalData, finalSlots);
-    } catch (error) {
-      console.error('Transfer error:', error);
-      showNotification('Erro ao realizar transferência.', 'error');
-    }
-  };
-
-  const handleMovementExit = async (exitData: any) => {
-    try {
-      const item = exitData.pallet || await supabaseService.findPalletByLoadingId(exitData.id);
-      if (!item) {
-        showNotification('Produto não encontrado.', 'error');
-        return;
-      }
-
-      // Find slot occupied by this item
-      const slotId = item.inspections?.[0]?.assignedSlot;
-      if (slotId && slotId !== 'AGUARDANDO') {
-        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(slotId);
-        // Only free the slot if this item is the ONLY one there
-        if (otherPalletsInSlot.length <= 1) {
-          await supabaseService.freeSlot(slotId);
-          setSlots(prev => prev.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
-        }
-      }
-
-      // Delete Inventory
-      await supabaseService.deleteInventoryItem(item.id);
-      setData(prev => prev.filter(d => d.id !== item.id));
-
-      // Add History (recoverable — allows operator to request restoration)
-      await addToHistory(createRecoverableExitEntry(
-        item,
-        item.inspections?.[0] || { contentType: SlotContent.OTHER, assignedSlot: slotId },
-        `Saída por ${user?.name || 'Operador'}: ${exitData.reason}`,
-        1,
-        true
-      ));
-
-      showNotification('Saída registrada com sucesso.');
-      setIsMovementModalOpen(false);
-      refreshCombinedData();
-
-      // Auto-reorganize E/F stacks
-      const finalData = data.filter(d => d.id !== item.id);
-      const finalSlots = slotId ? slots.map(s => s.id === slotId ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s) : slots;
-      performStackReorganization(finalData, finalSlots);
-    } catch (error) {
-      console.error('Exit error:', error);
-      showNotification('Erro ao registrar saída.', 'error');
     }
   };
 
@@ -1518,6 +1279,143 @@ const App: React.FC = () => {
   /* Removed local stats memo in favor of server-side stats state */
 
 
+
+  const handleManualAdd = async (palletData: any) => {
+    try {
+      const { description, op, lot, quantity, contentType, assignedSlot } = palletData;
+      
+      const newRow: SheetRow = {
+        id: `ROW-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        loadingId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        originOP: op,
+        description,
+        lot,
+        pallets: quantity,
+        status: StockStatus.PENDING,
+        date: new Date().toLocaleDateString('pt-BR'),
+        inspections: Array(quantity).fill(null).map(() => ({
+           bottles: 0, caps: 0, boxes: 0, cradles: 0,
+           others: [],
+           contentType,
+           assignedSlot,
+           isConsolidated: false
+        })),
+        operatorName: user?.name
+      };
+      
+      if (assignedSlot !== 'AGUARDANDO') {
+         const targetSlot = slots.find(s => s.id === assignedSlot);
+         if (targetSlot) {
+            const updatedSlot = {
+              ...targetSlot,
+              status: contentType,
+              occupiedBy: description
+            };
+            await supabaseService.updateSlot(updatedSlot);
+            setSlots(prev => prev.map(s => s.id === assignedSlot ? updatedSlot : s));
+         }
+      }
+      
+      await supabaseService.saveInventoryItem(newRow);
+      setData(prev => [newRow, ...prev]);
+
+      await addToHistory({
+        ...createHistoryEntry(HistoryType.ENTRY, newRow, `Entrada manual: ${quantity} pallet(s)`, 1),
+        slot: assignedSlot
+      });
+      
+      showNotification('Pallet adicionado com sucesso!');
+      refreshCombinedData();
+    } catch (error) {
+       console.error('Error adding pallet manually:', error);
+       showNotification('Erro ao adicionar pallet manualmente', 'error');
+       throw error;
+    }
+  };
+
+
+  const handleMovementTransfer = async (transferData: any) => {
+    try {
+      const item = transferData.pallet;
+      if (!item) return;
+      const { fromSlot, toSlot } = transferData;
+
+      if (fromSlot && fromSlot !== 'AGUARDANDO') {
+        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(fromSlot);
+        if (otherPalletsInSlot.length <= 1) {
+          const fromSlotObj = slots.find(s => s.id === fromSlot);
+          if (fromSlotObj) {
+            const updatedFrom = { ...fromSlotObj, status: 'VAZIO', occupiedBy: undefined };
+            await supabaseService.updateSlot(updatedFrom);
+            setSlots(prev => prev.map(s => s.id === fromSlot ? updatedFrom : s));
+          }
+        }
+      }
+
+      if (toSlot && toSlot !== 'AGUARDANDO') {
+        const targetSlotObj = slots.find(s => s.id === toSlot);
+        if (targetSlotObj) {
+          const updatedTo = {
+            ...targetSlotObj,
+            status: item.inspections?.[0]?.contentType || 'SUPPLIES',
+            occupiedBy: item.description
+          };
+          await supabaseService.updateSlot(updatedTo);
+          setSlots(prev => prev.map(s => s.id === toSlot ? updatedTo : s));
+        }
+      }
+
+      const updatedRow = { ...item };
+      if (updatedRow.inspections?.[0]) {
+        updatedRow.inspections[0].assignedSlot = toSlot;
+      }
+      await supabaseService.saveInventoryItem(updatedRow);
+      
+      await addToHistory({
+        ...createHistoryEntry(HistoryType.TRANSFER, item, `Transferência da vaga ${fromSlot || 'AGUARDANDO'} para ${toSlot}`),
+        slot: toSlot
+      });
+
+      showNotification('Transferência realizada com sucesso!');
+      refreshCombinedData();
+    } catch (error) {
+      console.error(error);
+      showNotification('Erro ao realizar transferência.', 'error');
+    }
+  };
+
+  const handleMovementExit = async (exitData: any) => {
+    try {
+      const item = exitData.pallet;
+      if (!item) return;
+      const fromSlot = item.inspections?.[0]?.assignedSlot;
+
+      if (fromSlot && fromSlot !== 'AGUARDANDO') {
+        const otherPalletsInSlot = await supabaseService.findPalletsBySlot(fromSlot);
+        if (otherPalletsInSlot.length <= 1) {
+          const fromSlotObj = slots.find(s => s.id === fromSlot);
+          if (fromSlotObj) {
+            const updatedFrom = { ...fromSlotObj, status: 'VAZIO', occupiedBy: undefined };
+            await supabaseService.updateSlot(updatedFrom);
+            setSlots(prev => prev.map(s => s.id === fromSlot ? updatedFrom : s));
+          }
+        }
+      }
+
+      await supabaseService.deleteInventoryItem(item.id);
+
+      await addToHistory({
+        ...createHistoryEntry(HistoryType.EXIT, item, `Saída operacional. Motivo: ${exitData.reason}`),
+        slot: fromSlot
+      });
+
+      showNotification('Saída registrada com sucesso!');
+      refreshCombinedData();
+    } catch (error) {
+      console.error(error);
+      showNotification('Erro ao registrar saída.', 'error');
+    }
+  };
 
   const handleUpdatePallet = async (updatedData: { 
     description: string; 
@@ -2197,12 +2095,11 @@ const App: React.FC = () => {
             <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="quicksearch" icon={Search} label="Consulta Rápida" isActive={activeTab === 'quicksearch'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} isActive={activeTab === 'waiting'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="movement" icon={ArrowLeftRight} label="Movimentação" isActive={activeTab === 'movement'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            
             <NavItem tab="inventory" icon={Package} label="Estoque Geral" isActive={activeTab === 'inventory'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" isActive={activeTab === 'rotative'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" isActive={activeTab === 'map'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="import" icon={FileUp} label="Importar CSV" isActive={activeTab === 'import'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={pendingRows.length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
             {user?.role === 'admin' && (
@@ -2266,10 +2163,9 @@ const App: React.FC = () => {
                   {activeTab === 'dashboard' && 'Painel de Controle'}
                   {activeTab === 'quicksearch' && 'Consulta Rápida'}
                   {activeTab === 'waiting' && 'Aguardando Vaga'}
-                  {activeTab === 'movement' && 'Movimentação'}
+                  
                   {activeTab === 'inventory' && 'Estoque Geral'}
                   {activeTab === 'map' && 'Mapa de vagas'}
-                  {activeTab === 'import' && 'Importar CSV'}
                   {activeTab === 'analysis' && 'Análise de Recebimento'}
                   {activeTab === 'history' && 'Histórico'}
                   {activeTab === 'shipments' && 'Gestão de Carregamentos'}
@@ -2381,26 +2277,6 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 lg:p-14 scroll-smooth">
-          {activeTab === 'movement' && (
-            <div className="max-w-4xl mx-auto text-center space-y-8 py-20 animate-in fade-in slide-in-from-bottom-10 duration-700">
-              <div className="w-24 h-24 bg-blue-600/10 text-blue-500 rounded-[32px] flex items-center justify-center mx-auto border border-blue-500/20 shadow-2xl shadow-blue-900/20 mb-8">
-                <Truck className="w-10 h-10" />
-              </div>
-              <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Gestão de Movimentação</h2>
-              <p className="text-slate-600 dark:text-slate-500 text-sm md:text-base font-bold uppercase tracking-[0.3em] max-w-xl mx-auto leading-relaxed">
-                Realize entradas, saídas e transferências de pallets no armazém G0 de forma rápida e segura.
-              </p>
-              <div className="pt-10">
-                <button 
-                  onClick={() => setIsMovementModalOpen(true)}
-                  className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 flex items-center gap-4 mx-auto"
-                >
-                  Abrir Painel de Movimentação <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
           {(activeTab === 'dashboard' || isPublicView) && (
             <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
                 {/* Dashboard Actions */}
@@ -2591,12 +2467,7 @@ const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'import' && (
-            <ImportPage 
-              onProcess={handleImportProcess} 
-              availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
-            />
-          )}
+
 
           {activeTab === 'waiting' && (
             <WaitingSlotsView 
@@ -2618,6 +2489,7 @@ const App: React.FC = () => {
               allSlots={slots}
               onConfirm={handleConfirmAnalysis}
               onReject={handleRejectAnalysis}
+              onImport={handleImportProcess}
             />
           )}
 
@@ -2700,7 +2572,7 @@ const App: React.FC = () => {
                     id: pallet.loadingId || pallet.id,
                     pallet: pallet
                   });
-                  setIsMovementModalOpen(true);
+                  
                 }}
                 onExit={(pallet) => {
                   setMovementInitialContext({
@@ -2708,7 +2580,7 @@ const App: React.FC = () => {
                     id: pallet.loadingId || pallet.id,
                     pallet: pallet
                   });
-                  setIsMovementModalOpen(true);
+                  
                 }}
                 onAddToShipment={(pallet) => {
                   setSelectedPallets([`${pallet.id}::0`]);
@@ -2732,6 +2604,15 @@ const App: React.FC = () => {
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
+                    {!isPublicView && (
+                      <button 
+                        onClick={() => setIsManualAddModalOpen(true)}
+                        className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all active:scale-95 whitespace-nowrap"
+                      >
+                        <Plus className="w-4 h-4" /> Adicionar Manualmente
+                      </button>
+                    )}
+
                     
                     {/* Type Filter Dropdown */}
                     <div className="relative w-full md:w-64">
@@ -3112,21 +2993,28 @@ const App: React.FC = () => {
         onDelete={handleDeleteShipment}
       />
       
-      <MovementModal 
-        isOpen={isMovementModalOpen} 
+                  <ManualPalletModal
+        isOpen={isManualAddModalOpen}
+        onClose={() => {
+          setIsManualAddModalOpen(false);
+          setMovementInitialContext(null);
+        }}
+        availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
+        onSave={handleManualAdd}
+        inventoryData={data}
+        historyData={history}
+      />
+      <MovementModal
+        isOpen={isMovementModalOpen}
         onClose={() => {
           setIsMovementModalOpen(false);
           setMovementInitialContext(null);
         }}
-        onEntry={handleMovementEntry}
         onTransfer={handleMovementTransfer}
         onExit={handleMovementExit}
         availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
-        occupiedSlots={slots.filter(s => s.status !== SlotContent.EMPTY)}
-        allSlots={slots}
         inventoryData={data}
-        history={history}
-        initialType={movementInitialContext?.type}
+        initialType={movementInitialContext?.type as any}
         initialId={movementInitialContext?.id}
         initialPallet={movementInitialContext?.pallet}
       />

@@ -242,12 +242,26 @@ const QuickSearch: React.FC<QuickSearchProps> = ({
                                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{p.loadingId || p.id}</p>
                               </div>
                             </div>
+                            <div className="flex gap-2 items-center">
+                              <button 
+                              onClick={() => onTransfer(p)}
+                              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-600 dark:text-amber-500 hover:text-white rounded-lg transition-colors text-[9px] font-black uppercase tracking-widest"
+                            >
+                              Transferir
+                            </button>
+                            <button 
+                              onClick={() => onExit(p)}
+                              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-600 dark:text-red-500 hover:text-white rounded-lg transition-colors text-[9px] font-black uppercase tracking-widest"
+                            >
+                              Saída
+                            </button>
                             <button 
                               onClick={() => onShowDetail(p)}
                               className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-blue-500 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors text-[9px] font-black uppercase tracking-widest"
                             >
                               Ver
                             </button>
+                            </div>
                           </div>
                         ))}
                       </div>
