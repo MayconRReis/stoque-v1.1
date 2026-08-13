@@ -53,7 +53,7 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
         </div>
         <div className="flex gap-3">
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+            <div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-sky-400 to-red-500"></div>
             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Mix de Produtos</span>
           </div>
         </div>
@@ -67,12 +67,14 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
                 {item.rate}% ({item.count} / {item.maxCapacity})
               </span>
             </div>
-            <div className="h-2 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden flex">
+            <div className="h-2 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden flex [container-type:inline-size]">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.min(item.rate, 100)}%` }}
-                className={`h-full ${item.rate > 100 ? 'bg-red-500' : item.color} rounded-full`}
-              />
+                className="h-full rounded-full overflow-hidden relative"
+              >
+                <div className="h-full w-[100cqw] absolute top-0 left-0 bg-gradient-to-r from-sky-400 via-amber-500 to-red-500" />
+              </motion.div>
             </div>
           </div>
         ))}

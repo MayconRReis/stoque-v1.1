@@ -39,7 +39,7 @@ const RackDistributionChart: React.FC<RackDistributionChartProps> = ({ slots, wa
         </div>
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
+            <div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-sky-400 to-red-500"></div>
             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ocupação</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -55,14 +55,16 @@ const RackDistributionChart: React.FC<RackDistributionChartProps> = ({ slots, wa
               <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic leading-none">Porta Pallet {item.rack}</span>
               <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 leading-none">{item.rate}% ({item.occupied}/{item.total})</span>
             </div>
-            <div className="h-1.5 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+            <div className="h-1.5 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative [container-type:inline-size]">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.min(item.rate, 100)}%` }}
-                className={`h-full ${item.color} rounded-full`}
-              />
+                className="h-full rounded-full overflow-hidden relative"
+              >
+                <div className="h-full w-[100cqw] absolute top-0 left-0 bg-gradient-to-r from-sky-400 via-amber-500 to-red-500" />
+              </motion.div>
               {item.rate > 100 && (
-                <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-red-600/40 to-transparent animate-pulse" />
+                <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-red-600/40 to-transparent animate-pulse pointer-events-none" />
               )}
             </div>
           </div>

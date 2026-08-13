@@ -2135,8 +2135,10 @@ const App: React.FC = () => {
                   <span>Ocupação G0</span>
                   <span>{stats.occupancyRate}%</span>
                 </div>
-                <div className="h-1.5 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden">
-                   <div className="h-full bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}></div>
+                <div className="h-1.5 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative [container-type:inline-size]">
+                   <div className="h-full rounded-full overflow-hidden relative transition-all duration-1000" style={{ width: `${stats.occupancyRate}%` }}>
+                      <div className="h-full w-[100cqw] absolute top-0 left-0 bg-gradient-to-r from-sky-400 via-amber-500 to-red-500" />
+                   </div>
                 </div>
               </div>
             </div>
@@ -2337,17 +2339,15 @@ const App: React.FC = () => {
                         <span className="text-2xl font-black text-blue-500 italic">{stats.occupancyRate}%</span>
                       </div>
                     </div>
-                    <div className="h-3 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+                    <div className="h-3 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden relative [container-type:inline-size]">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(stats.occupancyRate, 100)}%` }}
                         transition={{ duration: 1.5, ease: "easeOut" }}
-                        className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.2)] ${
-                          stats.occupancyRate > 95 ? 'bg-red-600 shadow-red-500/20' : 
-                          stats.occupancyRate > 80 ? 'bg-amber-500' : 
-                          'bg-blue-600'
-                        }`}
-                      />
+                        className="h-full rounded-full overflow-hidden relative"
+                      >
+                        <div className="h-full w-[100cqw] absolute top-0 left-0 bg-gradient-to-r from-sky-400 via-amber-500 to-red-500" />
+                      </motion.div>
                       {stats.occupancyRate > 100 && (
                         <div className="absolute inset-0 bg-red-600/10 pointer-events-none animate-pulse" />
                       )}
