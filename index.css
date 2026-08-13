@@ -6,6 +6,7 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-slate-50: #e7eaef; /* grayer light-theme page background (was #f8fafc) */
 }
 
 html {
