@@ -820,6 +820,7 @@ export const supabaseService = {
   },
 
   // History
+  // Kept for backward compatibility (offline fallback / callers that still want everything).
   async getHistory(): Promise<HistoryEntry[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('history');
 
@@ -832,23 +833,71 @@ export const supabaseService = {
       console.warn('Supabase getHistory failed, falling back to local storage:', error);
       return localStorageHelper.get('history');
     }
-    const history = (data || []).map(entry => ({
-      id: entry.id,
-      type: entry.type as HistoryType,
-      timestamp: entry.timestamp,
-      loadingId: entry.loading_id,
-      description: entry.description,
-      op: entry.op,
-      lot: entry.lot,
-      palletNumber: entry.pallet_number,
-      totalPallets: entry.total_pallets,
-      slot: entry.slot,
-      details: entry.details,
-      operatorName: entry.operator_name,
-      palletType: entry.pallet_type
-    }));
+    const history = (data || []).map(mapHistoryRow);
     localStorageHelper.save('history', history);
     return history;
+  },
+
+  // Paginated history load, with a real server-side search (ILIKE against the whole table,
+  // not just whatever page happens to be loaded). page is 0-indexed.
+  async getHistoryPaginated(page: number, pageSize: number, searchTerm?: string): Promise<{ data: HistoryEntry[], count: number }> {
+    const term = (searchTerm || '').trim();
+
+    if (!isSupabaseConfigured) {
+      let all: HistoryEntry[] = localStorageHelper.get('history');
+      if (term) {
+        const lower = term.toLowerCase();
+        all = all.filter((entry: HistoryEntry) =>
+          (entry.op || '').toLowerCase().includes(lower) ||
+          (entry.description || '').toLowerCase().includes(lower) ||
+          (entry.lot || '').toLowerCase().includes(lower) ||
+          (entry.details || '').toLowerCase().includes(lower) ||
+          (entry.loadingId || '').toLowerCase().includes(lower) ||
+          (entry.slot || '').toLowerCase().includes(lower) ||
+          (entry.operatorName || '').toLowerCase().includes(lower)
+        );
+      }
+      const from = page * pageSize;
+      const to = from + pageSize;
+      return { data: all.slice(from, to), count: all.length };
+    }
+
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('history')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (term) {
+      // Escape characters that have special meaning inside PostgREST's or()/ilike() syntax
+      // so a search term can't break the filter string or be (mis)interpreted as a wildcard.
+      const escaped = term.replace(/[%_,()]/g, (c) => `\\${c}`);
+      const pattern = `%${escaped}%`;
+      query = query.or(
+        [
+          `op.ilike.${pattern}`,
+          `description.ilike.${pattern}`,
+          `lot.ilike.${pattern}`,
+          `details.ilike.${pattern}`,
+          `loading_id.ilike.${pattern}`,
+          `slot.ilike.${pattern}`,
+          `operator_name.ilike.${pattern}`
+        ].join(',')
+      );
+    }
+
+    const { data, error, count } = await query.range(from, to);
+
+    if (error) {
+      console.error('Supabase getHistoryPaginated failed:', error);
+      // Fall back to whatever is in local storage so the UI doesn't just go blank.
+      const local = localStorageHelper.get('history');
+      return { data: local.slice(page * pageSize, page * pageSize + pageSize), count: local.length };
+    }
+
+    return { data: (data || []).map(mapHistoryRow), count: count || 0 };
   },
 
   async addHistoryEntry(entry: HistoryEntry) {
@@ -1883,6 +1932,24 @@ export const supabaseService = {
       .subscribe();
   }
 };
+
+function mapHistoryRow(entry: any): HistoryEntry {
+  return {
+    id: entry.id,
+    type: entry.type as HistoryType,
+    timestamp: entry.timestamp,
+    loadingId: entry.loading_id,
+    description: entry.description,
+    op: entry.op,
+    lot: entry.lot,
+    palletNumber: entry.pallet_number,
+    totalPallets: entry.total_pallets,
+    slot: entry.slot,
+    details: entry.details,
+    operatorName: entry.operator_name,
+    palletType: entry.pallet_type
+  };
+}
 
 const localStorageHelper = {
   get: (key: string) => {

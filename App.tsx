@@ -6,6 +6,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { useTheme } from './hooks/useTheme';
 import { useAuth } from './hooks/useAuth';
 import { useInventoryFilters, PAGE_SIZE } from './hooks/useInventoryFilters';
+import { useHistoryFilters } from './hooks/useHistoryFilters';
 import { usePalletSelection } from './hooks/usePalletSelection';
 import { useShipments } from './hooks/useShipments';
 import { useWarehouseData, generateSlots } from './hooks/useWarehouseData';
@@ -174,9 +175,6 @@ const App: React.FC = () => {
   // Selection and Search State
 
 
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historySearch, setHistorySearch] = useState('');
-
   const [deleteContext, setDeleteContext] = useState<{ type: 'row' | 'pallet', rowId: string, palletIdx?: number } | null>(null);
   const [matrixConfirmContext, setMatrixConfirmContext] = useState<{ rowId: string, palletIdx: number, slotId?: string } | null>(null);
   const { notifications, setNotifications, showNotification } = useNotifications();
@@ -192,6 +190,16 @@ const App: React.FC = () => {
     isLoadingMore, setIsLoadingMore,
     loadMoreInventory
   } = useInventoryFilters(user, isPublicView, showNotification, handleSetData);
+  const {
+    history, setHistory,
+    historySearch, setHistorySearch,
+    historyPage, setHistoryPage,
+    hasMoreHistory, setHasMoreHistory,
+    isLoadingMoreHistory, isSearchingHistory,
+    loadHistory,
+    loadMoreHistory: loadMoreHistoryEntries,
+    HISTORY_PAGE_SIZE
+  } = useHistoryFilters(user, isPublicView, showNotification);
   const {
     selectedPallets, setSelectedPallets,
     isConsolidateDrawerOpen, setIsConsolidateDrawerOpen,
@@ -421,13 +429,13 @@ const App: React.FC = () => {
 
     const loadData = async () => {
       try {
-        const [invPaginatied, slotData, historyData, shipData, globalStats, pendingRes, waitingRes, countsData, approvalsCount, diagnostic] = await Promise.all([
+        const [invPaginatied, slotData, historyRes, shipData, globalStats, pendingRes, waitingRes, countsData, approvalsCount, diagnostic] = await Promise.all([
           supabaseService.getInventoryPaginated(0, PAGE_SIZE, { 
             searchTerm: inventorySearch, 
             typeFilter: inventoryTypeFilter 
           }),
           supabaseService.getSlots(),
-          supabaseService.getHistory(),
+          supabaseService.getHistoryPaginated(0, HISTORY_PAGE_SIZE, historySearch),
           supabaseService.getShipments(),
           supabaseService.getGlobalStats(),
           supabaseService.getPendingInventory(),
@@ -445,7 +453,9 @@ const App: React.FC = () => {
         setShipmentCounts(countsData);
         setPendingApprovalsCount(approvalsCount);
         setWarehouseDiagnostic(diagnostic);        
-        setHistory(historyData);
+        setHistory(historyRes.data);
+        setHasMoreHistory(historyRes.data.length < historyRes.count);
+        setHistoryPage(0);
         setShipments(shipData);
         
         // If no slots in DB, initialize them. If fewer slots than expected, add missing ones.
@@ -1843,20 +1853,6 @@ const App: React.FC = () => {
 
 
 
-  const filteredHistory = useMemo(() => {
-    const term = (historySearch || '').toLowerCase().trim();
-    if (!term) return history;
-    return history.filter(entry => 
-      (entry.op || '').toLowerCase().includes(term) ||
-      (entry.description || '').toLowerCase().includes(term) ||
-      (entry.lot || '').toLowerCase().includes(term) ||
-      (entry.details || '').toLowerCase().includes(term) ||
-      (entry.loadingId || '').toLowerCase().includes(term) ||
-      (entry.slot || '').toLowerCase().includes(term) ||
-      (entry.operatorName && (entry.operatorName || '').toLowerCase().includes(term))
-    );
-  }, [history, historySearch]);
-
   const filteredInventory = useMemo(() => {
     // Only calculate if we are on the inventory tab or shipments or needed for bulk
     if (activeTab !== 'inventory' && activeTab !== 'shipments' && !isBulkConfirmOpen) return [];
@@ -2514,10 +2510,18 @@ const App: React.FC = () => {
                         placeholder="Pesquisar no histórico (OP, Produto, Lote, ID)..." 
                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                     />
+                    {isSearchingHistory && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-slate-400 border-t-blue-600 rounded-full animate-spin" />
+                    )}
                 </div>
+                {historySearch && !isSearchingHistory && (
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest -mt-3">
+                    Pesquisando em todo o histórico, não só nos itens carregados
+                  </p>
+                )}
 
                 <div className="space-y-3">
-                    {filteredHistory.length === 0 ? (
+                    {history.length === 0 ? (
                         <div className="py-32 text-center border-2 border-dashed border-slate-300 dark:border-slate-900 rounded-[2.5rem]">
                             <History className="w-12 h-12 text-slate-800 mx-auto mb-4" />
                             <p className="text-slate-700 font-bold uppercase text-[10px] tracking-[0.3em]">
@@ -2525,10 +2529,22 @@ const App: React.FC = () => {
                             </p>
                         </div>
                     ) : (
-                        filteredHistory.map(entry => (
+                        history.map(entry => (
                           <HistoryItem key={entry.id} entry={entry} onRecover={handleRecoverPallet} />
                         )))}
                 </div>
+
+                {hasMoreHistory && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={loadMoreHistoryEntries}
+                      disabled={isLoadingMoreHistory}
+                      className="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 hover:border-blue-600"
+                    >
+                      {isLoadingMoreHistory ? 'Carregando...' : 'Carregar mais'}
+                    </button>
+                  </div>
+                )}
             </div>
           )}
 
