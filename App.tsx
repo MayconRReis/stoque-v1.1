@@ -1301,7 +1301,7 @@ const App: React.FC = () => {
         description,
         lot,
         pallets: quantity,
-        status: StockStatus.PENDING,
+        status: StockStatus.INSPECTED,
         date: new Date().toLocaleDateString('pt-BR'),
         inspections: Array(quantity).fill(null).map(() => ({
            bottles: 0, caps: 0, boxes: 0, cradles: 0,

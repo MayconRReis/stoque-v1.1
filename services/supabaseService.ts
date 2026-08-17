@@ -631,7 +631,7 @@ export const supabaseService = {
       applyInventoryFilter(supabase.from('inventory').select('*', { count: 'exact', head: true }), 'ROOT_ONLY').eq('status', 'PENDING'),
       supabase.from('history').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('status', 'CLOSED').gte('closed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-      applyInventoryFilter(supabase.from('inventory').select('inspections, parent_group_id, origin_op'), 'ROOT_ONLY') 
+      applyInventoryFilter(supabase.from('inventory').select('inspections, parent_group_id, origin_op, status'), 'ROOT_ONLY').neq('status', 'PENDING') 
     ]);
 
     const allSlots = results[0].data || [];
