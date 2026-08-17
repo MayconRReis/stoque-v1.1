@@ -274,7 +274,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                       type="text" 
                       value={op}
                       onChange={e => setOp(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg focus:border-blue-600 outline-none transition-all uppercase"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -283,7 +283,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                       type="text" 
                       value={lot}
                       onChange={e => setLot(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg focus:border-blue-600 outline-none transition-all uppercase"
                     />
                   </div>
                 </div>
@@ -294,7 +294,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     type="text" 
                     value={description}
                     onChange={e => setDescription(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg focus:border-blue-600 outline-none transition-all uppercase"
                   />
                 </div>
 
@@ -316,12 +316,12 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                     <select 
                       value={slotId}
                       onChange={e => setSlotId(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-sm focus:border-blue-600 outline-none transition-all uppercase"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg focus:border-blue-600 outline-none transition-all uppercase"
                     >
                       <option value="">Selecionar</option>
                       <option value="AGUARDANDO" className="text-amber-500 font-bold">Aguardando Vaga</option>
                       {sortedAvailableSlots.map(s => (
-                        <option key={s.id} value={s.id}>{s.id} ({s.rack})</option>
+                        <option key={s.id} value={s.id}>{s.id}</option>
                       ))}
                     </select>
                   </div>

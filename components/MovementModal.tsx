@@ -126,7 +126,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Pallet Selecionado</p>
-                        <h4 className="text-slate-900 dark:text-white font-black text-base">{foundPallet.description}</h4>
+                        <h4 className="text-slate-900 dark:text-white font-black text-lg">{foundPallet.description}</h4>
                         <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">OP: {foundPallet.originOP} | LOTE: {foundPallet.lot}</p>
                       </div>
                       <div className="text-right">
@@ -138,11 +138,11 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     
                     <div className="pt-4 border-t border-amber-500/20">
                       <label className="text-[9px] font-black text-amber-500 uppercase tracking-widest ml-1 mb-2 block">Vaga de Destino</label>
-                      <select value={targetSlot} onChange={e => setTargetSlot(e.target.value)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-base focus:border-amber-500 outline-none appearance-none">
-                        <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-base">SELECIONAR</option>
-                        <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-base">AGUARDANDO VAGA</option>
+                      <select value={targetSlot} onChange={e => setTargetSlot(e.target.value)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-lg focus:border-amber-500 outline-none appearance-none">
+                        <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-lg">SELECIONAR</option>
+                        <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-lg">AGUARDANDO VAGA</option>
                         {availableSlots.map(s => (
-                          <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120] text-base">{s.id}</option>
+                          <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120] text-lg">{s.id}</option>
                         ))}
                       </select>
                     </div>
@@ -175,7 +175,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Confirmação de Saída</p>
-                        <h4 className="text-slate-900 dark:text-white font-black text-base">{foundPallet.description}</h4>
+                        <h4 className="text-slate-900 dark:text-white font-black text-lg">{foundPallet.description}</h4>
                         <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">OP: {foundPallet.originOP} | LOTE: {foundPallet.lot}</p>
                       </div>
                       <div className="text-right">
@@ -187,7 +187,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
                     
                     <div className="pt-4 border-t border-red-500/20">
                       <label className="text-[9px] font-black text-red-500 uppercase tracking-widest ml-1 mb-2 block">Motivo da Saída</label>
-                      <select value={exitReason} onChange={e => setExitReason(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-slate-900 dark:text-white font-bold text-base focus:border-red-500 outline-none">
+                      <select value={exitReason} onChange={e => setExitReason(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg focus:border-red-500 outline-none">
                         <option value="">Selecione o motivo...</option>
                         <option value="EXPEDICAO">EXPEDIÇÃO / CARREGAMENTO</option>
                         <option value="RETRABALHO">RETORNO PARA RETRABALHO</option>

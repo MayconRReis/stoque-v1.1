@@ -109,7 +109,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
                 <p className="text-[9px] text-slate-500 italic">O que é o pallet?</p>
               </div>
               <div className="relative">
-                <select value={contentType} onChange={e => setContentType(e.target.value as SlotContent)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none appearance-none">
+                <select value={contentType} onChange={e => setContentType(e.target.value as SlotContent)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none appearance-none">
                   <option value={SlotContent.FINISHED_PRODUCT}>Produto Acabado</option>
                   <option value={SlotContent.BOTTLES}>Frasco</option>
                   <option value={SlotContent.SUPPLIES}>Insumo</option>
@@ -138,7 +138,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
                 </div>
                 <p className="text-[9px] text-slate-500 italic">Ordem de Produção</p>
               </div>
-              <input type="text" value={op} onChange={e => setOp(e.target.value.toUpperCase())} placeholder="Ex: 410-152" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
+              <input type="text" value={op} onChange={e => setOp(e.target.value.toUpperCase())} placeholder="Ex: 410-152" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
             </div>
 
             {/* NOME */}
@@ -150,7 +150,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
                 </div>
                 <p className="text-[9px] text-slate-500 italic">informar o nome do produto</p>
               </div>
-              <input type="text" value={description} onChange={e => setDescription(e.target.value.toUpperCase())} placeholder="Ex: SELANTE 500G" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
+              <input type="text" value={description} onChange={e => setDescription(e.target.value.toUpperCase())} placeholder="Ex: SELANTE 500G" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
             </div>
 
             {/* LOTE */}
@@ -162,7 +162,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
                 </div>
                 <p className="text-[9px] text-slate-500 italic">Informar conforme etiqueta</p>
               </div>
-              <input type="text" value={lot} onChange={e => setLot(e.target.value.toUpperCase())} placeholder="Ex: 01260307143" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
+              <input type="text" value={lot} onChange={e => setLot(e.target.value.toUpperCase())} placeholder="Ex: 01260307143" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
             </div>
 
             {/* QUANTIDADE */}
@@ -170,11 +170,11 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
               <div>
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
-                  <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Quantidade</label>
+                  <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Qtd. Pallets</label>
                 </div>
-                <p className="text-[9px] text-slate-500 italic">informar quantidade total (unidades ou kg)</p>
+                <p className="text-[9px] text-slate-500 italic">informar a quantidade de pallets a cadastrar</p>
               </div>
-              <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none placeholder:text-slate-700" />
+              <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none placeholder:text-slate-700" />
             </div>
 
             {/* VAGA */}
@@ -187,11 +187,11 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
                 <p className="text-[9px] text-slate-500 italic">Local de armazenamento sugerido</p>
               </div>
               <div className="relative">
-                <select value={assignedSlot} onChange={e => setAssignedSlot(e.target.value)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-base focus:border-blue-500 outline-none appearance-none">
-                  <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-base">SELECIONAR</option>
-                  <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-base">AGUARDANDO VAGA</option>
+                <select value={assignedSlot} onChange={e => setAssignedSlot(e.target.value)} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none appearance-none">
+                  <option value="" className="bg-blue-300 text-slate-900 font-bold uppercase tracking-widest text-lg">SELECIONAR</option>
+                  <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120] text-lg">AGUARDANDO VAGA</option>
                   {availableSlots.map(s => (
-                    <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120] text-base">{s.id}</option>
+                    <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120] text-lg">{s.id}</option>
                   ))}
                 </select>
                 <ChevronDown className="w-4 h-4 text-slate-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
