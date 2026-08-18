@@ -110,16 +110,18 @@ export const ImportPage: React.FC<ImportPageProps> = ({ onProcess }) => {
           originOP: item.op,
           description: item.nome,
           lot: item.lote,
-          pallets: parseInt(item.quantidade) || 0,
+          pallets: 1,
           date: new Date().toLocaleDateString('pt-BR'),
           status: StockStatus.PENDING,
           inspections: [{
-            bottles: item.contentType === SlotContent.BOTTLES ? parseInt(item.quantidade) : 0,
+            bottles: item.contentType === SlotContent.BOTTLES ? (parseInt(item.quantidade) || 0) : 0,
             caps: 0,
-            boxes: 0,
+            boxes: item.contentType === SlotContent.FINISHED_PRODUCT ? (parseInt(item.quantidade) || 0) : 0,
             cradles: 0,
+            others: [],
             contentType: item.contentType,
-            palletNumber: 1
+            assignedSlot: 'AGUARDANDO',
+            isConsolidated: false
           }]
         };
         return { row, slotId: '' };

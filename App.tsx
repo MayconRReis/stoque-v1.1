@@ -1292,19 +1292,24 @@ const App: React.FC = () => {
 
   const handleManualAdd = async (palletData: any) => {
     try {
-      const { description, op, lot, quantity, contentType, assignedSlot } = palletData;
+      const { description, op, lot, palletsCount, units, contentType, assignedSlot } = palletData;
       
+      const unitsPerPallet = palletsCount > 0 ? units / palletsCount : 0;
+
       const newRow: SheetRow = {
         id: `ROW-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         loadingId: Math.random().toString(36).substring(2, 8).toUpperCase(),
         originOP: op,
         description,
         lot,
-        pallets: quantity,
+        pallets: palletsCount,
         status: StockStatus.INSPECTED,
         date: new Date().toLocaleDateString('pt-BR'),
-        inspections: Array(quantity).fill(null).map(() => ({
-           bottles: 0, caps: 0, boxes: 0, cradles: 0,
+        inspections: Array(palletsCount).fill(null).map(() => ({
+           bottles: contentType === SlotContent.BOTTLES ? unitsPerPallet : 0, 
+           caps: 0, 
+           boxes: contentType === SlotContent.FINISHED_PRODUCT ? unitsPerPallet : 0, 
+           cradles: 0,
            others: [],
            contentType,
            assignedSlot,

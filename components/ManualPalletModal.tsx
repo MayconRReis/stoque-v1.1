@@ -17,7 +17,8 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
   const [contentType, setContentType] = useState<SlotContent>(SlotContent.FINISHED_PRODUCT);
-  const [quantity, setQuantity] = useState(1);
+  const [palletsCount, setPalletsCount] = useState(1);
+  const [units, setUnits] = useState(0);
   const [assignedSlot, setAssignedSlot] = useState('AGUARDANDO');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -54,7 +55,8 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
         description,
         op,
         lot,
-        quantity,
+        palletsCount,
+        units,
         contentType,
         assignedSlot
       });
@@ -165,16 +167,28 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
               <input type="text" value={lot} onChange={e => setLot(e.target.value.toUpperCase())} placeholder="Ex: 01260307143" className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none uppercase placeholder:text-slate-700" />
             </div>
 
-            {/* QUANTIDADE */}
-            <div className="space-y-2">
-              <div>
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
-                  <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Qtd. Pallets</label>
+            {/* QUANTIDADE DE PALLETS E UNIDADES */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
+                    <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Qtd. de Pallets</label>
+                  </div>
+                  <p className="text-[9px] text-slate-500 italic">informar a quantidade de pallets a cadastrar</p>
                 </div>
-                <p className="text-[9px] text-slate-500 italic">informar a quantidade de pallets a cadastrar</p>
+                <input type="number" min="1" value={palletsCount} onChange={e => setPalletsCount(Number(e.target.value))} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none placeholder:text-slate-700" />
               </div>
-              <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none placeholder:text-slate-700" />
+              <div className="space-y-2">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
+                    <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Qtd. Unidades</label>
+                  </div>
+                  <p className="text-[9px] text-slate-500 italic">total de unidades/kg</p>
+                </div>
+                <input type="number" min="0" value={units} onChange={e => setUnits(Number(e.target.value))} className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none placeholder:text-slate-700" />
+              </div>
             </div>
 
             {/* VAGA */}
