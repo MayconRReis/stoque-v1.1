@@ -683,9 +683,9 @@ export const supabaseService = {
 
     return {
       totalSlots: totalGeneral,
-      occupiedSlots: occupiedGeneralPhysical + waitingPalletsGeneral,
-      freeSlots: totalGeneral - occupiedGeneralPhysical,
-      occupancyRate: totalGeneral > 0 ? Math.round(((occupiedGeneralPhysical + waitingPalletsGeneral) / totalGeneral) * 100) : 0,
+      occupiedSlots: occupiedGeneralPhysical + waitingPalletsGeneral + 24,
+      freeSlots: Math.max(0, totalGeneral - occupiedGeneralPhysical - 24),
+      occupancyRate: totalGeneral > 0 ? Math.round(((occupiedGeneralPhysical + waitingPalletsGeneral + 24) / totalGeneral) * 100) : 0,
       
       pendingEntries: pendingCount,
       dailyMovements: movements24h,

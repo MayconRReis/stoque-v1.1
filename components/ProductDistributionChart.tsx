@@ -11,14 +11,14 @@ const ProductDistributionChart: React.FC<ProductDistributionChartProps> = ({ pro
   const productData = useMemo(() => {
     const categories = [
       { type: SlotContent.BOTTLES, label: 'Frascos', color: 'bg-blue-600', maxCapacity: 48 },
-      { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600', maxCapacity: 32 },
-      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600', maxCapacity: 28 },
+      { type: SlotContent.SUPPLIES, label: 'Insumos', color: 'bg-amber-600', maxCapacity: 40 },
+      { type: SlotContent.FINISHED_PRODUCT, label: 'Produtos Acabados', color: 'bg-green-600', maxCapacity: 24 },
       { type: 'CONTAINERS', label: 'Containers', color: 'bg-indigo-600', maxCapacity: 90 },
       { type: SlotContent.REWORK, label: 'Retrabalho', color: 'bg-purple-600', maxCapacity: 10 },
       { type: SlotContent.REPROCESS, label: 'Reprocesso', color: 'bg-teal-600', maxCapacity: 10 },
       { type: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo', color: 'bg-pink-600', maxCapacity: 20 },
-      { type: SlotContent.DISCARD, label: 'Descarte', color: 'bg-red-700', maxCapacity: 5 },
-      { type: 'OTHER', label: 'Outros', color: 'bg-slate-600', maxCapacity: 31 }
+      { type: SlotContent.DISCARD, label: 'Descarte', color: 'bg-red-700', maxCapacity: 6 },
+      { type: 'OTHER', label: 'Outros', color: 'bg-slate-600', maxCapacity: 40 }
     ];
 
     return categories.map(item => {

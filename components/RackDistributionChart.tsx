@@ -11,9 +11,13 @@ const RackDistributionChart: React.FC<RackDistributionChartProps> = ({ slots, wa
   const rackData = useMemo(() => {
     return (['A', 'B', 'C', 'D'] as const).map(rack => {
       const rackSlots = slots.filter(s => s.rack === rack);
-      const occupied = rackSlots.filter(s => s.status !== SlotContent.EMPTY).length;
+      const occupied = rackSlots.filter(s => {
+        if (s.status === SlotContent.EMPTY) return false;
+        if ((rack === 'B' || rack === 'C') && s.status === SlotContent.FINISHED_PRODUCT) return false;
+        return true;
+      }).length;
       const totalCapacities: Record<string, number> = {
-        A: 48, B: 48, C: 48,
+        A: 48, B: 36, C: 36,
         D: 54,
         E: 45, F: 45
       };
