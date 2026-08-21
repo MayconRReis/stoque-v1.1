@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { WarehouseSlot, SlotContent, SheetRow, translateSlotContent, getContentTypeColor, AutocompleteItem } from '../types';
-import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare, Sparkles, CheckCircle2, Loader2, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { WarehouseSlot, SlotContent, SheetRow, translateSlotContent, getContentTypeColor, parseSlotContent } from '../types';
+import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabaseService } from '../services/supabaseService';
 import { formatOP } from '../lib/formatters';
@@ -28,15 +28,6 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
   const [units, setUnits] = useState(0);
   const [assignedSlot, setAssignedSlot] = useState('AGUARDANDO');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Suggestions & Autocomplete state
-  const [suggestions, setSuggestions] = useState<AutocompleteItem[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<'op' | 'desc' | null>(null);
-  const [autofillSource, setAutofillSource] = useState<string | null>(null);
-
-  const opContainerRef = useRef<HTMLDivElement>(null);
-  const descContainerRef = useRef<HTMLDivElement>(null);
 
   // Supply specific fields
   const [supplyFrascos, setSupplyFrascos] = useState(0);
@@ -69,147 +60,104 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
     setNewExtraName('');
     setNewExtraQty(0);
     setReworkObs('');
-    setSuggestions([]);
-    setActiveDropdown(null);
-    setAutofillSource(null);
   };
 
-  // Close dropdowns on outside click
+  // Auto-fill silently when an OP that already passed through stock is entered
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        opContainerRef.current && !opContainerRef.current.contains(e.target as Node) &&
-        descContainerRef.current && !descContainerRef.current.contains(e.target as Node)
-      ) {
-        setActiveDropdown(null);
+    if (!op || op.trim().length < 3) return;
+
+    const rawTerm = op.trim();
+    const formatted = formatOP(rawTerm);
+    const upperTerm = rawTerm.toUpperCase();
+    const upperFmt = formatted.toUpperCase();
+
+    // 1. Check local inventoryData first
+    const invMatch = inventoryData?.find(p => {
+      const pOp = (p.originOP || '').toUpperCase();
+      return pOp === upperTerm || pOp === upperFmt || formatOP(pOp) === formatted;
+    });
+
+    if (invMatch) {
+      if (invMatch.description) setDescription(invMatch.description);
+      if (invMatch.lot) setLot(invMatch.lot);
+      const insp = invMatch.inspections?.[0];
+      if (insp?.contentType) {
+        setContentType(insp.contentType);
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Apply suggestion
-  const applySuggestion = (item: AutocompleteItem) => {
-    if (item.originOP) setOp(formatOP(item.originOP));
-    if (item.description) setDescription(item.description);
-    if (item.lot) setLot(item.lot);
-    if (item.contentType) setContentType(item.contentType);
-    if (item.units !== undefined && item.units > 0) setUnits(item.units);
-
-    if (item.contentType === SlotContent.SUPPLIES && item.supplyDetails) {
-      setSupplyFrascos(item.supplyDetails.frascos || 0);
-      setSupplyTampas(item.supplyDetails.tampas || 0);
-      setSupplyCaixas(item.supplyDetails.caixas || 0);
-      setSupplyBercos(item.supplyDetails.bercos || 0);
-      if (item.supplyDetails.extras) {
-        setSupplyExtras(item.supplyDetails.extras);
+      const totalUnits = (insp?.bottles || 0) + (insp?.boxes || 0) + (insp?.caps || 0) + (insp?.cradles || 0) +
+        (insp?.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0);
+      if (totalUnits > 0) {
+        setUnits(totalUnits);
       }
-    }
-
-    if (item.reworkObs) {
-      setReworkObs(item.reworkObs);
-    }
-
-    setAutofillSource(item.originOP ? `OP ${item.originOP}` : (item.description || 'Histórico'));
-    setActiveDropdown(null);
-  };
-
-  // Debounced search when OP changes
-  useEffect(() => {
-    if (!op || op.trim().length < 2) {
-      if (activeDropdown === 'op') {
-        setSuggestions([]);
+      if (insp?.contentType === SlotContent.SUPPLIES) {
+        setSupplyFrascos(insp.bottles || 0);
+        setSupplyTampas(insp.caps || 0);
+        setSupplyCaixas(insp.boxes || 0);
+        setSupplyBercos(insp.cradles || 0);
+        if (insp.others && Array.isArray(insp.others)) {
+          setSupplyExtras(insp.others.map((o: any) => ({
+            id: Math.random().toString(36).slice(2),
+            name: o.name,
+            quantity: Number(o.quantity) || 0
+          })));
+        }
+      }
+      if (insp?.reworkObs) {
+        setReworkObs(insp.reworkObs);
       }
       return;
     }
 
+    // 2. Check local historyData
+    const histMatch = historyData?.find(h => {
+      const hOp = (h.op || h.origin_op || '').toUpperCase();
+      return hOp === upperTerm || hOp === upperFmt || formatOP(hOp) === formatted;
+    });
+
+    if (histMatch) {
+      if (histMatch.description) setDescription(histMatch.description);
+      if (histMatch.lot) setLot(histMatch.lot);
+      if (histMatch.pallet_type || histMatch.palletType) {
+        setContentType(parseSlotContent(histMatch.pallet_type || histMatch.palletType));
+      }
+      return;
+    }
+
+    // 3. Search via Supabase backend if not found locally
     const timer = setTimeout(async () => {
-      setIsSearching(true);
       try {
-        const rawTerm = op.trim();
-        const formatted = formatOP(rawTerm);
         const results = await supabaseService.searchOpOrProduct(rawTerm);
-
-        // Also search in local props as fallback / immediate supplement
-        const localMatches: AutocompleteItem[] = [];
-        const upperTerm = rawTerm.toUpperCase();
-        const upperFmt = formatted.toUpperCase();
-
-        (inventoryData || []).forEach(row => {
-          const rowOp = (row.originOP || '').toUpperCase();
-          if (rowOp.includes(upperTerm) || rowOp.includes(upperFmt)) {
-            const insp = row.inspections?.[0];
-            localMatches.push({
-              originOP: row.originOP,
-              description: row.description,
-              lot: row.lot,
-              contentType: insp?.contentType || SlotContent.FINISHED_PRODUCT,
-              units: (insp?.bottles || 0) + (insp?.boxes || 0) + (insp?.caps || 0) + (insp?.cradles || 0) || row.pallets,
-              source: 'inventory'
-            });
-          }
-        });
-
-        // Merge results
-        const combined = [...results];
-        localMatches.forEach(lm => {
-          if (!combined.some(c => c.originOP === lm.originOP && c.description === lm.description && c.lot === lm.lot)) {
-            combined.push(lm);
-          }
-        });
-
-        setSuggestions(combined);
-
-        // Direct Auto-fill if exact match or single high-confidence match and description is not filled or matched
-        const exactMatch = combined.find(item => 
-          item.originOP.toUpperCase() === upperTerm || 
+        const match = results.find(item => 
+          item.originOP.toUpperCase() === upperTerm ||
           item.originOP.toUpperCase() === upperFmt ||
           formatOP(item.originOP) === formatted
         );
 
-        if (exactMatch && (!description || description === exactMatch.description || !autofillSource)) {
-          setDescription(exactMatch.description || '');
-          setLot(exactMatch.lot || '');
-          if (exactMatch.contentType) {
-            setContentType(exactMatch.contentType);
+        if (match) {
+          if (match.description) setDescription(match.description);
+          if (match.lot) setLot(match.lot);
+          if (match.contentType) setContentType(match.contentType);
+          if (match.units && match.units > 0) setUnits(match.units);
+          if (match.contentType === SlotContent.SUPPLIES && match.supplyDetails) {
+            setSupplyFrascos(match.supplyDetails.frascos || 0);
+            setSupplyTampas(match.supplyDetails.tampas || 0);
+            setSupplyCaixas(match.supplyDetails.caixas || 0);
+            setSupplyBercos(match.supplyDetails.bercos || 0);
+            if (match.supplyDetails.extras) {
+              setSupplyExtras(match.supplyDetails.extras);
+            }
           }
-          if (exactMatch.units && exactMatch.units > 0 && units === 0) {
-            setUnits(exactMatch.units);
+          if (match.reworkObs) {
+            setReworkObs(match.reworkObs);
           }
-          setAutofillSource(`OP ${exactMatch.originOP}`);
         }
       } catch (err) {
-        console.error('Error fetching OP autocomplete:', err);
-      } finally {
-        setIsSearching(false);
+        console.warn('Erro ao buscar auto-preenchimento por OP:', err);
       }
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [op, inventoryData]);
-
-  // Debounced search when Description (Nome) changes
-  const handleDescriptionChange = async (val: string) => {
-    const upperVal = val.toUpperCase();
-    setDescription(upperVal);
-
-    if (upperVal.trim().length >= 3) {
-      setIsSearching(true);
-      setActiveDropdown('desc');
-      try {
-        const results = await supabaseService.searchOpOrProduct(upperVal.trim());
-        setSuggestions(results);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsSearching(false);
-      }
-    } else {
-      if (activeDropdown === 'desc') {
-        setSuggestions([]);
-      }
-    }
-  };
+  }, [op, inventoryData, historyData]);
 
   const handleAddExtra = () => {
     if (!newExtraName.trim()) return;
@@ -316,41 +264,6 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
           </button>
         </div>
 
-        {/* Autofill Notification Banner */}
-        <AnimatePresence>
-          {autofillSource && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: 'auto' }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              className="px-8 pb-2 overflow-hidden"
-            >
-              <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <p className="text-xs text-blue-200 font-semibold truncate">
-                    Auto-preenchido com dados de <strong className="text-white">{autofillSource}</strong>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAutofillSource(null);
-                    setDescription('');
-                    setLot('');
-                    setUnits(0);
-                  }}
-                  className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 uppercase tracking-wider shrink-0 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20 transition-all hover:bg-blue-500/20"
-                >
-                  <RotateCcw className="w-3 h-3" /> Limpar
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Form - scrollable */}
         <div className="px-8 pb-8 space-y-5 overflow-y-auto flex-1">
 
@@ -393,95 +306,20 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
 
           {/* GRID: OP + LOTE */}
           <div className="grid grid-cols-2 gap-4">
-            {/* OP Input with Autocomplete dropdown */}
-            <div ref={opContainerRef} className="space-y-2 relative">
-              <div className="flex items-center justify-between mb-0.5">
-                <div className="flex items-center gap-1.5">
-                  <ClipboardList className="w-3.5 h-3.5 text-blue-400" />
-                  <label className={labelCls}>OP (Opcional)</label>
-                </div>
-                {isSearching && activeDropdown === 'op' && (
-                  <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
-                )}
+            {/* OP Input */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <ClipboardList className="w-3.5 h-3.5 text-blue-400" />
+                <label className={labelCls}>OP (Opcional)</label>
               </div>
-              <p className={subLabelCls}>Ordem de Produção (Auto-busca)</p>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={op}
-                  onChange={e => {
-                    setOp(e.target.value.toUpperCase());
-                    setActiveDropdown('op');
-                  }}
-                  onFocus={() => {
-                    if (suggestions.length > 0) setActiveDropdown('op');
-                  }}
-                  placeholder="Ex: 410-152"
-                  className={`${inputCls} uppercase pr-8`}
-                />
-                {op && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOp('');
-                      setSuggestions([]);
-                      setActiveDropdown(null);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Suggestions Dropdown for OP */}
-              <AnimatePresence>
-                {activeDropdown === 'op' && suggestions.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-[#0e1726] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-slate-800/60 backdrop-blur-xl"
-                  >
-                    <div className="px-3 py-1.5 bg-slate-900/90 text-[9px] font-black uppercase tracking-widest text-blue-400 flex items-center justify-between">
-                      <span>Sugestões Encontradas</span>
-                      <span>{suggestions.length} resultado(s)</span>
-                    </div>
-                    {suggestions.map((item, idx) => (
-                      <button
-                        key={`${item.originOP}_${item.lot}_${idx}`}
-                        type="button"
-                        onClick={() => applySuggestion(item)}
-                        className="w-full px-3.5 py-2.5 text-left hover:bg-blue-600/10 transition-colors flex items-start justify-between gap-2 group"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-mono text-xs font-black text-blue-400 group-hover:text-blue-300">
-                              OP {item.originOP || 'S/OP'}
-                            </span>
-                            {item.lot && (
-                              <span className="text-[10px] text-amber-400/90 font-mono font-bold">
-                                Lote: {item.lot}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-white font-bold truncate group-hover:text-blue-200">
-                            {item.description}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-800 ${getContentTypeColor(item.contentType)}`}>
-                            {translateSlotContent(item.contentType)}
-                          </span>
-                          {item.units !== undefined && item.units > 0 && (
-                            <p className="text-[9px] font-mono text-slate-400 mt-1">{item.units} UN</p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <p className={subLabelCls}>Ordem de Produção</p>
+              <input
+                type="text"
+                value={op}
+                onChange={e => setOp(e.target.value.toUpperCase())}
+                placeholder="Ex: 410-152"
+                className={`${inputCls} uppercase`}
+              />
             </div>
 
             {/* Lote */}
@@ -501,81 +339,20 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
             </div>
           </div>
 
-          {/* NOME (Descrição) with Autocomplete dropdown */}
-          <div ref={descContainerRef} className="space-y-2 relative">
-            <div className="flex items-center justify-between mb-0.5">
-              <div className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-blue-400" />
-                <label className={labelCls}>Nome (Obrigatório)</label>
-              </div>
-              {isSearching && activeDropdown === 'desc' && (
-                <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
-              )}
+          {/* NOME (Descrição) */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Info className="w-3.5 h-3.5 text-blue-400" />
+              <label className={labelCls}>Nome (Obrigatório)</label>
             </div>
-            <p className={subLabelCls}>Informar o nome do produto (digite para buscar produtos conhecidos)</p>
-            <div className="relative">
-              <input
-                type="text"
-                value={description}
-                onChange={e => handleDescriptionChange(e.target.value)}
-                onFocus={() => {
-                  if (suggestions.length > 0 && activeDropdown === 'desc') setActiveDropdown('desc');
-                }}
-                placeholder="Ex: SELANTE 500G"
-                className={`${inputCls} uppercase`}
-              />
-            </div>
-
-            {/* Suggestions Dropdown for Description */}
-            <AnimatePresence>
-              {activeDropdown === 'desc' && suggestions.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-[#0e1726] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-slate-800/60 backdrop-blur-xl"
-                >
-                  <div className="px-3 py-1.5 bg-slate-900/90 text-[9px] font-black uppercase tracking-widest text-blue-400 flex items-center justify-between">
-                    <span>Produtos Encontrados</span>
-                    <span>{suggestions.length} resultado(s)</span>
-                  </div>
-                  {suggestions.map((item, idx) => (
-                    <button
-                      key={`desc_${item.originOP}_${item.lot}_${idx}`}
-                      type="button"
-                      onClick={() => applySuggestion(item)}
-                      className="w-full px-3.5 py-2.5 text-left hover:bg-blue-600/10 transition-colors flex items-start justify-between gap-2 group"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-white font-bold truncate group-hover:text-blue-200">
-                          {item.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {item.originOP && (
-                            <span className="font-mono text-[10px] font-black text-blue-400">
-                              OP {item.originOP}
-                            </span>
-                          )}
-                          {item.lot && (
-                            <span className="text-[10px] text-amber-400/90 font-mono font-bold">
-                              Lote: {item.lot}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-800 ${getContentTypeColor(item.contentType)}`}>
-                          {translateSlotContent(item.contentType)}
-                        </span>
-                        {item.units !== undefined && item.units > 0 && (
-                          <p className="text-[9px] font-mono text-slate-400 mt-1">{item.units} UN</p>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <p className={subLabelCls}>Informar o nome do produto</p>
+            <input
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value.toUpperCase())}
+              placeholder="Ex: SELANTE 500G"
+              className={`${inputCls} uppercase`}
+            />
           </div>
 
           {/* QUANTIDADE UN */}
@@ -598,98 +375,107 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
           <AnimatePresence>
             {isSupply && (
               <motion.div
-                key="supply-fields"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
+                className="space-y-4 pt-2 border-t border-slate-800"
               >
-                <div className="pt-2 space-y-4">
-                  {/* Divider */}
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-slate-800" />
-                    <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Detalhes do Insumo</span>
-                    <div className="h-px flex-1 bg-slate-800" />
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <Package className="w-4 h-4" />
+                  <span className="text-xs font-black uppercase tracking-wider">Detalhamento de Insumos</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className={labelCls}>Frascos</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={supplyFrascos}
+                      onChange={e => setSupplyFrascos(Number(e.target.value))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Tampas</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={supplyTampas}
+                      onChange={e => setSupplyTampas(Number(e.target.value))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Caixas</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={supplyCaixas}
+                      onChange={e => setSupplyCaixas(Number(e.target.value))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Berços</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={supplyBercos}
+                      onChange={e => setSupplyBercos(Number(e.target.value))}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+
+                {/* Itens Extras */}
+                <div className="space-y-2 pt-2">
+                  <label className={labelCls}>Itens Extras</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nome do item"
+                      value={newExtraName}
+                      onChange={e => setNewExtraName(e.target.value)}
+                      className="flex-1 bg-[#0B1120] border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-indigo-500 outline-none"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Qtd"
+                      value={newExtraQty || ''}
+                      onChange={e => setNewExtraQty(Number(e.target.value))}
+                      className="w-24 bg-[#0B1120] border border-slate-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:border-indigo-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddExtra}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add
+                    </button>
                   </div>
 
-                  {/* Frasco, Tampas, Caixas, Berços */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { label: 'Frascos', value: supplyFrascos, setter: setSupplyFrascos },
-                      { label: 'Tampas', value: supplyTampas, setter: setSupplyTampas },
-                      { label: 'Caixas', value: supplyCaixas, setter: setSupplyCaixas },
-                      { label: 'Berços', value: supplyBercos, setter: setSupplyBercos },
-                    ].map(({ label, value, setter }) => (
-                      <div key={label} className="space-y-1">
-                        <label className={labelCls}>{label}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={value}
-                          onChange={e => setter(Number(e.target.value))}
-                          className={inputCls}
-                          placeholder="0"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Itens extras já adicionados */}
                   {supplyExtras.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 mt-2">
                       {supplyExtras.map(extra => (
-                        <div
-                          key={extra.id}
-                          className="flex items-center gap-3 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3"
-                        >
-                          <span className="flex-1 text-sm font-bold text-white truncate">{extra.name}</span>
-                          <span className="text-xs font-black text-slate-400 shrink-0">{extra.quantity} un</span>
-                          <button
-                            onClick={() => handleRemoveExtra(extra.id)}
-                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div key={extra.id} className="flex items-center justify-between bg-[#0B1120] px-3 py-2 rounded-lg border border-slate-800 text-xs">
+                          <span className="text-white font-bold">{extra.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-indigo-400 font-mono font-bold">{extra.quantity} un</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExtra(extra.id)}
+                              className="text-slate-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
-
-                  {/* Adicionar item extra */}
-                  <div className="flex items-end gap-3">
-                    <div className="flex-1 space-y-1">
-                      <label className={labelCls}>Adicionar item</label>
-                      <input
-                        type="text"
-                        value={newExtraName}
-                        onChange={e => setNewExtraName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleAddExtra()}
-                        placeholder="Nome do item..."
-                        className={inputCls}
-                      />
-                    </div>
-                    <div className="w-28 space-y-1">
-                      <label className={labelCls}>Qtd</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={newExtraQty}
-                        onChange={e => setNewExtraQty(Number(e.target.value))}
-                        onKeyDown={e => e.key === 'Enter' && handleAddExtra()}
-                        className={inputCls}
-                        placeholder="0"
-                      />
-                    </div>
-                    <button
-                      onClick={handleAddExtra}
-                      disabled={!newExtraName.trim()}
-                      title="Adicionar"
-                      className="h-[58px] w-14 shrink-0 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -699,81 +485,66 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
           <AnimatePresence>
             {isRework && (
               <motion.div
-                key="rework-fields"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
+                className="space-y-2 pt-2 border-t border-slate-800"
               >
-                <div className="pt-2 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-slate-800" />
-                    <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">Observação</span>
-                    <div className="h-px flex-1 bg-slate-800" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                      <label className={labelCls}>O que está faltando no pallet?</label>
-                    </div>
-                    <p className={subLabelCls}>Descreva o motivo do retrabalho ou o que está faltando</p>
-                    <textarea
-                      rows={3}
-                      value={reworkObs}
-                      onChange={e => setReworkObs(e.target.value)}
-                      placeholder="Ex: Faltando lacre, etiqueta danificada..."
-                      className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-semibold text-base focus:border-purple-500 outline-none placeholder:text-slate-700 resize-none"
-                    />
-                  </div>
+                <div className="flex items-center gap-2 text-amber-400">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="text-xs font-black uppercase tracking-wider">Observações de Retrabalho/Reprocesso</span>
                 </div>
+                <textarea
+                  rows={2}
+                  value={reworkObs}
+                  onChange={e => setReworkObs(e.target.value)}
+                  placeholder="Ex: Troca de válvula, correção de rotulagem..."
+                  className="w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-sm focus:border-amber-500 outline-none placeholder:text-slate-700 resize-none"
+                />
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* VAGA */}
+          {/* LOCALIZAÇÃO (VAGA) */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 mb-0.5">
               <Database className="w-3.5 h-3.5 text-blue-400" />
-              <label className={labelCls}>Vaga</label>
+              <label className={labelCls}>Localização (Vaga)</label>
             </div>
-            <p className={subLabelCls}>Local de armazenamento</p>
+            <p className={subLabelCls}>Vaga onde o pallet será armazenado</p>
             <div className="relative">
               <select
                 value={assignedSlot}
                 onChange={e => setAssignedSlot(e.target.value)}
                 className={`${inputCls} appearance-none`}
               >
-                <option value="AGUARDANDO" className="text-amber-500 font-bold bg-[#0B1120]">AGUARDANDO VAGA</option>
-                {[...availableSlots]
-                  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }))
-                  .map(s => (
-                    <option key={s.id} value={s.id} className="text-slate-200 bg-[#0B1120]">{s.id}</option>
-                  ))}
+                <option value="AGUARDANDO">AGUARDANDO</option>
+                {availableSlots.map(slot => (
+                  <option key={slot.id} value={slot.id}>
+                    {slot.id} ({slot.currentPallets}/{slot.maxPallets})
+                  </option>
+                ))}
               </select>
               <ChevronDown className="w-4 h-4 text-slate-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
-          {/* BOTÃO */}
+        </div>
+
+        {/* Footer */}
+        <div className="p-8 pt-4 border-t border-slate-800/80 bg-[#0f1522] shrink-0">
           <button
             onClick={handleSave}
-            disabled={isProcessing || !description}
-            className="w-full py-4 mt-2 bg-slate-200 hover:bg-white text-slate-900 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-white/5"
+            disabled={!description.trim() || isProcessing}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm uppercase tracking-wider transition-all"
           >
-            {isProcessing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-slate-500 border-t-slate-900 rounded-full animate-spin" />
-                Registrando...
-              </>
-            ) : (
-              <>
-                Confirmar Entrada <Plus className="w-4 h-4" />
-              </>
-            )}
+            <Plus className="w-4 h-4" />
+            {isProcessing ? 'Adicionando...' : 'Adicionar Pallet'}
           </button>
         </div>
+
       </motion.div>
     </div>
   );
 };
+
