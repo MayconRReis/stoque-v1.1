@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, disableSupabase } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES, parseSlotContent, AutocompleteItem } from '../types';
 import { formatOP } from '../lib/formatters';
 
 /**
@@ -606,6 +606,167 @@ export const supabaseService = {
     const validItems = (data || []).filter(item => Array.isArray(item.inspections) && item.inspections.length > 0);
 
     return validItems.map(mapInventoryRow);
+  },
+
+  async searchOpOrProduct(searchTerm: string): Promise<AutocompleteItem[]> {
+    if (!searchTerm || searchTerm.trim().length < 2) return [];
+
+    const raw = searchTerm.trim();
+    const formatted = formatOP(raw);
+    const upperRaw = raw.toUpperCase();
+    const upperFormatted = formatted.toUpperCase();
+
+    const resultsMap = new Map<string, AutocompleteItem>();
+
+    const addItem = (item: AutocompleteItem) => {
+      const opNorm = (item.originOP || '').trim().toUpperCase();
+      const descNorm = (item.description || '').trim().toUpperCase();
+      const lotNorm = (item.lot || '').trim().toUpperCase();
+      const key = `${opNorm}_${descNorm}_${lotNorm}_${item.contentType}`;
+      if (!resultsMap.has(key)) {
+        resultsMap.set(key, item);
+      }
+    };
+
+    if (!isSupabaseConfigured) {
+      const inv: any[] = localStorageHelper.get('inventory') || [];
+      const hist: any[] = localStorageHelper.get('history') || [];
+
+      // Search in inventory
+      inv.forEach(row => {
+        const op = (row.origin_op || row.originOP || '').toUpperCase();
+        const desc = (row.description || '').toUpperCase();
+        const lot = (row.lot || '').toUpperCase();
+
+        if (
+          op.includes(upperRaw) || op.includes(upperFormatted) ||
+          desc.includes(upperRaw) || lot.includes(upperRaw)
+        ) {
+          const insp = row.inspections?.[0];
+          const cType = insp?.contentType ? parseSlotContent(insp.contentType) : SlotContent.FINISHED_PRODUCT;
+          let totalUnits = 0;
+          if (insp) {
+            totalUnits = (insp.bottles || 0) + (insp.boxes || 0) + (insp.caps || 0) + (insp.cradles || 0);
+            if (insp.others && Array.isArray(insp.others)) {
+              totalUnits += insp.others.reduce((acc: number, cur: any) => acc + (Number(cur.quantity) || 0), 0);
+            }
+          }
+          addItem({
+            originOP: row.origin_op || row.originOP || '',
+            description: row.description || '',
+            lot: row.lot || '',
+            contentType: cType,
+            units: totalUnits > 0 ? totalUnits : (row.pallets || 1),
+            supplyDetails: cType === SlotContent.SUPPLIES && insp ? {
+              frascos: insp.bottles || 0,
+              tampas: insp.caps || 0,
+              caixas: insp.boxes || 0,
+              bercos: insp.cradles || 0,
+              extras: (insp.others || []).map((o: any) => ({ id: Math.random().toString(), name: o.name, quantity: Number(o.quantity) || 0 }))
+            } : undefined,
+            reworkObs: insp?.reworkObs || '',
+            source: 'inventory'
+          });
+        }
+      });
+
+      // Search in history
+      hist.forEach(h => {
+        const op = (h.op || h.origin_op || '').toUpperCase();
+        const desc = (h.description || '').toUpperCase();
+        const lot = (h.lot || '').toUpperCase();
+
+        if (
+          op.includes(upperRaw) || op.includes(upperFormatted) ||
+          desc.includes(upperRaw) || lot.includes(upperRaw)
+        ) {
+          const cType = parseSlotContent(h.pallet_type || h.palletType);
+          addItem({
+            originOP: h.op || h.origin_op || '',
+            description: h.description || '',
+            lot: h.lot || '',
+            contentType: cType,
+            source: 'history'
+          });
+        }
+      });
+
+      return Array.from(resultsMap.values()).slice(0, 15);
+    }
+
+    try {
+      // 1. Search in inventory table
+      const termFragmentRaw = `%${raw}%`;
+      const termFragmentFmt = `%${formatted}%`;
+      
+      const invQuery = supabase
+        .from('inventory')
+        .select('origin_op, description, lot, pallets, inspections')
+        .or(`origin_op.ilike.${termFragmentRaw},origin_op.ilike.${termFragmentFmt},description.ilike.${termFragmentRaw},lot.ilike.${termFragmentRaw}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // 2. Search in history table
+      const histQuery = supabase
+        .from('history')
+        .select('op, description, lot, pallet_type, details')
+        .or(`op.ilike.${termFragmentRaw},op.ilike.${termFragmentFmt},description.ilike.${termFragmentRaw},lot.ilike.${termFragmentRaw}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const [invRes, histRes] = await Promise.all([invQuery, histQuery]);
+
+      if (invRes.data) {
+        invRes.data.forEach((row: any) => {
+          if (!row.origin_op && !row.description) return;
+          const insp = Array.isArray(row.inspections) && row.inspections.length > 0 ? row.inspections[0] : null;
+          const cType = insp?.contentType ? parseSlotContent(insp.contentType) : SlotContent.FINISHED_PRODUCT;
+          
+          let totalUnits = 0;
+          if (insp) {
+            totalUnits = (insp.bottles || 0) + (insp.boxes || 0) + (insp.caps || 0) + (insp.cradles || 0);
+            if (insp.others && Array.isArray(insp.others)) {
+              totalUnits += insp.others.reduce((acc: number, cur: any) => acc + (Number(cur.quantity) || 0), 0);
+            }
+          }
+
+          addItem({
+            originOP: row.origin_op || '',
+            description: row.description || '',
+            lot: row.lot || '',
+            contentType: cType,
+            units: totalUnits > 0 ? totalUnits : (row.pallets || 1),
+            supplyDetails: cType === SlotContent.SUPPLIES && insp ? {
+              frascos: insp.bottles || 0,
+              tampas: insp.caps || 0,
+              caixas: insp.boxes || 0,
+              bercos: insp.cradles || 0,
+              extras: (insp.others || []).map((o: any) => ({ id: Math.random().toString(), name: o.name, quantity: Number(o.quantity) || 0 }))
+            } : undefined,
+            reworkObs: insp?.reworkObs || '',
+            source: 'inventory'
+          });
+        });
+      }
+
+      if (histRes.data) {
+        histRes.data.forEach((h: any) => {
+          if (!h.op && !h.description) return;
+          const cType = parseSlotContent(h.pallet_type);
+          addItem({
+            originOP: h.op || '',
+            description: h.description || '',
+            lot: h.lot || '',
+            contentType: cType,
+            source: 'history'
+          });
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar autocomplete:', e);
+    }
+
+    return Array.from(resultsMap.values()).slice(0, 15);
   },
 
   async getGlobalStats(): Promise<DashboardStats> {

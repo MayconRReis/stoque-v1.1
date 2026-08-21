@@ -183,6 +183,45 @@ export const translateSlotContent = (content: SlotContent): string => {
   return translations[content] || content;
 };
 
+export const parseSlotContent = (value: string | undefined | null): SlotContent => {
+  if (!value) return SlotContent.FINISHED_PRODUCT;
+  const upper = value.toUpperCase().trim();
+  if (Object.values(SlotContent).includes(upper as SlotContent)) {
+    return upper as SlotContent;
+  }
+  if (upper.includes('FRASCO') || upper.includes('BOTTLE')) return SlotContent.BOTTLES;
+  if (upper.includes('INSUMO') || upper.includes('SUPPL')) return SlotContent.SUPPLIES;
+  if (upper.includes('PRODUTO ACABADO') || upper.includes('ACABADO') || upper.includes('FINISHED')) return SlotContent.FINISHED_PRODUCT;
+  if (upper.includes('RETORNO') || upper.includes('RETURN')) return SlotContent.RETURN;
+  if (upper.includes('SUJO') || upper.includes('CONTAINER_SJ')) return SlotContent.CONTAINER_SJ;
+  if (upper.includes('LIMPO') || upper.includes('CONTAINER_LP')) return SlotContent.CONTAINER_LP;
+  if (upper.includes('COM PRODUTO') || upper.includes('CONTAINER_CP')) return SlotContent.CONTAINER_CP;
+  if (upper.includes('USO') || upper.includes('CONSUMO')) return SlotContent.USE_CONSUMPTION;
+  if (upper.includes('RETRABALHO') || upper.includes('REWORK')) return SlotContent.REWORK;
+  if (upper.includes('REPROCESSO') || upper.includes('REPROCESS')) return SlotContent.REPROCESS;
+  if (upper.includes('ROTATIVO') || upper.includes('ROTATIVE')) return SlotContent.ROTATIVE;
+  if (upper.includes('DIVERSOS') || upper.includes('MISCELLANEOUS')) return SlotContent.MISCELLANEOUS;
+  if (upper.includes('DESCARTE') || upper.includes('DISCARD')) return SlotContent.DISCARD;
+  return SlotContent.FINISHED_PRODUCT;
+};
+
+export interface AutocompleteItem {
+  originOP: string;
+  description: string;
+  lot: string;
+  contentType: SlotContent;
+  units?: number;
+  supplyDetails?: {
+    frascos: number;
+    tampas: number;
+    caixas: number;
+    bercos: number;
+    extras: { id: string; name: string; quantity: number }[];
+  };
+  reworkObs?: string;
+  source: 'inventory' | 'history';
+}
+
 export const getContentTypeColor = (content: SlotContent): string => {
   const colors: Record<SlotContent, string> = {
     [SlotContent.EMPTY]: 'text-slate-600 dark:text-slate-400',

@@ -21,10 +21,12 @@ import {
   RefreshCw,
   MapPin,
   ChevronDown,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
+import { supabaseService } from '../services/supabaseService';
 
 interface EditPalletModalProps {
   isOpen: boolean;
@@ -126,18 +128,38 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
 
   // Auto-fill based on OP
   useEffect(() => {
-    if (op.trim().length >= 3 && history) {
-      const formattedOP = formatOP(op);
-      const existingInHistory = history.find(entry => formatOP(entry.op) === formattedOP);
+    if (op.trim().length >= 3) {
+      const rawOP = op.trim();
+      const formattedOP = formatOP(rawOP);
 
-      if (existingInHistory) {
-        // Only auto-fill if the current description is empty or much smaller
-        if (!description || description.length < 5) {
-          setDescription(existingInHistory.description);
-          setLot(existingInHistory.lot || lot);
-          setIsAutoFilled(true);
-        }
+      // Check local history first
+      const existingInHistory = history?.find(entry => formatOP(entry.op) === formattedOP);
+      if (existingInHistory && (!description || description.length < 3)) {
+        setDescription(existingInHistory.description || '');
+        setLot(existingInHistory.lot || lot);
+        setIsAutoFilled(true);
+        return;
       }
+
+      // Also search database via supabaseService
+      const timeout = setTimeout(async () => {
+        try {
+          const results = await supabaseService.searchOpOrProduct(rawOP);
+          const match = results.find(r => formatOP(r.originOP) === formattedOP || r.originOP.toUpperCase() === rawOP.toUpperCase());
+          if (match && (!description || description.length < 3)) {
+            setDescription(match.description || '');
+            setLot(match.lot || lot);
+            if (match.contentType) {
+              setContentType(match.contentType);
+            }
+            setIsAutoFilled(true);
+          }
+        } catch (e) {
+          console.warn('Erro ao buscar OP no EditPalletModal:', e);
+        }
+      }, 300);
+
+      return () => clearTimeout(timeout);
     }
   }, [op, history]);
 
