@@ -1292,9 +1292,11 @@ const App: React.FC = () => {
 
   const handleManualAdd = async (palletData: any) => {
     try {
-      const { description, op, lot, palletsCount, units, contentType, assignedSlot } = palletData;
+      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs } = palletData;
       
-      const unitsPerPallet = palletsCount > 0 ? units / palletsCount : 0;
+      const count = palletsCount || 1;
+      const totalUnits = Number(units) || 0;
+      const unitsPerPallet = count > 0 ? totalUnits / count : 0;
 
       const newRow: SheetRow = {
         id: `ROW-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -1302,19 +1304,42 @@ const App: React.FC = () => {
         originOP: op,
         description,
         lot,
-        pallets: palletsCount,
+        pallets: count,
         status: StockStatus.INSPECTED,
         date: new Date().toLocaleDateString('pt-BR'),
-        inspections: Array(palletsCount).fill(null).map(() => ({
-           bottles: contentType === SlotContent.BOTTLES ? unitsPerPallet : 0, 
-           caps: 0, 
-           boxes: contentType === SlotContent.FINISHED_PRODUCT ? unitsPerPallet : 0, 
-           cradles: 0,
-           others: [],
-           contentType,
-           assignedSlot,
-           isConsolidated: false
-        })),
+        inspections: Array(count).fill(null).map(() => {
+          let bottles = 0;
+          let caps = 0;
+          let boxes = 0;
+          let cradles = 0;
+          let others: { name: string; quantity: number }[] = [];
+
+          if (contentType === SlotContent.SUPPLIES && supplyDetails) {
+            bottles = supplyDetails.frascos || 0;
+            caps = supplyDetails.tampas || 0;
+            boxes = supplyDetails.caixas || 0;
+            cradles = supplyDetails.bercos || 0;
+            others = supplyDetails.extras || [];
+          } else if (contentType === SlotContent.BOTTLES) {
+            bottles = unitsPerPallet;
+          } else if (contentType === SlotContent.FINISHED_PRODUCT) {
+            boxes = unitsPerPallet;
+          } else {
+            boxes = unitsPerPallet;
+          }
+
+          return {
+            bottles,
+            caps,
+            boxes,
+            cradles,
+            others,
+            contentType,
+            assignedSlot,
+            isConsolidated: false,
+            ...(reworkObs ? { reworkObs } : {})
+          };
+        }),
         operatorName: user?.name
       };
       
@@ -1335,7 +1360,7 @@ const App: React.FC = () => {
       setData(prev => [newRow, ...prev]);
 
       await addToHistory({
-        ...createHistoryEntry(HistoryType.ENTRY, newRow, `Entrada manual: ${quantity} pallet(s)`, 1),
+        ...createHistoryEntry(HistoryType.ENTRY, newRow, `Entrada manual: ${count} pallet(s)`, 1),
         slot: assignedSlot
       });
       
@@ -1456,12 +1481,17 @@ const App: React.FC = () => {
       
       const updatedInspections = [...(row.inspections || [])];
       if (updatedInspections[idx]) {
+        const isSuppliesType = updatedData.contentType === SlotContent.SUPPLIES;
+        const isBottlesType = updatedData.contentType === SlotContent.BOTTLES;
+
         updatedInspections[idx] = {
           ...updatedInspections[idx],
           contentType: updatedData.contentType,
           assignedSlot: updatedData.assignedSlot || updatedInspections[idx].assignedSlot,
           withoutSeal: updatedData.withoutSeal !== undefined ? updatedData.withoutSeal : updatedInspections[idx].withoutSeal,
-          ...(updatedData.supplyDetails || {})
+          ...(isSuppliesType && updatedData.supplyDetails ? updatedData.supplyDetails : {}),
+          ...(isBottlesType ? { bottles: updatedData.quantity, boxes: 0 } : {}),
+          ...(!isSuppliesType && !isBottlesType ? { boxes: updatedData.quantity, bottles: 0 } : {})
         };
       }
 

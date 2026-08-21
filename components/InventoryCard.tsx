@@ -73,14 +73,17 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
   };
 
   const isSupplies = insp.contentType === SlotContent.SUPPLIES;
-  const isBottles = insp.contentType === SlotContent.BOTTLES;
   const baseColor = getBaseColor(insp.contentType);
   
-  const qtyValue = isSupplies 
-    ? (insp.bottles || insp.boxes || insp.caps || insp.cradles || 0)
-    : (isBottles ? (insp.bottles || item.pallets) : item.pallets);
-  
-  const qtyLabel = (isSupplies || isBottles) ? 'Qtd (UN)' : 'Qtd (PL)';
+  const totalUnits = (insp.bottles || 0) + 
+                     (insp.boxes || 0) + 
+                     (insp.caps || 0) + 
+                     (insp.cradles || 0) + 
+                     (insp.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0);
+
+  const hasUnits = totalUnits > 0;
+  const qtyValue = hasUnits ? totalUnits : (item.pallets || 1);
+  const qtyLabel = hasUnits ? 'Qtd (UN)' : 'Qtd (PL)';
 
   return (
     <motion.div 

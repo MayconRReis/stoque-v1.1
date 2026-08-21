@@ -151,7 +151,16 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                {inspection.contentType !== SlotContent.CONTAINER_SJ && inspection.contentType !== SlotContent.CONTAINER_LP && (
                  <div className="flex justify-between items-center pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Quantidade Total</p>
-                    <span className="text-lg font-black text-green-400 font-mono">{row.pallets}</span>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-green-400 font-mono">
+                        {((inspection.bottles || 0) + (inspection.boxes || 0) + (inspection.caps || 0) + (inspection.cradles || 0) + (inspection.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0)) > 0
+                          ? `${(inspection.bottles || 0) + (inspection.boxes || 0) + (inspection.caps || 0) + (inspection.cradles || 0) + (inspection.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0)} UN`
+                          : `${row.pallets} PL`}
+                      </span>
+                      {((inspection.bottles || 0) + (inspection.boxes || 0) + (inspection.caps || 0) + (inspection.cradles || 0) + (inspection.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0)) > 0 && (
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{row.pallets} Pallet(s)</p>
+                      )}
+                    </div>
                  </div>
                )}
             </div>

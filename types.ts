@@ -106,6 +106,8 @@ export interface InspectionData {
   others?: { name: string; quantity: number }[];
   shipmentId?: string;
   withoutSeal?: boolean;
+  isConsolidated?: boolean;
+  reworkObs?: string;
 }
 
 export interface SheetRow {

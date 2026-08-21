@@ -104,7 +104,13 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       setDescription(pallet.row.description);
       setOp(pallet.row.originOP);
       setLot(pallet.row.lot);
-      setQuantity(pallet.row.pallets);
+      const totalUnits = (pallet.inspection.bottles || 0) + 
+                         (pallet.inspection.boxes || 0) + 
+                         (pallet.inspection.caps || 0) + 
+                         (pallet.inspection.cradles || 0) + 
+                         (pallet.inspection.others?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0);
+
+      setQuantity(totalUnits > 0 ? totalUnits : pallet.row.pallets);
       setContentType(pallet.inspection.contentType || SlotContent.BOTTLES);
       setAssignedSlot(pallet.inspection.assignedSlot || '');
       
@@ -221,8 +227,12 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
                   <p className="text-xs font-black text-amber-500 font-mono italic">{pallet.row.lot}</p>
                 </div>
                 <div>
-                  <p className="text-[7px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Qtd Pallets</p>
-                  <p className="text-xs font-black text-emerald-500 font-mono italic">{pallet.row.pallets}</p>
+                  <p className="text-[7px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">
+                    {((pallet.inspection.bottles || 0) + (pallet.inspection.boxes || 0) + (pallet.inspection.caps || 0) + (pallet.inspection.cradles || 0)) > 0 ? 'Qtd Unidades' : 'Qtd Pallets'}
+                  </p>
+                  <p className="text-xs font-black text-emerald-500 font-mono italic">
+                    {((pallet.inspection.bottles || 0) + (pallet.inspection.boxes || 0) + (pallet.inspection.caps || 0) + (pallet.inspection.cradles || 0)) || pallet.row.pallets}
+                  </p>
                 </div>
               </div>
             </div>
