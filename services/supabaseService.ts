@@ -164,6 +164,20 @@ const mapInventoryRow = (item: any): SheetRow => ({
   parent_group_id: item.parent_group_id
 });
 
+export const isDedicatedFinishedProductSlot = (slotId: string): boolean => {
+  if (!slotId) return false;
+  const parts = slotId.split('.');
+  if (parts.length !== 3) return false;
+  const rack = parts[0].toUpperCase();
+  const level = parseInt(parts[1], 10);
+  const position = parseInt(parts[2], 10);
+
+  if (level !== 1) return false;
+  if (rack === 'B' && position >= 5 && position <= 16) return true;
+  if (rack === 'C' && position >= 3 && position <= 14) return true;
+  return false;
+};
+
 export const supabaseService = {
   async consolidatePallets(childIds: string[], parentId: string, historyId: string, userId: string | null, userName: string): Promise<any> {
     if (!isSupabaseConfigured) {
@@ -861,7 +875,9 @@ export const supabaseService = {
 
       const generalSlots = allSlots.filter((s: any) => s.id?.startsWith('A') || s.id?.startsWith('B') || s.id?.startsWith('C') || s.id?.startsWith('D'));
       const totalGeneral = generalSlots.length > 0 ? generalSlots.length : 198;
-      const occupiedGeneralPhysical = generalSlots.filter((s: any) => s.status && s.status !== 'EMPTY' && s.status !== 'empty').length;
+      const occupiedGeneralPhysical = generalSlots.filter((s: any) => 
+        (s.status && s.status !== 'EMPTY' && s.status !== 'empty') || isDedicatedFinishedProductSlot(s.id)
+      ).length;
 
       const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
       const movements24h = history.filter((h: any) => new Date(h.created_at || h.timestamp).getTime() >= oneDayAgo).length;
@@ -938,7 +954,9 @@ export const supabaseService = {
       const generalSlots = allSlots.filter(s => s.id.startsWith('A') || s.id.startsWith('B') || s.id.startsWith('C') || s.id.startsWith('D'));
 
       const totalGeneral = generalSlots.length > 0 ? generalSlots.length : 198;
-      const occupiedGeneralPhysical = generalSlots.filter(s => s.status !== 'EMPTY' && s.status !== 'empty').length;
+      const occupiedGeneralPhysical = generalSlots.filter(s => 
+        (s.status && s.status !== 'EMPTY' && s.status !== 'empty') || isDedicatedFinishedProductSlot(s.id)
+      ).length;
       
       let totalBottles = 0;
       let waitingPallets = 0;
@@ -2256,10 +2274,17 @@ export const supabaseService = {
       .channel('shipment-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
       .subscribe();
+  },
+  subscribeToHistory(callback: (payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    return supabase
+      .channel('history-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'history' }, callback)
+      .subscribe();
   }
 };
 
-function mapHistoryRow(entry: any): HistoryEntry {
+export function mapHistoryRow(entry: any): HistoryEntry {
   return {
     id: entry.id,
     type: entry.type as HistoryType,

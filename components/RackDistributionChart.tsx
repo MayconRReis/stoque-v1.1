@@ -1,6 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { WarehouseSlot, SlotContent } from '../types';
+import { isDedicatedFinishedProductSlot } from '../services/supabaseService';
 
 interface RackDistributionChartProps {
   slots: WarehouseSlot[];
@@ -11,7 +12,9 @@ const RackDistributionChart: React.FC<RackDistributionChartProps> = ({ slots, wa
   const rackData = useMemo(() => {
     return (['A', 'B', 'C', 'D'] as const).map(rack => {
       const rackSlots = slots.filter(s => s.rack === rack);
-      const occupied = rackSlots.filter(s => s.status && s.status !== SlotContent.EMPTY).length;
+      const occupied = rackSlots.filter(s => 
+        (s.status && s.status !== SlotContent.EMPTY) || isDedicatedFinishedProductSlot(s.id)
+      ).length;
       const totalCapacities: Record<string, number> = {
         A: 48, B: 48, C: 48,
         D: 54,

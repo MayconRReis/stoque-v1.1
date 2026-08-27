@@ -18,7 +18,7 @@ import {
   ArrowLeftRight, 
   History, 
   FileUp, 
-  ClipboardCheck, Bell, 
+  ClipboardCheck, Bell, BellRing, BellOff,
   LogOut, 
   Menu, 
   X, 
@@ -79,7 +79,19 @@ import { MovementModal } from "./components/MovementModal";
 import { ShipmentPage } from './components/ShipmentPage';
 import { ShipmentModal } from './components/ShipmentModal';
 import { ShipmentDetailModal } from './components/ShipmentDetailModal';
-import { supabaseService } from './services/supabaseService';
+import { supabaseService, mapHistoryRow } from './services/supabaseService';
+import {
+  isBrowserNotificationSupported,
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  isBrowserNotificationsEnabled,
+  setBrowserNotificationsEnabled,
+  sendBrowserNotification,
+  notifyShipmentCreated,
+  notifyPendingApproval,
+  notifyPendingAnalysis,
+  notifyMovementDone
+} from './utils/browserNotifications';
 import { Login } from './components/Login';
 import { UserManager } from './components/UserManager';
 import ApprovalsPage from './components/ApprovalsPage';
@@ -239,6 +251,52 @@ const App: React.FC = () => {
   React.useEffect(() => {
     setDataRef.current = setData;
   }, [setData]);
+
+  // Browser Notifications State & Handlers
+  const [browserPerm, setBrowserPerm] = useState<NotificationPermission | 'unsupported'>(() => getBrowserNotificationPermission());
+  const [isBrowserNotifActive, setIsBrowserNotifActive] = useState<boolean>(() => isBrowserNotificationsEnabled());
+
+  const handleRequestBrowserPermission = useCallback(async () => {
+    const perm = await requestBrowserNotificationPermission();
+    setBrowserPerm(perm);
+    if (perm === 'granted') {
+      setIsBrowserNotifActive(true);
+      setBrowserNotificationsEnabled(true);
+      sendBrowserNotification({
+        title: '🔔 Notificações Ativadas!',
+        body: 'Você receberá avisos sobre novos carregamentos, aprovações, análises e movimentações mesmo com o navegador em segundo plano.',
+        tag: 'stoque-welcome-test'
+      });
+      showNotification('Notificações no navegador ativadas com sucesso!');
+    } else if (perm === 'denied') {
+      setIsBrowserNotifActive(false);
+      showNotification('Notificações bloqueadas pelo navegador. Habilite nas permissões do site.', 'info');
+    }
+  }, [showNotification]);
+
+  const handleToggleBrowserNotif = useCallback((enabled: boolean) => {
+    setBrowserNotificationsEnabled(enabled);
+    setIsBrowserNotifActive(enabled);
+    if (enabled && browserPerm !== 'granted') {
+      handleRequestBrowserPermission();
+    } else if (enabled) {
+      showNotification('Notificações no navegador ativadas');
+    } else {
+      showNotification('Notificações no navegador desativadas', 'info');
+    }
+  }, [browserPerm, handleRequestBrowserPermission, showNotification]);
+
+  const handleTestBrowserNotification = useCallback(() => {
+    if (browserPerm !== 'granted') {
+      handleRequestBrowserPermission();
+      return;
+    }
+    sendBrowserNotification({
+      title: '📦 Stoque+ Notificação Ativa',
+      body: 'Teste realizado com sucesso! Você continuará sendo notificado em segundo plano.',
+      tag: `test-${Date.now()}`
+    });
+  }, [browserPerm, handleRequestBrowserPermission]);
 
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
@@ -496,6 +554,7 @@ const App: React.FC = () => {
         if (newItem.status === 'PENDING') {
           setPendingRows(prev => [newItem, ...prev]);
           showNotification('Novo pallet aguardando análise', 'info');
+          notifyPendingAnalysis(payload.new, () => navigateToTab('analysis'));
         }
       } else if (payload.eventType === 'UPDATE') {
         const updatedItem = mapInventoryItem(payload.new);
@@ -519,6 +578,7 @@ const App: React.FC = () => {
         setPendingApprovalsCount(prev => prev + 1);
         if (user?.role === 'admin') {
           showNotification('Nova solicitação de aprovação', 'info');
+          notifyPendingApproval(payload.new, () => navigateToTab('approvals'));
         }
       } else if (payload.eventType === 'UPDATE') {
         if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
@@ -549,6 +609,18 @@ const App: React.FC = () => {
       supabaseService.getShipments().then(setShipments);
       if (payload && payload.eventType === 'INSERT' && payload.new.status === 'OPEN') {
         showNotification('Novo carregamento criado', 'info');
+        notifyShipmentCreated(payload.new, () => navigateToTab('shipments'));
+      }
+    });
+
+    const historyChannel = supabaseService.subscribeToHistory((payload) => {
+      if (payload && payload.eventType === 'INSERT') {
+        const newHist = mapHistoryRow(payload.new);
+        setHistory(prev => {
+          if (prev.some(h => h.id === newHist.id)) return prev;
+          return [newHist, ...prev];
+        });
+        notifyMovementDone(newHist, () => navigateToTab('history'));
       }
     });
 
@@ -557,6 +629,7 @@ const App: React.FC = () => {
       editRequestsChannel.unsubscribe();
       slotsChannel.unsubscribe();
       shipmentsChannel.unsubscribe();
+      historyChannel.unsubscribe();
     };
   }, [user, isPublicView]);
 
@@ -2257,17 +2330,20 @@ const App: React.FC = () => {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden"
+                        className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden"
                       >
                         <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
-                          <h3 className="font-bold text-slate-800 dark:text-white text-sm">Notificações</h3>
+                          <h3 className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-2">
+                            <Bell className="w-4 h-4 text-blue-500" />
+                            Notificações
+                          </h3>
                           {totalAppNotifications > 0 && (
                             <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
                               {totalAppNotifications}
                             </span>
                           )}
                         </div>
-                        <div className="max-h-[60vh] overflow-y-auto relative z-50">
+                        <div className="max-h-[48vh] overflow-y-auto relative z-50">
                           {appNotifications.length > 0 ? (
                             <div className="p-2 space-y-1">
                               {appNotifications.map((n) => (
@@ -2286,17 +2362,86 @@ const App: React.FC = () => {
                                   <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                                     <n.icon className="w-5 h-5" />
                                   </div>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-semibold text-slate-800 dark:text-white">{n.label}</p>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{n.label}</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.count} {n.count === 1 ? 'item pendente' : 'itens pendentes'}</p>
                                   </div>
                                 </button>
                               ))}
                             </div>
                           ) : (
-                            <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-sm flex flex-col items-center">
-                              <Bell className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2" />
-                              <p>Nenhuma notificação</p>
+                            <div className="p-5 text-center text-slate-500 dark:text-slate-400 text-xs flex flex-col items-center">
+                              <Bell className="w-7 h-7 text-slate-300 dark:text-slate-700 mb-1.5" />
+                              <p>Nenhuma pendência no momento</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Browser Desktop Notifications Card */}
+                        <div className="border-t border-slate-100 dark:border-slate-800 p-2.5 bg-slate-50/60 dark:bg-slate-900/80">
+                          {browserPerm === 'granted' ? (
+                            <div className="p-2.5 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                    <BellRing className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-none">Alertas no Navegador</p>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                                      {isBrowserNotifActive ? 'Ativo em 2º plano' : 'Pausado'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    onClick={handleTestBrowserNotification}
+                                    className="px-2 py-1 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                    title="Enviar notificação de teste"
+                                  >
+                                    Testar
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleBrowserNotif(!isBrowserNotifActive)}
+                                    className={`w-9 h-5 rounded-full transition-colors p-0.5 flex items-center ${isBrowserNotifActive ? 'bg-blue-600 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'}`}
+                                    title={isBrowserNotifActive ? 'Desativar notificações' : 'Ativar notificações'}
+                                  >
+                                    <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                                Notifica carregamentos, aprovações, análises e movimentações mesmo fora do app.
+                              </p>
+                            </div>
+                          ) : browserPerm === 'denied' ? (
+                            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                              <div className="text-[11px] leading-tight">
+                                <span className="font-bold block">Notificações bloqueadas</span>
+                                Habilite permissões no navegador para receber avisos em segundo plano.
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl space-y-2">
+                              <div className="flex items-start gap-2">
+                                <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                  <BellRing className="w-3.5 h-3.5 animate-pulse" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-none">Notificações no Navegador</p>
+                                  <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight mt-1">
+                                    Receba avisos de carregamento, aprovações, análise e movimentações em outras abas.
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleRequestBrowserPermission}
+                                className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <Bell className="w-3.5 h-3.5" />
+                                Ativar no Navegador
+                              </button>
                             </div>
                           )}
                         </div>
