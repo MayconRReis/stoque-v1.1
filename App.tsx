@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import Papa from 'papaparse';
-import { disableSupabase } from './lib/supabase';
+import { disableSupabase, isFetchOrNetworkError } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
 import { useTheme } from './hooks/useTheme';
 import { useAuth } from './hooks/useAuth';
@@ -473,7 +473,7 @@ const App: React.FC = () => {
           setSlots(slotData);
         }
       } catch (error: any) {
-        if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+        if (isFetchOrNetworkError(error)) {
           console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
           disableSupabase();
           setTimeout(() => loadData(), 100);
