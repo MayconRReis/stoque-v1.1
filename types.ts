@@ -58,6 +58,7 @@ export interface Shipment {
   scheduledDate: string;
   operatorName?: string;
   closedAt?: string;
+  obs?: string;
 }
 
 export interface HistoryEntry {
@@ -260,3 +261,59 @@ export interface InventoryEditRequest {
   reviewer_name?: string;
   product_description?: string;
 }
+
+export const isPendingSlot = (slot?: string | null): boolean => {
+  if (!slot) return true;
+  const upper = slot.trim().toUpperCase();
+  return (
+    upper === '' ||
+    upper === '-' ||
+    upper === 'N/A' ||
+    upper === 'SEM VAGA' ||
+    upper === 'AG VAGA' ||
+    upper === 'AG. VAGA' ||
+    upper === 'AGUARDANDO' ||
+    upper === 'AGUARDANDO VAGA' ||
+    upper.includes('AGUARDANDO')
+  );
+};
+
+export const compareWarehouseSlots = (slotA?: string | null, slotB?: string | null): number => {
+  const isInvalidA = isPendingSlot(slotA);
+  const isInvalidB = isPendingSlot(slotB);
+
+  if (isInvalidA && isInvalidB) return 0;
+  if (isInvalidA) return 1; // Itens sem vaga vão para o final
+  if (isInvalidB) return -1;
+
+  const parseSlot = (s: string) => {
+    const clean = s.trim().toUpperCase();
+    const match = clean.match(/^([A-Z]+)[.\-_/\s]*(\d+)(?:[.\-_/\s]*(\d+))?/);
+    if (match) {
+      return {
+        rack: match[1],
+        level: parseInt(match[2], 10),
+        position: match[3] !== undefined ? parseInt(match[3], 10) : 0,
+        valid: true
+      };
+    }
+    return { rack: clean, level: 0, position: 0, valid: false };
+  };
+
+  const parsedA = parseSlot(slotA!);
+  const parsedB = parseSlot(slotB!);
+
+  if (parsedA.valid && parsedB.valid) {
+    if (parsedA.rack !== parsedB.rack) {
+      return parsedA.rack.localeCompare(parsedB.rack);
+    }
+    if (parsedA.level !== parsedB.level) {
+      return parsedA.level - parsedB.level;
+    }
+    if (parsedA.position !== parsedB.position) {
+      return parsedA.position - parsedB.position;
+    }
+  }
+
+  return (slotA || '').localeCompare(slotB || '', undefined, { numeric: true, sensitivity: 'base' });
+};

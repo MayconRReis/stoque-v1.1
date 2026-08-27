@@ -1819,7 +1819,8 @@ export const supabaseService = {
       createdAt: s.created_at,
       scheduledDate: s.scheduled_date,
       operatorName: s.operator_name,
-      closedAt: s.closed_at
+      closedAt: s.closed_at,
+      obs: s.obs || s.notes || (localStorageHelper.get('shipments').find((ls: any) => ls.id === s.id)?.obs) || ''
     }));
     localStorageHelper.save('shipments', shipments);
     return shipments;
@@ -1827,19 +1828,29 @@ export const supabaseService = {
 
   async saveShipment(shipment: Shipment) {
     if (isSupabaseConfigured) {
+      // First attempt with obs
+      const payload: any = {
+        id: shipment.id,
+        type: shipment.type,
+        status: shipment.status,
+        created_at: shipment.createdAt,
+        scheduled_date: shipment.scheduledDate,
+        operator_name: shipment.operatorName,
+        closed_at: shipment.closedAt
+      };
+      if (shipment.obs !== undefined) {
+        payload.obs = shipment.obs;
+      }
       const { error } = await supabase
         .from('shipments')
-        .upsert({
-          id: shipment.id,
-          type: shipment.type,
-          status: shipment.status,
-          created_at: shipment.createdAt,
-          scheduled_date: shipment.scheduledDate,
-          operator_name: shipment.operatorName,
-          closed_at: shipment.closedAt
-        });
+        .upsert(payload);
       
-      if (error) console.error('Supabase saveShipment error:', error);
+      if (error) {
+        console.warn('Supabase saveShipment with obs error, retrying without obs field:', error);
+        // Fallback without obs if column doesn't exist in remote schema
+        delete payload.obs;
+        await supabase.from('shipments').upsert(payload);
+      }
     }
     localStorageHelper.update('shipments', shipment);
   },

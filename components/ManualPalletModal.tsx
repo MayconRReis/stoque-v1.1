@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { WarehouseSlot, SlotContent, SheetRow, translateSlotContent, getContentTypeColor, parseSlotContent } from '../types';
-import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare } from 'lucide-react';
+import { WarehouseSlot, SlotContent, SheetRow, translateSlotContent, getContentTypeColor, parseSlotContent, Shipment, ShipmentType } from '../types';
+import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabaseService } from '../services/supabaseService';
 import { formatOP } from '../lib/formatters';
@@ -18,14 +18,24 @@ interface ManualPalletModalProps {
   onClose: () => void;
   availableSlots: WarehouseSlot[];
   onSave: (data: any) => Promise<void>;
+  shipmentContext?: Shipment | null;
 }
 
-export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, onClose, availableSlots, onSave, inventoryData, historyData }) => {
+export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  availableSlots, 
+  onSave, 
+  inventoryData, 
+  historyData,
+  shipmentContext
+}) => {
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
   const [contentType, setContentType] = useState<SlotContent>(SlotContent.FINISHED_PRODUCT);
   const [units, setUnits] = useState(0);
+  const [palletsCount, setPalletsCount] = useState(1);
   const [assignedSlot, setAssignedSlot] = useState('AGUARDANDO');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -51,6 +61,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
     setLot('');
     setContentType(SlotContent.FINISHED_PRODUCT);
     setUnits(0);
+    setPalletsCount(1);
     setAssignedSlot('AGUARDANDO');
     setSupplyFrascos(0);
     setSupplyTampas(0);
@@ -181,7 +192,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
         description,
         op: formatOP(op),
         lot,
-        palletsCount: 1,
+        palletsCount: Math.max(1, Number(palletsCount) || 1),
         units,
         contentType,
         assignedSlot,
@@ -220,17 +231,19 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
 
   if (!isOpen) return null;
 
-  const inputCls = "w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-blue-500 outline-none placeholder:text-slate-700 transition-colors";
+  const isShipmentMode = !!shipmentContext;
+  const accentColor = isShipmentMode ? "fuchsia" : "blue";
+  const inputCls = "w-full bg-[#0B1120] border border-slate-800 rounded-xl px-4 py-3.5 text-white font-bold text-lg focus:border-fuchsia-500 outline-none placeholder:text-slate-700 transition-colors";
   const labelCls = "text-[10px] font-black text-slate-300 uppercase tracking-widest";
   const subLabelCls = "text-[9px] text-slate-500 italic";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/85 backdrop-blur-md"
         onClick={handleClose}
       />
       <motion.div
@@ -239,20 +252,31 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="relative w-full max-w-2xl bg-[#0f1522] rounded-[2rem] border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
-        {/* Left blue accent line */}
-        <div className="absolute top-8 left-0 w-1 h-16 bg-blue-500 rounded-r-md"></div>
+        {/* Left accent line */}
+        <div className={`absolute top-8 left-0 w-1 h-16 ${isShipmentMode ? 'bg-gradient-to-b from-fuchsia-500 to-pink-500' : 'bg-blue-500'} rounded-r-md`}></div>
 
         {/* Header */}
         <div className="p-8 pb-6 flex justify-between items-start shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl border border-slate-700 flex items-center justify-center bg-[#0B1120]">
-              <Truck className="w-5 h-5 text-blue-500" />
+            <div className={`w-12 h-12 rounded-2xl border ${isShipmentMode ? 'border-fuchsia-500/30 bg-fuchsia-950/30 text-fuchsia-400' : 'border-slate-700 bg-[#0B1120] text-blue-500'} flex items-center justify-center`}>
+              <Truck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white italic tracking-tight leading-none mb-1">ENTRADA</h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-2xl font-black text-white italic tracking-tight leading-none">
+                  {isShipmentMode ? 'ENTRADA NO CARREGAMENTO' : 'ENTRADA'}
+                </h2>
+                {isShipmentMode && (
+                  <span className="text-[9px] font-black bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    Não Catalogado
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Fluxo Operacional GO</p>
+                <div className={`w-1.5 h-1.5 rounded-full ${isShipmentMode ? 'bg-fuchsia-500' : 'bg-blue-500'}`}></div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                  {isShipmentMode ? `Vincular direto ao Carregamento #${shipmentContext.id}` : 'Fluxo Operacional GO'}
+                </p>
               </div>
             </div>
           </div>
@@ -265,20 +289,20 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
         </div>
 
         {/* Form - scrollable */}
-        <div className="px-8 pb-8 space-y-5 overflow-y-auto flex-1">
+        <div className="px-8 pb-8 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
 
           {/* TIPO */}
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-0.5">
               <div className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-blue-400" />
-                <label className={labelCls}>Tipo</label>
+                <Package className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
+                <label className={labelCls}>Tipo de Pallet</label>
               </div>
               <span className={`text-[10px] font-black uppercase tracking-wider ${getContentTypeColor(contentType)}`}>
                 {translateSlotContent(contentType)}
               </span>
             </div>
-            <p className={subLabelCls}>O que é o pallet?</p>
+            <p className={subLabelCls}>Selecione a classificação do pallet</p>
             <div className="relative">
               <select
                 value={contentType}
@@ -309,7 +333,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
             {/* OP Input */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <ClipboardList className="w-3.5 h-3.5 text-blue-400" />
+                <ClipboardList className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
                 <label className={labelCls}>OP (Opcional)</label>
               </div>
               <p className={subLabelCls}>Ordem de Produção</p>
@@ -325,7 +349,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
             {/* Lote */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <Package className="w-3.5 h-3.5 text-blue-400" />
+                <Package className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
                 <label className={labelCls}>Lote (Opcional)</label>
               </div>
               <p className={subLabelCls}>Informar conforme etiqueta</p>
@@ -342,10 +366,10 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
           {/* NOME (Descrição) */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 mb-0.5">
-              <Info className="w-3.5 h-3.5 text-blue-400" />
-              <label className={labelCls}>Nome (Obrigatório)</label>
+              <Info className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
+              <label className={labelCls}>Nome / Descrição (Obrigatório)</label>
             </div>
-            <p className={subLabelCls}>Informar o nome do produto</p>
+            <p className={subLabelCls}>Informar a descrição do produto ou item</p>
             <input
               type="text"
               value={description}
@@ -355,20 +379,37 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
             />
           </div>
 
-          {/* QUANTIDADE UN */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
-              <label className={labelCls}>Qtd. Unidades</label>
+          {/* QUANTIDADE UN + QUANTIDADE PALLETS */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <FlaskConical className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
+                <label className={labelCls}>Qtd. Unidades</label>
+              </div>
+              <p className={subLabelCls}>Total de unidades/kg</p>
+              <input
+                type="number"
+                min="0"
+                value={units}
+                onChange={e => setUnits(Number(e.target.value))}
+                className={inputCls}
+              />
             </div>
-            <p className={subLabelCls}>Total de unidades/kg</p>
-            <input
-              type="number"
-              min="0"
-              value={units}
-              onChange={e => setUnits(Number(e.target.value))}
-              className={inputCls}
-            />
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Layers className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
+                <label className={labelCls}>Qtd. Pallets</label>
+              </div>
+              <p className={subLabelCls}>Pallets a gerar</p>
+              <input
+                type="number"
+                min="1"
+                value={palletsCount}
+                onChange={e => setPalletsCount(Math.max(1, Number(e.target.value)))}
+                className={inputCls}
+              />
+            </div>
           </div>
 
           {/* ─── CAMPOS DINÂMICOS: INSUMO ─── */}
@@ -536,10 +577,10 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({ isOpen, on
           <button
             onClick={handleSave}
             disabled={!description.trim() || isProcessing}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm uppercase tracking-wider transition-all"
+            className={`w-full ${isShipmentMode ? 'bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 shadow-fuchsia-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg text-sm uppercase tracking-wider transition-all active:scale-[0.99]`}
           >
             <Plus className="w-4 h-4" />
-            {isProcessing ? 'Adicionando...' : 'Adicionar Pallet'}
+            {isProcessing ? 'Adicionando...' : isShipmentMode ? 'Adicionar ao Carregamento' : 'Adicionar Pallet ao Estoque'}
           </button>
         </div>
 

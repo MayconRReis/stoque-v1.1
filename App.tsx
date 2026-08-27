@@ -1446,6 +1446,110 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAddUncatalogedPalletToShipment = async (palletData: any, shipmentId: string) => {
+    try {
+      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs } = palletData;
+      
+      const count = Math.max(1, Number(palletsCount) || 1);
+      const totalUnits = Number(units) || 0;
+      const unitsPerPallet = count > 0 ? totalUnits / count : 0;
+
+      const newRow: SheetRow = {
+        id: `ROW-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        loadingId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        originOP: op,
+        description,
+        lot,
+        pallets: count,
+        status: StockStatus.INSPECTED,
+        date: new Date().toLocaleDateString('pt-BR'),
+        inspections: Array(count).fill(null).map(() => {
+          let bottles = 0;
+          let caps = 0;
+          let boxes = 0;
+          let cradles = 0;
+          let others: { name: string; quantity: number }[] = [];
+
+          if (contentType === SlotContent.SUPPLIES && supplyDetails) {
+            bottles = supplyDetails.frascos || 0;
+            caps = supplyDetails.tampas || 0;
+            boxes = supplyDetails.caixas || 0;
+            cradles = supplyDetails.bercos || 0;
+            others = supplyDetails.extras || [];
+          } else if (contentType === SlotContent.BOTTLES) {
+            bottles = unitsPerPallet;
+          } else if (contentType === SlotContent.FINISHED_PRODUCT) {
+            boxes = unitsPerPallet;
+          } else {
+            boxes = unitsPerPallet;
+          }
+
+          return {
+            bottles,
+            caps,
+            boxes,
+            cradles,
+            others,
+            contentType,
+            assignedSlot,
+            shipmentId: shipmentId, // Linked directly to this shipment
+            isConsolidated: false,
+            ...(reworkObs ? { reworkObs } : {})
+          };
+        }),
+        operatorName: user?.name
+      };
+      
+      if (assignedSlot && assignedSlot !== 'AGUARDANDO') {
+         const targetSlot = slots.find(s => s.id === assignedSlot);
+         if (targetSlot) {
+            const updatedSlot = {
+              ...targetSlot,
+              status: contentType,
+              occupiedBy: description
+            };
+            await supabaseService.updateSlot(updatedSlot);
+            setSlots(prev => prev.map(s => s.id === assignedSlot ? updatedSlot : s));
+         }
+      }
+      
+      await supabaseService.saveInventoryItem(newRow);
+      setData(prev => [newRow, ...prev]);
+
+      await addToHistory({
+        ...createHistoryEntry(HistoryType.ENTRY, newRow, `Entrada não catalogada vinculada ao carregamento #${shipmentId}: ${count} pallet(s)`, 1),
+        slot: assignedSlot,
+        details: `Pallet avulso criado e vinculado ao carregamento #${shipmentId}`
+      });
+      
+      showNotification(`Pallet adicionado ao carregamento ${shipmentId}!`);
+      await fetchShipmentDetailPallets(shipmentId);
+      refreshCombinedData();
+    } catch (error: any) {
+       console.error('Error adding uncataloged pallet to shipment:', error);
+       showNotification(`Erro ao adicionar pallet ao carregamento: ${error.message || error}`, 'error');
+       throw error;
+    }
+  };
+
+  const handleUpdateShipmentObs = async (shipmentId: string, obs: string) => {
+    try {
+      const currentShipment = shipments.find(s => s.id === shipmentId) || shipmentDetailContext;
+      if (!currentShipment) return;
+      const updatedShipment = { ...currentShipment, obs };
+      await supabaseService.saveShipment(updatedShipment);
+      setShipments(prev => prev.map(s => s.id === shipmentId ? updatedShipment : s));
+      if (shipmentDetailContext && shipmentDetailContext.id === shipmentId) {
+        setShipmentDetailContext(updatedShipment);
+      }
+      showNotification('Observação do carregamento salva!');
+    } catch (error: any) {
+      console.error('Error updating shipment obs:', error);
+      showNotification('Erro ao salvar observação', 'error');
+      throw error;
+    }
+  };
+
 
   const handleMovementTransfer = async (transferData: any) => {
     try {
@@ -3186,6 +3290,15 @@ const App: React.FC = () => {
             await handleAddToShipmentSingle(pallet, shipmentDetailContext.id);
           }
         }}
+        onAddUncatalogedPallet={async (palletData) => {
+          if (shipmentDetailContext) {
+            await handleAddUncatalogedPalletToShipment(palletData, shipmentDetailContext.id);
+          }
+        }}
+        onUpdateObs={handleUpdateShipmentObs}
+        availableSlots={slots.filter(s => s.status === SlotContent.EMPTY)}
+        inventoryData={data}
+        historyData={history}
         onDelete={handleDeleteShipment}
       />
       
