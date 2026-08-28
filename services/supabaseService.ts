@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, disableSupabase, isFetchOrNetworkError } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, disableSupabase, isFetchOrNetworkError, isRetryableError } from '../lib/supabase';
 import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES, parseSlotContent, AutocompleteItem } from '../types';
 import { formatOP } from '../lib/formatters';
 
@@ -1019,35 +1019,95 @@ export const supabaseService = {
 
   async saveInventoryItem(item: SheetRow) {
     if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('inventory')
-        .upsert({
-          id: item.id,
-          loading_id: item.loadingId,
-          origin_op: item.originOP,
-          description: item.description,
-          lot: item.lot,
-          pallets: item.pallets,
-          date: item.date,
-          status: item.status,
-          inspections: item.inspections || [],
-          operator_name: item.operatorName
-        });
-      
-      if (error) {
-        console.error('Supabase saveInventoryItem error:', error);
-        throw error;
+      try {
+        let { error } = await supabase
+          .from('inventory')
+          .upsert({
+            id: item.id,
+            loading_id: item.loadingId,
+            origin_op: item.originOP,
+            description: item.description,
+            lot: item.lot,
+            pallets: item.pallets,
+            date: item.date,
+            status: item.status,
+            inspections: item.inspections || [],
+            operator_name: item.operatorName
+          });
+        
+        if (error && isRetryableError(error)) {
+          await new Promise(r => setTimeout(r, 400));
+          const retryRes = await supabase
+            .from('inventory')
+            .upsert({
+              id: item.id,
+              loading_id: item.loadingId,
+              origin_op: item.originOP,
+              description: item.description,
+              lot: item.lot,
+              pallets: item.pallets,
+              date: item.date,
+              status: item.status,
+              inspections: item.inspections || [],
+              operator_name: item.operatorName
+            });
+          error = retryRes.error;
+        }
+
+        if (error) {
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Supabase saveInventoryItem network/schema issue, saved locally:', error);
+          } else {
+            console.error('Supabase saveInventoryItem error:', error);
+            throw error;
+          }
+        }
+      } catch (err: any) {
+        if (isFetchOrNetworkError(err)) {
+          console.warn('Supabase saveInventoryItem exception, saved locally:', err);
+        } else {
+          throw err;
+        }
       }
     }
     localStorageHelper.update('inventory', item);
   },
 
   async deleteInventoryItem(id: string) {
-    const { error } = await supabase
-      .from('inventory')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    if (isSupabaseConfigured) {
+      try {
+        let { error } = await supabase
+          .from('inventory')
+          .delete()
+          .eq('id', id);
+        
+        if (error && isRetryableError(error)) {
+          await new Promise(r => setTimeout(r, 400));
+          const retryRes = await supabase
+            .from('inventory')
+            .delete()
+            .eq('id', id);
+          error = retryRes.error;
+        }
+
+        if (error) {
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Supabase deleteInventoryItem network/schema issue, deleted locally:', error);
+          } else {
+            console.error('Supabase deleteInventoryItem error:', error);
+            throw error;
+          }
+        }
+      } catch (err: any) {
+        if (isFetchOrNetworkError(err)) {
+          console.warn('Supabase deleteInventoryItem exception, deleted locally:', err);
+        } else {
+          throw err;
+        }
+      }
+    }
+    const current = localStorageHelper.get('inventory');
+    localStorageHelper.save('inventory', current.filter((item: any) => item.id !== id));
   },
 
   // Slots
@@ -1185,65 +1245,80 @@ export const supabaseService = {
     const from = page * pageSize;
     const to = from + pageSize - 1;
 
-    let query = supabase
-      .from('history')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false });
+    const buildQuery = () => {
+      let q = supabase
+        .from('history')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-    if (term) {
-      // Escape characters that have special meaning inside PostgREST's or()/ilike() syntax
-      // so a search term can't break the filter string or be (mis)interpreted as a wildcard.
-      const escaped = term.replace(/[%_,()]/g, (c) => `\\${c}`);
-      const pattern = `%${escaped}%`;
-      query = query.or(
-        [
-          `op.ilike.${pattern}`,
-          `description.ilike.${pattern}`,
-          `lot.ilike.${pattern}`,
-          `details.ilike.${pattern}`,
-          `loading_id.ilike.${pattern}`,
-          `slot.ilike.${pattern}`,
-          `operator_name.ilike.${pattern}`
-        ].join(',')
-      );
-    }
+      if (term) {
+        // Escape characters that have special meaning inside PostgREST's or()/ilike() syntax
+        const escaped = term.replace(/[%_,()]/g, (c) => `\\${c}`);
+        const pattern = `%${escaped}%`;
+        q = q.or(
+          [
+            `op.ilike.${pattern}`,
+            `description.ilike.${pattern}`,
+            `lot.ilike.${pattern}`,
+            `details.ilike.${pattern}`,
+            `loading_id.ilike.${pattern}`,
+            `slot.ilike.${pattern}`,
+            `operator_name.ilike.${pattern}`
+          ].join(',')
+        );
+      }
+      return q;
+    };
 
-    const { data, error, count } = await query.range(from, to);
+    try {
+      let { data, error, count } = await buildQuery().range(from, to);
 
-    if (error) {
-      console.error('Supabase getHistoryPaginated failed:', error);
-      // Fall back to whatever is in local storage so the UI doesn't just go blank.
+      if (error && isRetryableError(error)) {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await buildQuery().range(from, to);
+        data = retryRes.data;
+        error = retryRes.error;
+        count = retryRes.count;
+      }
+
+      if (error) {
+        console.warn('Supabase getHistoryPaginated warning, falling back to local storage:', error.message || error.code);
+        const local = localStorageHelper.get('history');
+        return { data: local.slice(page * pageSize, page * pageSize + pageSize), count: local.length };
+      }
+
+      return { data: (data || []).map(mapHistoryRow), count: count || 0 };
+    } catch (err: any) {
+      console.warn('Supabase getHistoryPaginated exception, falling back to local storage:', err);
       const local = localStorageHelper.get('history');
       return { data: local.slice(page * pageSize, page * pageSize + pageSize), count: local.length };
     }
-
-    return { data: (data || []).map(mapHistoryRow), count: count || 0 };
   },
 
   async addHistoryEntry(entry: HistoryEntry) {
     if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('history')
-        .insert({
-          id: entry.id,
-          type: entry.type,
-          timestamp: entry.timestamp,
-          loading_id: entry.loadingId,
-          description: entry.description,
-          op: entry.op,
-          lot: entry.lot,
-          pallet_number: entry.palletNumber,
-          total_pallets: entry.totalPallets,
-          slot: entry.slot,
-          details: entry.details,
-          operator_name: entry.operatorName,
-          pallet_type: entry.palletType
-        });
-      
-      if (error) {
-        if ((error.code === '42703' || error.code === 'PGRST204') && error.message.includes('pallet_type')) {
-          console.warn('Column pallet_type missing, retrying without it');
-          const { error: retryError } = await supabase
+      try {
+        let { error } = await supabase
+          .from('history')
+          .insert({
+            id: entry.id,
+            type: entry.type,
+            timestamp: entry.timestamp,
+            loading_id: entry.loadingId,
+            description: entry.description,
+            op: entry.op,
+            lot: entry.lot,
+            pallet_number: entry.palletNumber,
+            total_pallets: entry.totalPallets,
+            slot: entry.slot,
+            details: entry.details,
+            operator_name: entry.operatorName,
+            pallet_type: entry.palletType
+          });
+        
+        if (error && isRetryableError(error)) {
+          await new Promise(r => setTimeout(r, 400));
+          const retryRes = await supabase
             .from('history')
             .insert({
               id: entry.id,
@@ -1257,17 +1332,41 @@ export const supabaseService = {
               total_pallets: entry.totalPallets,
               slot: entry.slot,
               details: entry.details,
-              operator_name: entry.operatorName
+              operator_name: entry.operatorName,
+              pallet_type: entry.palletType
             });
-            
-          if (retryError) {
-             console.error('Supabase addHistoryEntry retry error:', retryError);
-             // don't throw, we want local state to update
-          }
-        } else {
-          console.error('Supabase addHistoryEntry error:', error);
-          // don't throw, we want local state to update
+          error = retryRes.error;
         }
+
+        if (error) {
+          if ((error.code === '42703' || error.code === 'PGRST204') && error.message?.includes('pallet_type')) {
+            console.warn('Column pallet_type missing, retrying without it');
+            const { error: retryError } = await supabase
+              .from('history')
+              .insert({
+                id: entry.id,
+                type: entry.type,
+                timestamp: entry.timestamp,
+                loading_id: entry.loadingId,
+                description: entry.description,
+                op: entry.op,
+                lot: entry.lot,
+                pallet_number: entry.palletNumber,
+                total_pallets: entry.totalPallets,
+                slot: entry.slot,
+                details: entry.details,
+                operator_name: entry.operatorName
+              });
+              
+            if (retryError) {
+               console.warn('Supabase addHistoryEntry retry warning:', retryError);
+            }
+          } else {
+            console.warn('Supabase addHistoryEntry warning:', error);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Supabase addHistoryEntry exception:', err);
       }
     }
     localStorageHelper.add('history', entry);
@@ -1581,16 +1680,20 @@ export const supabaseService = {
   
   async getPendingEditRequestsCount(): Promise<number> {
     if (!isSupabaseConfigured) return 0;
-    const { count, error } = await supabase
-      .from('inventory_edit_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending');
-    
-    if (error) {
-      console.error('Error fetching pending edit requests count:', error);
+    try {
+      const { count, error } = await supabase
+        .from('inventory_edit_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      if (error) {
+        // Suppress warning if table is empty, doesn't exist yet, or schema cache is refreshing
+        return 0;
+      }
+      return count || 0;
+    } catch {
       return 0;
     }
-    return count || 0;
   },
   async getEditRequests(): Promise<any[]> {
     if (!isSupabaseConfigured) return [];
@@ -1651,7 +1754,7 @@ export const supabaseService = {
         let requiresAguardando = false;
         
         if (targetSlot && targetSlot !== 'AGUARDANDO') {
-          const { data: slotData } = await supabase.from('slots').select('status').eq('id', targetSlot).single();
+          const { data: slotData } = await supabase.from('warehouse_slots').select('status').eq('id', targetSlot).single();
           if (slotData && slotData.status !== 'VAZIO' && slotData.status !== request.after_data.inspections[0].contentType) {
              requiresAguardando = true;
           }
@@ -1677,7 +1780,7 @@ export const supabaseService = {
         
         // If not AGUARDANDO, update the slot status
         if (!requiresAguardando && targetSlot && targetSlot !== 'AGUARDANDO') {
-          await supabase.from('slots').update({
+          await supabase.from('warehouse_slots').update({
              status: request.after_data.inspections[0].contentType,
              occupied_by: request.after_data.description
           }).eq('id', targetSlot);
@@ -1719,13 +1822,13 @@ export const supabaseService = {
               .neq('id', request.inventory_id);
               
             if (!otherItemsInOldSlot || otherItemsInOldSlot.length === 0) {
-              await supabase.from('slots').update({ status: 'VAZIO', occupied_by: null }).eq('id', oldSlot);
+              await supabase.from('warehouse_slots').update({ status: 'VAZIO', occupied_by: null }).eq('id', oldSlot);
             }
           }
 
           // Occupy new slot if not aguardando
           if (newSlot && newSlot !== 'AGUARDANDO') {
-            await supabase.from('slots').update({ 
+            await supabase.from('warehouse_slots').update({ 
               status: request.after_data.inspections[0].contentType,
               occupied_by: request.after_data.description
             }).eq('id', newSlot);

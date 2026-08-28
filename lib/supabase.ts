@@ -16,10 +16,44 @@ export let isSupabaseConfigured = Boolean(
   supabaseAnonKey.trim().length > 10
 );
 
+export function isRetryableError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || err.error_description || err.details || err.hint || err.toString() || '').toLowerCase();
+  const code = (err.code || '').toString().toUpperCase();
+  return (
+    code === 'PGRST002' ||
+    code === 'PGRST000' ||
+    code === 'PGRST001' ||
+    code === 'PGRST003' ||
+    code === '57P01' ||
+    code === '57P02' ||
+    code === '57P03' ||
+    code === '53300' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    msg.includes('schema cache') ||
+    msg.includes('could not query the database') ||
+    msg.includes('connection reset') ||
+    msg.includes('connection refused') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network error') ||
+    msg.includes('load failed') ||
+    msg.includes('timeout') ||
+    err.status === 502 ||
+    err.status === 503 ||
+    err.status === 504 ||
+    err.status === 0
+  );
+}
+
 export function isFetchOrNetworkError(err: any): boolean {
   if (!err) return false;
   const msg = (err.message || err.error_description || err.details || err.hint || err.toString() || '').toLowerCase();
+  const code = (err.code || '').toString().toUpperCase();
   return (
+    isRetryableError(err) ||
     msg.includes('failed to fetch') ||
     msg.includes('networkerror') ||
     msg.includes('network error') ||
