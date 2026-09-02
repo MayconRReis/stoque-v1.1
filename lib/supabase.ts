@@ -82,14 +82,47 @@ if (!isSupabaseConfigured) {
   console.warn('Supabase credentials missing or using placeholders. The app will run in offline mode (LocalStorage).');
 }
 
+const safeFetch: typeof fetch = async (input, init) => {
+  if (!isSupabaseConfigured) {
+    return new Response(
+      JSON.stringify({ code: 'PGRST000', message: 'Offline mode active', details: null, hint: null }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  try {
+    const res = await fetch(input, init);
+    return res;
+  } catch (err: any) {
+    if (isFetchOrNetworkError(err)) {
+      try {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await fetch(input, init);
+        return retryRes;
+      } catch (retryErr: any) {
+        console.warn('Supabase fetch failed after retry, activating offline fallback mode:', retryErr?.message || retryErr);
+        disableSupabase();
+        return new Response(
+          JSON.stringify({ code: 'PGRST000', message: 'Offline mode active', details: null, hint: null }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    throw err;
+  }
+};
+
 export const supabase = createClient(
   isSupabaseConfigured ? supabaseUrl! : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? supabaseAnonKey! : 'placeholder',
   {
     auth: {
       persistSession: true,
-      autoRefreshToken: true,
+      autoRefreshToken: isSupabaseConfigured,
       detectSessionInUrl: false
+    },
+    global: {
+      fetch: safeFetch
     }
   }
 );

@@ -73,8 +73,7 @@ export const RotativeStockManager: React.FC<RotativeStockManagerProps> = ({
       const data = await supabaseService.getRotativeStock();
       setItems(data);
     } catch (error) {
-      console.error('Error loading rotative stock:', error);
-      onShowNotification('Erro ao carregar estoque rotativo', 'error');
+      console.warn('Error loading rotative stock:', error);
     } finally {
       setIsLoading(false);
     }

@@ -1091,19 +1091,10 @@ export const supabaseService = {
         }
 
         if (error) {
-          if (isFetchOrNetworkError(error)) {
-            console.warn('Supabase saveInventoryItem network/schema issue, saved locally:', error);
-          } else {
-            console.error('Supabase saveInventoryItem error:', error);
-            throw error;
-          }
+          console.warn('Supabase saveInventoryItem issue, saved locally:', error.message || error);
         }
       } catch (err: any) {
-        if (isFetchOrNetworkError(err)) {
-          console.warn('Supabase saveInventoryItem exception, saved locally:', err);
-        } else {
-          throw err;
-        }
+        console.warn('Supabase saveInventoryItem exception, saved locally:', err?.message || err);
       }
     }
     localStorageHelper.update('inventory', item);
@@ -1127,19 +1118,10 @@ export const supabaseService = {
         }
 
         if (error) {
-          if (isFetchOrNetworkError(error)) {
-            console.warn('Supabase deleteInventoryItem network/schema issue, deleted locally:', error);
-          } else {
-            console.error('Supabase deleteInventoryItem error:', error);
-            throw error;
-          }
+          console.warn('Supabase deleteInventoryItem issue, deleted locally:', error.message || error);
         }
       } catch (err: any) {
-        if (isFetchOrNetworkError(err)) {
-          console.warn('Supabase deleteInventoryItem exception, deleted locally:', err);
-        } else {
-          throw err;
-        }
+        console.warn('Supabase deleteInventoryItem exception, deleted locally:', err?.message || err);
       }
     }
     const current = localStorageHelper.get('inventory');
@@ -1258,16 +1240,10 @@ export const supabaseService = {
         }
 
         if (error) {
-          if (isFetchOrNetworkError(error)) {
-            console.warn('Supabase updateSlot network issue, saved locally:', error);
-          } else {
-            console.error('Supabase updateSlot error:', error);
-          }
+          console.warn('Supabase updateSlot issue, saved locally:', error.message || error);
         }
-      } catch (err) {
-        if (isFetchOrNetworkError(err)) {
-          console.warn('Supabase updateSlot exception, saved locally:', err);
-        }
+      } catch (err: any) {
+        console.warn('Supabase updateSlot exception, saved locally:', err?.message || err);
       }
     }
     localStorageHelper.update('warehouse_slots', slot);
@@ -1589,13 +1565,15 @@ export const supabaseService = {
         console.warn('Supabase Auth lock warning ignored:', error);
         return null;
       }
-      console.error('Error in getCurrentUser:', error);
-      if (error?.message === 'Failed to fetch' || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Supabase getCurrentUser network issue, falling back to local user:', error?.message || error);
         disableSupabase();
         const localUser = localStorage.getItem('stoque_plus_logged_user');
         return localUser ? JSON.parse(localUser) : null;
       }
-      return null;
+      console.warn('Error in getCurrentUser, falling back to local user:', error?.message || error);
+      const localUser = localStorage.getItem('stoque_plus_logged_user');
+      return localUser ? JSON.parse(localUser) : null;
     }
   },
 
@@ -2596,32 +2574,54 @@ export const supabaseService = {
   },
 
   subscribeToRotativeStock(callback: (payload: any) => void) {
-    return supabase
-      .channel('rotative-stock-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rotative_stock' }, callback)
-      .subscribe();
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    try {
+      return supabase
+        .channel('rotative-stock-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rotative_stock' }, callback)
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription failed for rotative stock:', e);
+      return { unsubscribe: () => {} };
+    }
   },
 
   
   subscribeToEditRequests(callback: (payload: any) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    return supabase
-      .channel('edit-requests-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_edit_requests' }, callback)
-      .subscribe();
+    try {
+      return supabase
+        .channel('edit-requests-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_edit_requests' }, callback)
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription failed for edit requests:', e);
+      return { unsubscribe: () => {} };
+    }
   },
   subscribeToShipments(callback: (payload: any) => void) {
-    return supabase
-      .channel('shipment-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
-      .subscribe();
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    try {
+      return supabase
+        .channel('shipment-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, callback)
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription failed for shipments:', e);
+      return { unsubscribe: () => {} };
+    }
   },
   subscribeToHistory(callback: (payload: any) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    return supabase
-      .channel('history-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'history' }, callback)
-      .subscribe();
+    try {
+      return supabase
+        .channel('history-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'history' }, callback)
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription failed for history:', e);
+      return { unsubscribe: () => {} };
+    }
   }
 };
 

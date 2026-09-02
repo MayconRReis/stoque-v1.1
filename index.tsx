@@ -2,6 +2,15 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { isFetchOrNetworkError } from './lib/supabase';
+
+// Prevent uncaught network/fetch rejections from crashing the runtime
+window.addEventListener('unhandledrejection', (event) => {
+  if (isFetchOrNetworkError(event.reason)) {
+    console.warn('Unhandled network/fetch rejection prevented:', event.reason);
+    event.preventDefault();
+  }
+});
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

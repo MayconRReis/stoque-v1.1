@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
+import { isFetchOrNetworkError } from '../lib/supabase';
 import { HistoryEntry } from '../types';
 
 export const HISTORY_PAGE_SIZE = 100;
@@ -25,8 +26,11 @@ export function useHistoryFilters(
       setHasMoreHistory(result.data.length < result.count);
       setHistoryPage(0);
     } catch (error) {
-      console.error('Error loading history:', error);
-      showNotification('Erro ao carregar histórico.', 'error');
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Network issue loading history:', error);
+      } else {
+        console.warn('Error loading history:', error);
+      }
     }
   };
 
@@ -47,8 +51,11 @@ export function useHistoryFilters(
       });
       setHistoryPage(nextPage);
     } catch (error) {
-      console.error('Error loading more history:', error);
-      showNotification('Erro ao carregar mais registros do histórico.', 'error');
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Network issue loading more history:', error);
+      } else {
+        console.warn('Error loading more history:', error);
+      }
     } finally {
       setIsLoadingMoreHistory(false);
     }
@@ -65,8 +72,11 @@ export function useHistoryFilters(
           setHasMoreHistory(result.data.length < result.count);
           setHistoryPage(0);
         } catch (error) {
-          console.error('Error searching history:', error);
-          showNotification('Erro ao pesquisar no histórico.', 'error');
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Network issue searching history:', error);
+          } else {
+            console.warn('Error searching history:', error);
+          }
         } finally {
           setIsSearchingHistory(false);
         }

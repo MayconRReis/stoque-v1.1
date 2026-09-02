@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
+import { isFetchOrNetworkError } from '../lib/supabase';
 import { User as AppUser } from '../types';
 
 export function useAuth(showNotification: (msg: string, type?: 'success'|'error'|'info') => void) {
@@ -21,8 +22,11 @@ export function useAuth(showNotification: (msg: string, type?: 'success'|'error'
         const currentUser = await supabaseService.getCurrentUser();
         setUser(currentUser);
       } catch (error) {
-        console.error('Auth check error:', error);
-        showNotification('Erro ao verificar sessão. Faça login novamente.', 'error');
+        if (isFetchOrNetworkError(error)) {
+          console.warn('Network issue during auth check:', error);
+        } else {
+          console.warn('Auth check issue:', error);
+        }
       } finally {
         setIsAuthLoading(false);
       }

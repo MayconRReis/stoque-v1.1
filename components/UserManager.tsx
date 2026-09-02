@@ -49,7 +49,7 @@ export const UserManager: React.FC = () => {
       const data = await supabaseService.getProfiles();
       setProfiles(data as any);
     } catch (error) {
-      console.error('Error loading profiles:', error);
+      console.warn('Error loading profiles:', error);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export const UserManager: React.FC = () => {
       await supabaseService.updateProfile(profile.id, { active: !profile.active });
       loadProfiles();
     } catch (error) {
-      console.error('Error toggling profile status:', error);
+      console.warn('Error toggling profile status:', error);
     }
   };
 
@@ -73,7 +73,7 @@ export const UserManager: React.FC = () => {
       await supabaseService.updateProfile(profile.id, { role: newRole });
       loadProfiles();
     } catch (error) {
-      console.error('Error changing profile role:', error);
+      console.warn('Error changing profile role:', error);
     }
   };
 
@@ -91,7 +91,7 @@ export const UserManager: React.FC = () => {
       setNewRole('operator');
       loadProfiles();
     } catch (error: any) {
-      console.error('Error adding user:', error);
+      console.warn('Error adding user:', error);
       setFormError(error.message || 'Erro ao criar usuário. Verifique se o nome de acesso já existe.');
     } finally {
       setIsSubmitting(false);

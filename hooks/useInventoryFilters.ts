@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User as AppUser } from '../types';
 import { supabaseService } from '../services/supabaseService';
+import { isFetchOrNetworkError } from '../lib/supabase';
 import { SlotContent } from '../types';
 import { SheetRow } from '../types';
 
@@ -40,8 +41,11 @@ export function useInventoryFilters(
       });
       setInventoryPage(nextPage);
     } catch (error) {
-      console.error('Error loading more inventory:', error);
-      showNotification('Erro ao carregar mais itens.', 'error');
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Network issue loading more inventory:', error);
+      } else {
+        console.warn('Error loading more inventory:', error);
+      }
     } finally {
       setIsLoadingMore(false);
     }
@@ -61,8 +65,11 @@ export function useInventoryFilters(
           setHasMoreInventory(result.data.length < result.count);
           setInventoryPage(0);
         } catch (error) {
-          console.error('Error searching inventory:', error);
-          showNotification('Erro ao buscar itens no estoque', 'error');
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Network issue searching inventory:', error);
+          } else {
+            console.warn('Error searching inventory:', error);
+          }
         } finally {
           setIsLoadingMore(false);
         }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabaseService } from '../services/supabaseService';
+import { isFetchOrNetworkError } from '../lib/supabase';
 import { Shipment, ShipmentStatus, HistoryEntry, SheetRow, StockStatus, SlotContent } from '../types';
 
 export function useShipments(
@@ -62,8 +63,11 @@ export function useShipments(
         setShipmentDetailPallets(linked);
       }
     } catch (error) {
-      console.error('Error fetching detail pallets:', error);
-      showNotification('Erro ao carregar pallets do carregamento', 'error');
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Network issue fetching detail pallets:', error);
+      } else {
+        console.warn('Error fetching detail pallets:', error);
+      }
     } finally {
       setIsDetailLoading(false);
     }

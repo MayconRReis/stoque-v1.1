@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
+import { isFetchOrNetworkError } from '../lib/supabase';
 import { SheetRow, InspectionData } from '../types';
 
 export function usePalletSelection(
@@ -26,8 +27,11 @@ export function usePalletSelection(
           }).filter((p): p is { row: SheetRow, inspection: InspectionData, idx: number, selectionKey: string } => p !== null);
           setSelectedPalletsData(mapped);
         } catch (error) {
-          console.error('Error fetching selected pallets data:', error);
-          showNotification('Erro ao carregar dados dos pallets selecionados', 'error');
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Network issue fetching selected pallets data:', error);
+          } else {
+            console.warn('Error fetching selected pallets data:', error);
+          }
         }
       };
       fetchSelectedData();

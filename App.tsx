@@ -393,8 +393,11 @@ const App: React.FC = () => {
         // Broadcast logic removed as notifications are disabled
       }
     } catch (error) {
-      console.error('Error adding history entry:', error);
-      showNotification('Erro ao salvar histórico no servidor.', 'error');
+      if (isFetchOrNetworkError(error)) {
+        console.warn('Network issue adding history entry, saved locally:', error);
+      } else {
+        console.warn('Error adding history entry:', error);
+      }
     }
   }, [user]);
 
@@ -606,7 +609,9 @@ const App: React.FC = () => {
     });
 
     const shipmentsChannel = supabaseService.subscribeToShipments((payload) => {
-      supabaseService.getShipments().then(setShipments);
+      supabaseService.getShipments().then(setShipments).catch(err => {
+        console.warn('Silent shipments fetch error:', err);
+      });
       if (payload && payload.eventType === 'INSERT' && payload.new.status === 'OPEN') {
         showNotification('Novo carregamento criado', 'info');
         notifyShipmentCreated(payload.new, () => navigateToTab('shipments'));
@@ -625,11 +630,11 @@ const App: React.FC = () => {
     });
 
     return () => {
-      inventoryChannel.unsubscribe();
-      editRequestsChannel.unsubscribe();
-      slotsChannel.unsubscribe();
-      shipmentsChannel.unsubscribe();
-      historyChannel.unsubscribe();
+      inventoryChannel?.unsubscribe?.();
+      editRequestsChannel?.unsubscribe?.();
+      slotsChannel?.unsubscribe?.();
+      shipmentsChannel?.unsubscribe?.();
+      historyChannel?.unsubscribe?.();
     };
   }, [user, isPublicView]);
 

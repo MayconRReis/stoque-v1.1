@@ -41,7 +41,7 @@ const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ currentUser }) => {
       const data = await supabaseService.getEditRequests();
       setRequests(data);
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.warn('Error fetching requests:', error);
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +55,7 @@ const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ currentUser }) => {
       setAdminComment('');
       setExpandedId(null);
     } catch (error) {
-      console.error('Error processing request:', error);
+      console.warn('Error processing request:', error);
       alert('Erro ao processar solicitação.');
     } finally {
       setIsProcessing(null);
