@@ -311,15 +311,17 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
     
-    const obsContent = shipment.obs && shipment.obs.trim() ? shipment.obs.trim() : 'aqui vão ficar as obs dos carregamentos quando ouver';
-    const splitObs = doc.splitTextToSize(`OBS: ${obsContent}`, 268);
+    const obsContent = shipment.obs && shipment.obs.trim() ? shipment.obs.trim() : '';
+    const obsText = obsContent ? `OBS: ${obsContent}` : 'OBS:';
+    const splitObs = doc.splitTextToSize(obsText, 268);
     
     const pageHeight = doc.internal.pageSize.getHeight();
-    if (finalY + 20 + (splitObs.length * 5) > pageHeight - 10) {
+    const targetY = finalY + 6;
+    if (targetY + (splitObs.length * 5) > pageHeight - 10) {
       doc.addPage();
-      doc.text(splitObs, 14, 20);
+      doc.text(splitObs, 14, 18);
     } else {
-      doc.text(splitObs, 14, Math.max(finalY + 18, 140));
+      doc.text(splitObs, 14, targetY);
     }
 
     doc.save(`Separacao_${shipment.id || 'Carregamento'}.pdf`);
@@ -660,7 +662,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
                   rows={4}
                   value={obsValue}
                   onChange={e => setObsValue(e.target.value)}
-                  placeholder="Ex: aqui vão ficar as obs dos carregamentos quando ouver..."
+                  placeholder="Digite as observações para o carregamento..."
                   className="w-full bg-[#0B1120] border border-slate-800 rounded-xl p-4 text-white text-sm focus:border-amber-500 outline-none placeholder:text-slate-600 transition-colors custom-scrollbar"
                 />
               </div>

@@ -336,7 +336,7 @@ export const supabaseService = {
 
   // Inventory
   async getInventoryPaginated(page: number, pageSize: number, filters?: { searchTerm?: string, typeFilter?: string }): Promise<{ data: SheetRow[], count: number }> {
-    if (!isSupabaseConfigured) {
+    const getLocalInventory = () => {
       const all = localStorageHelper.get('inventory');
       let filtered = all.filter((row: any) => !row.parent_group_id);
       
@@ -388,141 +388,177 @@ export const supabaseService = {
         data: filtered.slice(from, to),
         count: filtered.length
       };
-    }
-
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-
-    let query = applyInventoryFilter(
-      supabase.from('inventory').select('*', { count: 'exact' }),
-      'ROOT_ONLY'
-    );
-
-    if (filters?.searchTerm) {
-      const originalTerm = filters.searchTerm.trim();
-      const upperTerm = originalTerm.toUpperCase();
-      const term = originalTerm.toLowerCase();
-      const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
-      const isSemSeloSearch = upperTerm === 'SEM SELO';
-
-      try {
-        
-        // Adding limit to avoid missing rows if >1000, or maybe we just do a text search
-        const { data: searchData, error: searchErr } = await supabase.from('inventory').select('id, parent_group_id, origin_op, description, lot, loading_id, inspections').limit(1500);
-        if (searchErr) console.error("Search fetch error:", searchErr);
-
-        if (searchData) {
-          const matchedRootIds = new Set<string>();
-
-          searchData.forEach((row: any) => {
-            const matchesText = 
-              (row.origin_op || '').toLowerCase().includes(term) ||
-              (row.description || '').toLowerCase().includes(term) ||
-              (row.lot || '').toLowerCase().includes(term) ||
-              (row.id || '').toLowerCase().includes(term) ||
-              (row.loading_id || '').toLowerCase().includes(term);
-              
-            const matchesSlot = isSlotSearch && row.inspections?.some((i:any) => i.assignedSlot?.toUpperCase().startsWith(upperTerm));
-            const matchesSemSelo = isSemSeloSearch && row.inspections?.some((i:any) => i.withoutSeal);
-            const matchesAssignedSlot = row.inspections?.some((i:any) => (i.assignedSlot || '').toLowerCase().includes(term));
-
-            if (matchesText || matchesSlot || matchesSemSelo || matchesAssignedSlot) {
-              if (row.parent_group_id) {
-                matchedRootIds.add(row.parent_group_id);
-              } else {
-                matchedRootIds.add(row.id);
-              }
-            }
-          });
-
-          if (matchedRootIds.size > 0) {
-            
-            const idsArray = Array.from(matchedRootIds);
-            // Limit to 100 to prevent URI Too Long (Failed to fetch)
-            query = query.in('id', idsArray.slice(0, 30));
-
-          } else {
-            query = query.eq('id', 'none_found_' + Date.now());
-          }
-        }
-      } catch (e) {
-         console.warn('Erro na busca', e);
-         const termFragment = `%${originalTerm}%`;
-         let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
-         query = query.or(orClause);
-      }
-    }
-
-    if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
-      const isContainerSearch = filters.typeFilter === 'CONTAINER';
-      const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, parent_group_id, inspections');
-      
-      if (allWithInsps && !inspError) {
-        const matchedRootIds = new Set<string>();
-
-        allWithInsps.forEach((item: any) => {
-          const matches = item.inspections?.some((insp: any) => {
-            if (filters.typeFilter === 'SEM_SELO') {
-              return insp.withoutSeal;
-            }
-            if (isContainerSearch) {
-              return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
-            }
-            return insp.contentType === filters.typeFilter;
-          });
-
-          if (matches) {
-             if (item.parent_group_id) {
-               matchedRootIds.add(item.parent_group_id);
-             } else {
-               matchedRootIds.add(item.id);
-             }
-          }
-        });
-        
-          if (matchedRootIds.size > 0) {
-          
-            const idsArray = Array.from(matchedRootIds);
-            // Limit to 100 to prevent URI Too Long (Failed to fetch)
-            query = query.in('id', idsArray.slice(0, 30));
-
-        } else {
-          query = query.eq('id', 'none_found_' + Date.now());
-        }
-      }
-    }
-
-    query = query.eq('status', 'INSPECTED').order('created_at', { ascending: false }).range(from, to);
-
-    const { data, count, error } = await query;
-    
-    if (error) {
-      console.warn('Supabase getInventoryPaginated failed, falling back to local storage:', error);
-      const all = localStorageHelper.get('inventory');
-      return { data: all.slice(from, to), count: all.length };
-    }
-
-    return {
-      data: (data || []).map(mapInventoryRow),
-      count: count || 0
     };
+
+    if (!isSupabaseConfigured) {
+      return getLocalInventory();
+    }
+
+    try {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = applyInventoryFilter(
+        supabase.from('inventory').select('*', { count: 'exact' }),
+        'ROOT_ONLY'
+      );
+
+      if (filters?.searchTerm) {
+        const originalTerm = filters.searchTerm.trim();
+        const upperTerm = originalTerm.toUpperCase();
+        const term = originalTerm.toLowerCase();
+        const isSlotSearch = /^[A-F](\.\d+){0,2}$/.test(upperTerm);
+        const isSemSeloSearch = upperTerm === 'SEM SELO';
+
+        try {
+          const { data: searchData, error: searchErr } = await supabase.from('inventory').select('id, parent_group_id, origin_op, description, lot, loading_id, inspections').limit(1500);
+          if (searchErr) console.warn("Search fetch error:", searchErr);
+
+          if (searchData) {
+            const matchedRootIds = new Set<string>();
+
+            searchData.forEach((row: any) => {
+              const matchesText = 
+                (row.origin_op || '').toLowerCase().includes(term) ||
+                (row.description || '').toLowerCase().includes(term) ||
+                (row.lot || '').toLowerCase().includes(term) ||
+                (row.id || '').toLowerCase().includes(term) ||
+                (row.loading_id || '').toLowerCase().includes(term);
+                
+              const matchesSlot = isSlotSearch && row.inspections?.some((i:any) => i.assignedSlot?.toUpperCase().startsWith(upperTerm));
+              const matchesSemSelo = isSemSeloSearch && row.inspections?.some((i:any) => i.withoutSeal);
+              const matchesAssignedSlot = row.inspections?.some((i:any) => (i.assignedSlot || '').toLowerCase().includes(term));
+
+              if (matchesText || matchesSlot || matchesSemSelo || matchesAssignedSlot) {
+                if (row.parent_group_id) {
+                  matchedRootIds.add(row.parent_group_id);
+                } else {
+                  matchedRootIds.add(row.id);
+                }
+              }
+            });
+
+            if (matchedRootIds.size > 0) {
+              const idsArray = Array.from(matchedRootIds);
+              query = query.in('id', idsArray.slice(0, 30));
+            } else {
+              query = query.eq('id', 'none_found_' + Date.now());
+            }
+          }
+        } catch (e) {
+           console.warn('Erro na busca', e);
+           const termFragment = `%${originalTerm}%`;
+           let orClause = `origin_op.ilike.${termFragment},description.ilike.${termFragment},lot.ilike.${termFragment},id.ilike.${termFragment},loading_id.ilike.${termFragment}`;
+           query = query.or(orClause);
+        }
+      }
+
+      if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
+        const isContainerSearch = filters.typeFilter === 'CONTAINER';
+        try {
+          const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, parent_group_id, inspections');
+          
+          if (allWithInsps && !inspError) {
+            const matchedRootIds = new Set<string>();
+
+            allWithInsps.forEach((item: any) => {
+              const matches = item.inspections?.some((insp: any) => {
+                if (filters.typeFilter === 'SEM_SELO') {
+                  return insp.withoutSeal;
+                }
+                if (isContainerSearch) {
+                  return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
+                }
+                return insp.contentType === filters.typeFilter;
+              });
+
+              if (matches) {
+                 if (item.parent_group_id) {
+                   matchedRootIds.add(item.parent_group_id);
+                 } else {
+                   matchedRootIds.add(item.id);
+                 }
+              }
+            });
+            
+            if (matchedRootIds.size > 0) {
+              const idsArray = Array.from(matchedRootIds);
+              query = query.in('id', idsArray.slice(0, 30));
+            } else {
+              query = query.eq('id', 'none_found_' + Date.now());
+            }
+          }
+        } catch (e) {
+          console.warn('Erro na filtragem de tipo:', e);
+        }
+      }
+
+      query = query.eq('status', 'INSPECTED').order('created_at', { ascending: false }).range(from, to);
+
+      let { data, count, error } = await query;
+
+      if (error && isRetryableError(error)) {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await query;
+        data = retryRes.data;
+        count = retryRes.count;
+        error = retryRes.error;
+      }
+      
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        console.warn('Supabase getInventoryPaginated failed, falling back to local storage:', error);
+        return getLocalInventory();
+      }
+
+      return {
+        data: (data || []).map(mapInventoryRow),
+        count: count || 0
+      };
+    } catch (err: any) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getInventoryPaginated exception, falling back to local storage:', err);
+      return getLocalInventory();
+    }
   },
 
   async getPendingInventory(): Promise<SheetRow[]> {
-    if (!isSupabaseConfigured) {
+    const getLocalPending = () => {
       const all = localStorageHelper.get('inventory');
       return all.filter((r: any) => r.status === 'PENDING');
+    };
+
+    if (!isSupabaseConfigured) {
+      return getLocalPending();
     }
-    const { data, error } = await applyInventoryFilter(
-      supabase.from('inventory').select('*'),
-      'ROOT_ONLY'
-    ).eq('status', 'PENDING').order('created_at', { ascending: false });
-    
-    if (error) {
-      console.warn('Supabase getPendingInventory failed:', error);
-      return [];
+
+    try {
+      let { data, error } = await applyInventoryFilter(
+        supabase.from('inventory').select('*'),
+        'ROOT_ONLY'
+      ).eq('status', 'PENDING').order('created_at', { ascending: false });
+
+      if (error && isRetryableError(error)) {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await applyInventoryFilter(
+          supabase.from('inventory').select('*'),
+          'ROOT_ONLY'
+        ).eq('status', 'PENDING').order('created_at', { ascending: false });
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+      
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        console.warn('Supabase getPendingInventory failed:', error);
+        return getLocalPending();
+      }
+      return (data || []).map(mapInventoryRow);
+    } catch (err: any) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getPendingInventory exception:', err);
+      return getLocalPending();
     }
-    return (data || []).map(mapInventoryRow);
   },
 
   async getWaitingInventory(): Promise<SheetRow[]> {
@@ -1114,27 +1150,46 @@ export const supabaseService = {
   async getSlots(): Promise<WarehouseSlot[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('warehouse_slots');
 
-    const { data, error } = await supabase
-      .from('warehouse_slots')
-      .select('*')
-      .order('rack')
-      .order('level')
-      .order('position');
-    
-    if (error) {
-      console.warn('Supabase getSlots failed, falling back to local storage:', error);
+    try {
+      let { data, error } = await supabase
+        .from('warehouse_slots')
+        .select('*')
+        .order('rack')
+        .order('level')
+        .order('position');
+      
+      if (error && isRetryableError(error)) {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await supabase
+          .from('warehouse_slots')
+          .select('*')
+          .order('rack')
+          .order('level')
+          .order('position');
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        console.warn('Supabase getSlots failed, falling back to local storage:', error);
+        return localStorageHelper.get('warehouse_slots');
+      }
+      const slots = (data || []).map(slot => ({
+        id: slot.id,
+        rack: slot.rack as any,
+        level: slot.level,
+        position: slot.position,
+        status: slot.status as SlotContent,
+        occupiedBy: slot.occupied_by
+      }));
+      localStorageHelper.save('warehouse_slots', slots);
+      return slots;
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getSlots exception, falling back to local storage:', err);
       return localStorageHelper.get('warehouse_slots');
     }
-    const slots = (data || []).map(slot => ({
-      id: slot.id,
-      rack: slot.rack as any,
-      level: slot.level,
-      position: slot.position,
-      status: slot.status as SlotContent,
-      occupiedBy: slot.occupied_by
-    }));
-    localStorageHelper.save('warehouse_slots', slots);
-    return slots;
   },
 
   async getSlotById(id: string): Promise<WarehouseSlot | null> {
@@ -1142,61 +1197,110 @@ export const supabaseService = {
       const all = localStorageHelper.get('warehouse_slots');
       return all.find((s: any) => s.id === id) || null;
     }
-    const { data, error } = await supabase
-      .from('warehouse_slots')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-    
-    if (error) throw error;
-    if (!data) return null;
+    try {
+      const { data, error } = await supabase
+        .from('warehouse_slots')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        const all = localStorageHelper.get('warehouse_slots');
+        return all.find((s: any) => s.id === id) || null;
+      }
+      if (!data) return null;
 
-    return {
-      id: data.id,
-      rack: data.rack as any,
-      level: data.level,
-      position: data.position,
-      status: data.status as SlotContent,
-      occupiedBy: data.occupied_by
-    };
+      return {
+        id: data.id,
+        rack: data.rack as any,
+        level: data.level,
+        position: data.position,
+        status: data.status as SlotContent,
+        occupiedBy: data.occupied_by
+      };
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      const all = localStorageHelper.get('warehouse_slots');
+      return all.find((s: any) => s.id === id) || null;
+    }
   },
 
   async updateSlot(slot: WarehouseSlot) {
     if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('warehouse_slots')
-        .upsert({
-          id: slot.id,
-          rack: slot.rack,
-          level: slot.level,
-          position: slot.position,
-          status: slot.status,
-          occupied_by: slot.occupiedBy,
-          updated_at: new Date().toISOString()
-        });
-      
-      if (error) {
-        console.error('Supabase updateSlot error:', error);
-        throw error;
+      try {
+        let { error } = await supabase
+          .from('warehouse_slots')
+          .upsert({
+            id: slot.id,
+            rack: slot.rack,
+            level: slot.level,
+            position: slot.position,
+            status: slot.status,
+            occupied_by: slot.occupiedBy,
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error && isRetryableError(error)) {
+          await new Promise(r => setTimeout(r, 400));
+          const retryRes = await supabase
+            .from('warehouse_slots')
+            .upsert({
+              id: slot.id,
+              rack: slot.rack,
+              level: slot.level,
+              position: slot.position,
+              status: slot.status,
+              occupied_by: slot.occupiedBy,
+              updated_at: new Date().toISOString()
+            });
+          error = retryRes.error;
+        }
+
+        if (error) {
+          if (isFetchOrNetworkError(error)) {
+            console.warn('Supabase updateSlot network issue, saved locally:', error);
+          } else {
+            console.error('Supabase updateSlot error:', error);
+          }
+        }
+      } catch (err) {
+        if (isFetchOrNetworkError(err)) {
+          console.warn('Supabase updateSlot exception, saved locally:', err);
+        }
       }
     }
     localStorageHelper.update('warehouse_slots', slot);
   },
 
   async bulkUpdateSlots(slots: WarehouseSlot[]) {
-    const { error } = await supabase
-      .from('warehouse_slots')
-      .upsert(slots.map(slot => ({
-        id: slot.id,
-        rack: slot.rack,
-        level: slot.level,
-        position: slot.position,
-        status: slot.status,
-        occupied_by: slot.occupiedBy,
-        updated_at: new Date().toISOString()
-      })))
-      .select();
-    if (error) throw error;
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('warehouse_slots')
+          .upsert(slots.map(slot => ({
+            id: slot.id,
+            rack: slot.rack,
+            level: slot.level,
+            position: slot.position,
+            status: slot.status,
+            occupied_by: slot.occupiedBy,
+            updated_at: new Date().toISOString()
+          })))
+          .select();
+        if (error && isFetchOrNetworkError(error)) {
+          console.warn('Supabase bulkUpdateSlots network issue, saved locally:', error);
+        }
+      } catch (err) {
+        if (isFetchOrNetworkError(err)) {
+          console.warn('Supabase bulkUpdateSlots exception, saved locally:', err);
+        }
+      }
+    }
+    const current = localStorageHelper.get('warehouse_slots');
+    const slotMap = new Map(current.map((s: any) => [s.id, s]));
+    slots.forEach(s => slotMap.set(s.id, s));
+    localStorageHelper.save('warehouse_slots', Array.from(slotMap.values()));
   },
 
   // History
@@ -1497,19 +1601,29 @@ export const supabaseService = {
 
   async getProfiles() {
     if (!isSupabaseConfigured) return [];
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true });
-    
-    if (error) throw error;
-    return (data || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      role: p.role,
-      active: p.active,
-      createdAt: p.created_at
-    }));
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        console.warn('getProfiles error:', error);
+        return [];
+      }
+      return (data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        role: p.role,
+        active: p.active,
+        createdAt: p.created_at
+      }));
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getProfiles exception:', err);
+      return [];
+    }
   },
 
   async updateProfile(id: string, updates: { name?: string, role?: string, active?: boolean }) {
@@ -1608,73 +1722,97 @@ export const supabaseService = {
   },
 
   async findPalletByLoadingId(id: string) {
-    if (!isSupabaseConfigured) {
+    const getLocal = () => {
       const all = localStorageHelper.get('inventory');
       return all.find((row: any) => row.loadingId === id || row.id === id) || null;
+    };
+
+    if (!isSupabaseConfigured) {
+      return getLocal();
     }
 
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .or(`loading_id.eq."${id}",id.eq."${id}"`)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .or(`loading_id.eq."${id}",id.eq."${id}"`)
+        .maybeSingle();
 
-    if (error) throw error;
-    if (!data) return null;
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        return getLocal();
+      }
+      if (!data) return null;
 
-    if (!data.inspections || (Array.isArray(data.inspections) && data.inspections.length === 0)) {
-      if (data.status !== 'PENDING') return null;
+      if (!data.inspections || (Array.isArray(data.inspections) && data.inspections.length === 0)) {
+        if (data.status !== 'PENDING') return null;
+      }
+
+      // Map to application standard (SheetRow)
+      return {
+        id: data.id,
+        loadingId: data.loading_id,
+        originOP: data.origin_op,
+        description: data.description,
+        lot: data.lot,
+        pallets: data.pallets,
+        date: data.date || data.created_at,
+        status: data.status as StockStatus,
+        operatorName: data.operator_name,
+        inspections: data.inspections || [],
+      } as SheetRow;
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      return getLocal();
     }
-
-    // Map to application standard (SheetRow)
-    return {
-      id: data.id,
-      loadingId: data.loading_id,
-      originOP: data.origin_op,
-      description: data.description,
-      lot: data.lot,
-      pallets: data.pallets,
-      date: data.date || data.created_at,
-      status: data.status as StockStatus,
-      operatorName: data.operator_name,
-      inspections: data.inspections || [],
-    } as SheetRow;
   },
 
   async findPalletsBySlot(slotId: string) {
-    if (!isSupabaseConfigured) {
+    const getLocal = () => {
       const all = localStorageHelper.get('inventory');
       return all.filter((row: any) => row.inspections?.some((i: any) => i.assignedSlot === slotId));
+    };
+
+    if (!isSupabaseConfigured) {
+      return getLocal();
     }
 
-    // Fetching and filtering in JS is safer against inconsistent JSONB structures (array vs object)
-    // that cause Postgrest syntax errors.
-    const { data, error } = await applyInventoryFilter(
-      supabase.from('inventory').select('*'),
-      'ROOT_ONLY'
-    );
+    try {
+      // Fetching and filtering in JS is safer against inconsistent JSONB structures (array vs object)
+      // that cause Postgrest syntax errors.
+      const { data, error } = await applyInventoryFilter(
+        supabase.from('inventory').select('*'),
+        'ROOT_ONLY'
+      );
 
-    if (error) throw error;
-    if (!data) return [];
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        return getLocal();
+      }
+      if (!data) return [];
 
-    const matched = data.filter((item: any) => {
-      const insps = Array.isArray(item.inspections) ? item.inspections : 
-                   (item.inspections ? [item.inspections] : []);
-      return insps.some((i: any) => i.assignedSlot === slotId);
-    });
+      const matched = data.filter((item: any) => {
+        const insps = Array.isArray(item.inspections) ? item.inspections : 
+                     (item.inspections ? [item.inspections] : []);
+        return insps.some((i: any) => i.assignedSlot === slotId);
+      });
 
-    return matched.map((item: any) => ({
-      id: item.id,
-      loadingId: item.loading_id,
-      originOP: item.origin_op,
-      description: item.description,
-      lot: item.lot,
-      pallets: item.pallets,
-      date: item.date || item.created_at,
-      status: item.status as StockStatus,
-      operatorName: item.operator_name,
-      inspections: item.inspections || [],
-    })) as SheetRow[];
+      return matched.map((item: any) => ({
+        id: item.id,
+        loadingId: item.loading_id,
+        originOP: item.origin_op,
+        description: item.description,
+        lot: item.lot,
+        pallets: item.pallets,
+        date: item.date || item.created_at,
+        status: item.status as StockStatus,
+        operatorName: item.operator_name,
+        inspections: item.inspections || [],
+      })) as SheetRow[];
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      return getLocal();
+    }
   },
 
   
@@ -1698,38 +1836,48 @@ export const supabaseService = {
   async getEditRequests(): Promise<any[]> {
     if (!isSupabaseConfigured) return [];
     
-    // Using a manual join approach since simple joins depend on FK structure and Supabase config
-    // First, get the requests
-    const { data: requests, error } = await supabase
-      .from('inventory_edit_requests')
-      .select('*')
-      .order('requested_at', { ascending: false });
-    
-    if (error) throw error;
-    if (!requests || requests.length === 0) return [];
+    try {
+      // Using a manual join approach since simple joins depend on FK structure and Supabase config
+      // First, get the requests
+      const { data: requests, error } = await supabase
+        .from('inventory_edit_requests')
+        .select('*')
+        .order('requested_at', { ascending: false });
+      
+      if (error) {
+        if (isFetchOrNetworkError(error)) disableSupabase();
+        console.warn('getEditRequests error:', error);
+        return [];
+      }
+      if (!requests || requests.length === 0) return [];
 
-    // Get all relevant profiles and inventory items to "join" them manually
-    const userIds = [...new Set([
-      ...requests.map(r => r.requested_by),
-      ...requests.map(r => r.reviewed_by).filter(Boolean)
-    ])];
-    
-    const inventoryIds = [...new Set(requests.map(r => r.inventory_id).filter(Boolean))];
+      // Get all relevant profiles and inventory items to "join" them manually
+      const userIds = [...new Set([
+        ...requests.map(r => r.requested_by),
+        ...requests.map(r => r.reviewed_by).filter(Boolean)
+      ])];
+      
+      const inventoryIds = [...new Set(requests.map(r => r.inventory_id).filter(Boolean))];
 
-    const [profilesRes, inventoryRes] = await Promise.all([
-      supabase.from('profiles').select('id, name').in('id', userIds),
-      inventoryIds.length > 0 ? supabase.from('inventory').select('id, description').in('id', inventoryIds) : Promise.resolve({ data: [] })
-    ]);
+      const [profilesRes, inventoryRes] = await Promise.all([
+        supabase.from('profiles').select('id, name').in('id', userIds),
+        inventoryIds.length > 0 ? supabase.from('inventory').select('id, description').in('id', inventoryIds) : Promise.resolve({ data: [] })
+      ]);
 
-    const profilesMap = new Map((profilesRes.data || []).map(p => [p.id, p.name]));
-    const inventoryMap = new Map((inventoryRes.data || []).map(i => [i.id, i.description]));
+      const profilesMap = new Map((profilesRes.data || []).map(p => [p.id, p.name]));
+      const inventoryMap = new Map((inventoryRes.data || []).map(i => [i.id, i.description]));
 
-    return requests.map(r => ({
-      ...r,
-      requester_name: profilesMap.get(r.requested_by) || 'Desconhecido',
-      reviewer_name: r.reviewed_by ? profilesMap.get(r.reviewed_by) : undefined,
-      product_description: r.after_data?._isRecovery ? `RECUPERAÇÃO: ${r.after_data.description || 'Produto'}` : (inventoryMap.get(r.inventory_id) || 'Produto não encontrado')
-    }));
+      return requests.map(r => ({
+        ...r,
+        requester_name: profilesMap.get(r.requested_by) || 'Desconhecido',
+        reviewer_name: r.reviewed_by ? profilesMap.get(r.reviewed_by) : undefined,
+        product_description: r.after_data?._isRecovery ? `RECUPERAÇÃO: ${r.after_data.description || 'Produto'}` : (inventoryMap.get(r.inventory_id) || 'Produto não encontrado')
+      }));
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getEditRequests exception:', err);
+      return [];
+    }
   },
 
   async processEditRequest(requestId: string, adminId: string, status: 'approved' | 'rejected', adminComment?: string) {
@@ -1904,132 +2052,177 @@ export const supabaseService = {
 
   // Shipments
   async getShipments(): Promise<Shipment[]> {
-    if (!isSupabaseConfigured) return localStorageHelper.get('shipments');
+    const getLocalShipments = () => {
+      return localStorageHelper.get('shipments');
+    };
 
-    const { data, error } = await supabase
-      .from('shipments')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-       console.warn('Supabase getShipments failed, falling back to local storage:', error);
-       return localStorageHelper.get('shipments');
+    if (!isSupabaseConfigured) return getLocalShipments();
+
+    try {
+      let { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error && isRetryableError(error)) {
+        await new Promise(r => setTimeout(r, 400));
+        const retryRes = await supabase
+          .from('shipments')
+          .select('*')
+          .order('created_at', { ascending: false });
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (error) {
+         if (isFetchOrNetworkError(error)) disableSupabase();
+         console.warn('Supabase getShipments failed, falling back to local storage:', error);
+         return getLocalShipments();
+      }
+      const shipments = (data || []).map(s => ({
+        id: s.id,
+        type: s.type as ShipmentType,
+        status: s.status as ShipmentStatus,
+        createdAt: s.created_at,
+        scheduledDate: s.scheduled_date,
+        operatorName: s.operator_name,
+        closedAt: s.closed_at,
+        obs: s.obs || s.notes || (localStorageHelper.get('shipments').find((ls: any) => ls.id === s.id)?.obs) || ''
+      }));
+      localStorageHelper.save('shipments', shipments);
+      return shipments;
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getShipments exception, falling back to local storage:', err);
+      return getLocalShipments();
     }
-    const shipments = (data || []).map(s => ({
-      id: s.id,
-      type: s.type as ShipmentType,
-      status: s.status as ShipmentStatus,
-      createdAt: s.created_at,
-      scheduledDate: s.scheduled_date,
-      operatorName: s.operator_name,
-      closedAt: s.closed_at,
-      obs: s.obs || s.notes || (localStorageHelper.get('shipments').find((ls: any) => ls.id === s.id)?.obs) || ''
-    }));
-    localStorageHelper.save('shipments', shipments);
-    return shipments;
   },
 
   async saveShipment(shipment: Shipment) {
     if (isSupabaseConfigured) {
-      // First attempt with obs
-      const payload: any = {
-        id: shipment.id,
-        type: shipment.type,
-        status: shipment.status,
-        created_at: shipment.createdAt,
-        scheduled_date: shipment.scheduledDate,
-        operator_name: shipment.operatorName,
-        closed_at: shipment.closedAt
-      };
-      if (shipment.obs !== undefined) {
-        payload.obs = shipment.obs;
-      }
-      const { error } = await supabase
-        .from('shipments')
-        .upsert(payload);
-      
-      if (error) {
-        console.warn('Supabase saveShipment with obs error, retrying without obs field:', error);
-        // Fallback without obs if column doesn't exist in remote schema
-        delete payload.obs;
-        await supabase.from('shipments').upsert(payload);
+      try {
+        // First attempt with obs
+        const payload: any = {
+          id: shipment.id,
+          type: shipment.type,
+          status: shipment.status,
+          created_at: shipment.createdAt,
+          scheduled_date: shipment.scheduledDate,
+          operator_name: shipment.operatorName,
+          closed_at: shipment.closedAt
+        };
+        if (shipment.obs !== undefined) {
+          payload.obs = shipment.obs;
+        }
+        let { error } = await supabase
+          .from('shipments')
+          .upsert(payload);
+        
+        if (error) {
+          console.warn('Supabase saveShipment with obs error, retrying without obs field:', error);
+          // Fallback without obs if column doesn't exist in remote schema
+          delete payload.obs;
+          const retryRes = await supabase.from('shipments').upsert(payload);
+          error = retryRes.error;
+        }
+
+        if (error && isFetchOrNetworkError(error)) {
+          console.warn('Supabase saveShipment network error, saved locally:', error);
+        }
+      } catch (err) {
+        if (isFetchOrNetworkError(err)) {
+          console.warn('Supabase saveShipment exception, saved locally:', err);
+        }
       }
     }
     localStorageHelper.update('shipments', shipment);
   },
 
   async deleteShipment(shipmentId: string) {
-    // 1. Unlink all inventory items from this shipment
-    const items = await this.getInventoryItemsByShipmentId(shipmentId);
-    
-    for (const item of items) {
-      const updatedInspections = (item.inspections || []).map((insp: any) => {
-        if (insp.shipmentId === shipmentId || insp.shipment_id === shipmentId) {
-          const newInsp = { ...insp };
-          delete newInsp.shipmentId;
-          delete newInsp.shipment_id;
-          return newInsp;
-        }
-        return insp;
-      });
+    try {
+      if (isSupabaseConfigured) {
+        // 1. Unlink all inventory items from this shipment
+        const items = await this.getInventoryItemsByShipmentId(shipmentId);
+        
+        for (const item of items) {
+          const updatedInspections = (item.inspections || []).map((insp: any) => {
+            if (insp.shipmentId === shipmentId || insp.shipment_id === shipmentId) {
+              const newInsp = { ...insp };
+              delete newInsp.shipmentId;
+              delete newInsp.shipment_id;
+              return newInsp;
+            }
+            return insp;
+          });
 
-      const { error: updateError } = await supabase
-        .from('inventory')
-        .update({ inspections: updatedInspections })
-        .eq('id', item.id);
-      
-      if (updateError) throw updateError;
+          await supabase
+            .from('inventory')
+            .update({ inspections: updatedInspections })
+            .eq('id', item.id);
+        }
+
+        // 2. Delete the shipment record
+        await supabase
+          .from('shipments')
+          .delete()
+          .eq('id', shipmentId);
+      }
+    } catch (err) {
+      console.warn('deleteShipment Supabase sync error, deleted locally:', err);
     }
 
-    // 2. Delete the shipment record
-    const { error: deleteError } = await supabase
-      .from('shipments')
-      .delete()
-      .eq('id', shipmentId);
-    
-    if (deleteError) throw deleteError;
+    // Also delete locally
+    const current = localStorageHelper.get('shipments');
+    localStorageHelper.save('shipments', current.filter((s: any) => s.id !== shipmentId));
   },
 
   async updateInventoryShipment(selections: { rowId: string, palletIdx: number }[], shipmentId: string | null) {
-    // Group by rowId to minimize database calls
-    const grouped = selections.reduce((acc, sel) => {
-      if (!acc[sel.rowId]) acc[sel.rowId] = [];
-      acc[sel.rowId].push(sel.palletIdx);
-      return acc;
-    }, {} as Record<string, number[]>);
+    try {
+      if (isSupabaseConfigured) {
+        // Group by rowId to minimize database calls
+        const grouped = selections.reduce((acc, sel) => {
+          if (!acc[sel.rowId]) acc[sel.rowId] = [];
+          acc[sel.rowId].push(sel.palletIdx);
+          return acc;
+        }, {} as Record<string, number[]>);
 
-    for (const rowId in grouped) {
-      // 1. Get current item
-      const { data: item, error: getError } = await supabase
-        .from('inventory')
-        .select('inspections')
-        .eq('id', rowId)
-        .single();
-      
-      if (getError) throw getError;
-
-      // 2. Update inspections array
-      const inspections = [...(item.inspections || [])];
-      grouped[rowId].forEach(idx => {
-        if (inspections[idx]) {
-          if (shipmentId === null) {
-            const newInsp = { ...inspections[idx] };
-            delete newInsp.shipmentId;
-            delete (newInsp as any).shipment_id;
-            inspections[idx] = newInsp;
-          } else {
-            inspections[idx] = { ...inspections[idx], shipmentId: shipmentId };
+        for (const rowId in grouped) {
+          // 1. Get current item
+          const { data: item, error: getError } = await supabase
+            .from('inventory')
+            .select('inspections')
+            .eq('id', rowId)
+            .single();
+          
+          if (getError) {
+            console.warn('updateInventoryShipment fetch error:', getError);
+            continue;
           }
-        }
-      });
 
-      // 3. Save back
-      const { error: updateError } = await supabase
-        .from('inventory')
-        .update({ inspections })
-        .eq('id', rowId);
-      
-      if (updateError) throw updateError;
+          // 2. Update inspections array
+          const inspections = [...(item.inspections || [])];
+          grouped[rowId].forEach(idx => {
+            if (inspections[idx]) {
+              if (shipmentId === null) {
+                const newInsp = { ...inspections[idx] };
+                delete newInsp.shipmentId;
+                delete (newInsp as any).shipment_id;
+                inspections[idx] = newInsp;
+              } else {
+                inspections[idx] = { ...inspections[idx], shipmentId: shipmentId };
+              }
+            }
+          });
+
+          // 3. Save back
+          await supabase
+            .from('inventory')
+            .update({ inspections })
+            .eq('id', rowId);
+        }
+      }
+    } catch (err) {
+      console.warn('updateInventoryShipment exception:', err);
     }
   },
 
@@ -2104,67 +2297,101 @@ export const supabaseService = {
   async getRotativeStock(): Promise<RotativeStockItem[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('rotative_stock');
 
-    const { data, error } = await supabase
-      .from('rotative_stock')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    
-    if (error) {
-       console.warn('Supabase getRotativeStock failed, falling back to local storage:', error);
-       return localStorageHelper.get('rotative_stock');
+    try {
+      const { data, error } = await supabase
+        .from('rotative_stock')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if (error) {
+         if (isFetchOrNetworkError(error)) disableSupabase();
+         console.warn('Supabase getRotativeStock failed, falling back to local storage:', error);
+         return localStorageHelper.get('rotative_stock');
+      }
+      const rotativeStock = (data || []).map(item => ({
+        id: item.id,
+        productName: item.product_name,
+        quantity: item.quantity,
+        slotId: item.slot_id,
+        type: item.type || 'Frasco',
+        updatedAt: item.updated_at
+      }));
+      localStorageHelper.save('rotative_stock', rotativeStock);
+      return rotativeStock;
+    } catch (err) {
+      if (isFetchOrNetworkError(err)) disableSupabase();
+      console.warn('getRotativeStock exception, falling back to local storage:', err);
+      return localStorageHelper.get('rotative_stock');
     }
-    const rotativeStock = (data || []).map(item => ({
-      id: item.id,
-      productName: item.product_name,
-      quantity: item.quantity,
-      slotId: item.slot_id,
-      type: item.type || 'Frasco',
-      updatedAt: item.updated_at
-    }));
-    localStorageHelper.save('rotative_stock', rotativeStock);
-    return rotativeStock;
   },
 
   async saveRotativeStockItem(item: RotativeStockItem) {
     if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('rotative_stock')
-        .upsert({
-          id: item.id,
-          product_name: item.productName,
-          quantity: item.quantity,
-          slot_id: item.slotId,
-          type: item.type,
-          updated_at: new Date().toISOString()
-        });
-      
-      if (error) console.error('Supabase saveRotativeStockItem error:', error);
+      try {
+        const { error } = await supabase
+          .from('rotative_stock')
+          .upsert({
+            id: item.id,
+            product_name: item.productName,
+            quantity: item.quantity,
+            slot_id: item.slotId,
+            type: item.type,
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error) console.warn('Supabase saveRotativeStockItem error:', error);
+      } catch (err) {
+        console.warn('saveRotativeStockItem exception:', err);
+      }
     }
     localStorageHelper.update('rotative_stock', item);
   },
 
   async deleteRotativeStockItem(id: string) {
-    const { error } = await supabase
-      .from('rotative_stock')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    if (isSupabaseConfigured) {
+      try {
+        await supabase
+          .from('rotative_stock')
+          .delete()
+          .eq('id', id);
+      } catch (err) {
+        console.warn('deleteRotativeStockItem exception:', err);
+      }
+    }
+    const current = localStorageHelper.get('rotative_stock');
+    localStorageHelper.save('rotative_stock', current.filter((r: any) => r.id !== id));
   },
 
   async freeSlot(slotId: string) {
     if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('warehouse_slots')
-        .update({
-          status: 'EMPTY',
-          occupied_by: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', slotId);
-      
-      if (error) {
-        console.error('Error freeing slot:', error);
-        throw error;
+      try {
+        let { error } = await supabase
+          .from('warehouse_slots')
+          .update({
+            status: 'EMPTY',
+            occupied_by: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', slotId);
+        
+        if (error && isRetryableError(error)) {
+          await new Promise(r => setTimeout(r, 400));
+          const retryRes = await supabase
+            .from('warehouse_slots')
+            .update({
+              status: 'EMPTY',
+              occupied_by: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', slotId);
+          error = retryRes.error;
+        }
+
+        if (error) {
+          console.warn('Error freeing slot on Supabase:', error);
+        }
+      } catch (err) {
+        console.warn('freeSlot exception:', err);
       }
     }
     

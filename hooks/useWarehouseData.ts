@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { supabaseService } from '../services/supabaseService';
-import { disableSupabase } from '../lib/supabase';
+import { disableSupabase, isFetchOrNetworkError } from '../lib/supabase';
 import { 
   SheetRow, 
   DashboardStats, 
@@ -86,8 +86,8 @@ export function useWarehouseData(
       setWarehouseDiagnostic(diagnostic);
       setHasMoreInventory(invResult.data.length < invResult.count);
     } catch (error: any) {
-      console.error('Error refreshing data:', error);
-      if (error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.toString().includes('Failed to fetch')) {
+      console.warn('Error refreshing data:', error);
+      if (isFetchOrNetworkError(error)) {
         console.warn('Network error detected. Disabling Supabase and falling back to offline mode.');
         disableSupabase();
         setTimeout(() => refreshCombinedData(), 100);
