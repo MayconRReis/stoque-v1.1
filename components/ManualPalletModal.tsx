@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WarehouseSlot, SlotContent, SheetRow, translateSlotContent, getContentTypeColor, parseSlotContent, Shipment, ShipmentType } from '../types';
-import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare, Layers } from 'lucide-react';
+import { X, Plus, Truck, Package, ClipboardList, Info, FlaskConical, Database, ChevronDown, Trash2, MessageSquare, Layers, ShieldAlert, Calendar, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabaseService } from '../services/supabaseService';
 import { formatOP } from '../lib/formatters';
@@ -39,6 +39,10 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
   const [assignedSlot, setAssignedSlot] = useState('AGUARDANDO');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Special identifiers for supplies and bottles
+  const [withoutSeal, setWithoutSeal] = useState(false);
+  const [datedBottles, setDatedBottles] = useState(false);
+
   // Supply specific fields
   const [supplyFrascos, setSupplyFrascos] = useState(0);
   const [supplyTampas, setSupplyTampas] = useState(0);
@@ -63,6 +67,8 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
     setUnits(0);
     setPalletsCount(1);
     setAssignedSlot('AGUARDANDO');
+    setWithoutSeal(false);
+    setDatedBottles(false);
     setSupplyFrascos(0);
     setSupplyTampas(0);
     setSupplyCaixas(0);
@@ -116,6 +122,12 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
       if (insp?.reworkObs) {
         setReworkObs(insp.reworkObs);
       }
+      if (insp?.withoutSeal !== undefined) {
+        setWithoutSeal(Boolean(insp.withoutSeal));
+      }
+      if (insp?.datedBottles !== undefined) {
+        setDatedBottles(Boolean(insp.datedBottles));
+      }
       return;
     }
 
@@ -131,6 +143,8 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
       if (histMatch.pallet_type || histMatch.palletType) {
         setContentType(parseSlotContent(histMatch.pallet_type || histMatch.palletType));
       }
+      if (histMatch.withoutSeal !== undefined) setWithoutSeal(Boolean(histMatch.withoutSeal));
+      if (histMatch.datedBottles !== undefined) setDatedBottles(Boolean(histMatch.datedBottles));
       return;
     }
 
@@ -160,6 +174,12 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
           }
           if (match.reworkObs) {
             setReworkObs(match.reworkObs);
+          }
+          if ((match as any).withoutSeal !== undefined) {
+            setWithoutSeal(Boolean((match as any).withoutSeal));
+          }
+          if ((match as any).datedBottles !== undefined) {
+            setDatedBottles(Boolean((match as any).datedBottles));
           }
         }
       } catch (err) {
@@ -196,6 +216,8 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
         units,
         contentType,
         assignedSlot,
+        withoutSeal,
+        datedBottles,
       };
 
       if (isSupply) {
@@ -545,6 +567,42 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ─── IDENTIFICAÇÃO ESPECIAL: INSUMOS E FRASCOS ─── */}
+          {(contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <label className={labelCls}>Identificação Especial</label>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Botão 1: Sem Selo */}
+                <button
+                  type="button"
+                  onClick={() => setWithoutSeal(!withoutSeal)}
+                  className={`relative flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-center font-bold text-xs uppercase tracking-wider transition-all active:scale-[0.98] ${
+                    withoutSeal
+                      ? 'bg-red-500/15 border-red-500 text-red-400 shadow-lg shadow-red-950/40 ring-1 ring-red-500/30'
+                      : 'bg-[#0B1120] border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+                  }`}
+                >
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>Sem Selo</span>
+                </button>
+
+                {/* Botão 2: Datado */}
+                <button
+                  type="button"
+                  onClick={() => setDatedBottles(!datedBottles)}
+                  className={`relative flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-center font-bold text-xs uppercase tracking-wider transition-all active:scale-[0.98] ${
+                    datedBottles
+                      ? 'bg-amber-500/15 border-amber-500 text-amber-400 shadow-lg shadow-amber-950/40 ring-1 ring-amber-500/30'
+                      : 'bg-[#0B1120] border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>Datado</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* LOCALIZAÇÃO (VAGA) */}
           <div className="space-y-2">

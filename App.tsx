@@ -1491,7 +1491,7 @@ const App: React.FC = () => {
 
   const handleManualAdd = async (palletData: any) => {
     try {
-      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs } = palletData;
+      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs, withoutSeal, datedBottles } = palletData;
       
       const count = palletsCount || 1;
       const totalUnits = Number(units) || 0;
@@ -1536,6 +1536,8 @@ const App: React.FC = () => {
             contentType,
             assignedSlot,
             isConsolidated: false,
+            withoutSeal: !!withoutSeal,
+            datedBottles: !!datedBottles,
             ...(reworkObs ? { reworkObs } : {})
           };
         }),
@@ -1574,7 +1576,7 @@ const App: React.FC = () => {
 
   const handleAddUncatalogedPalletToShipment = async (palletData: any, shipmentId: string) => {
     try {
-      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs } = palletData;
+      const { description, op, lot, palletsCount, units, contentType, assignedSlot, supplyDetails, reworkObs, withoutSeal, datedBottles } = palletData;
       
       const count = Math.max(1, Number(palletsCount) || 1);
       const totalUnits = Number(units) || 0;
@@ -1620,6 +1622,8 @@ const App: React.FC = () => {
             assignedSlot,
             shipmentId: shipmentId, // Linked directly to this shipment
             isConsolidated: false,
+            withoutSeal: !!withoutSeal,
+            datedBottles: !!datedBottles,
             ...(reworkObs ? { reworkObs } : {})
           };
         }),
@@ -1776,6 +1780,7 @@ const App: React.FC = () => {
     assignedSlot?: string;
     reason?: string;
     withoutSeal?: boolean;
+    datedBottles?: boolean;
     supplyDetails?: {
       bottles: number;
       caps: number;
@@ -1799,6 +1804,7 @@ const App: React.FC = () => {
           contentType: updatedData.contentType,
           assignedSlot: updatedData.assignedSlot || updatedInspections[idx].assignedSlot,
           withoutSeal: updatedData.withoutSeal !== undefined ? updatedData.withoutSeal : updatedInspections[idx].withoutSeal,
+          datedBottles: updatedData.datedBottles !== undefined ? updatedData.datedBottles : updatedInspections[idx].datedBottles,
           ...(isSuppliesType && updatedData.supplyDetails ? updatedData.supplyDetails : {}),
           ...(isBottlesType ? { bottles: updatedData.quantity, boxes: 0 } : {}),
           ...(!isSuppliesType && !isBottlesType ? { boxes: updatedData.quantity, bottles: 0 } : {})
@@ -2211,23 +2217,25 @@ const App: React.FC = () => {
       item.inspections?.forEach((insp, idx) => {
         // Search term check
         
-        const isSemSeloSearch = term === 'sem selo';
+        const isSemSeloSearch = term === 'sem selo' || term === 'sem-selo';
+        const isDatadoSearch = term === 'datado' || term === 'datados' || term === 'frasco datado' || term === 'frascos datados';
         const isSlotSearch = /^[a-fA-F](\.\d+){0,2}$/.test(term);
         
         let matchesSearch = true;
         if (term) {
            if (isSemSeloSearch) {
               matchesSearch = insp.withoutSeal === true;
+           } else if (isDatadoSearch) {
+              matchesSearch = insp.datedBottles === true;
            } else if (isSlotSearch) {
               matchesSearch = (insp.assignedSlot || '').toLowerCase().includes(term);
            }
         }
 
-
-        
         // Type filter check
         const matchesType = inventoryTypeFilter === 'ALL' || 
           (inventoryTypeFilter === 'SEM_SELO' && insp.withoutSeal) ||
+          (inventoryTypeFilter === 'DATADOS' && insp.datedBottles) ||
           insp.contentType === inventoryTypeFilter ||
           (inventoryTypeFilter === 'CONTAINER' && [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType));
 
@@ -3065,6 +3073,7 @@ const App: React.FC = () => {
                           <span className={`text-[10px] font-black uppercase tracking-widest ${inventoryTypeFilter !== 'ALL' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500'}`}>
                             {inventoryTypeFilter === 'ALL' ? 'Todos os Tipos' : 
                              inventoryTypeFilter === 'SEM_SELO' ? 'SEM SELO' : 
+                             inventoryTypeFilter === 'DATADOS' ? 'FRASCOS DATADOS' :
                              inventoryTypeFilter === 'CONTAINER' ? 'Container (SJ/LP/CP)' : 
                              translateSlotContent(inventoryTypeFilter as SlotContent)}
                           </span>
@@ -3080,6 +3089,7 @@ const App: React.FC = () => {
                               {[
                                 { value: 'ALL', label: 'Todos os Tipos' },
                                 { value: 'SEM_SELO', label: 'SEM SELO' },
+                                { value: 'DATADOS', label: 'FRASCOS DATADOS' },
                                 { value: SlotContent.BOTTLES, label: 'Frasco' },
                                 { value: SlotContent.SUPPLIES, label: 'Insumo' },
                                 { value: SlotContent.FINISHED_PRODUCT, label: 'Produto Acabado' },

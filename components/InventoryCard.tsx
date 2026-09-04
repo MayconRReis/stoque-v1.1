@@ -90,14 +90,27 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
       onClick={() => onToggleSelection(item.id, idx)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`group bg-white dark:bg-slate-900/60 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full shadow-lg ${
+      className={`group bg-white dark:bg-slate-900/60 backdrop-blur-md p-6 rounded-[2rem] border transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col h-full shadow-lg ${
         isSelected 
           ? 'ring-2 ring-purple-500/50 bg-purple-50 dark:bg-purple-900/10 border-purple-500/50' 
-          : `hover:border-${baseColor}-500/30 hover:shadow-xl`
+          : insp.withoutSeal && insp.datedBottles
+          ? 'border-red-500/40 dark:border-red-500/30 hover:border-red-500/60 hover:shadow-xl'
+          : insp.withoutSeal
+          ? 'border-red-500/30 dark:border-red-500/20 hover:border-red-500/50 hover:shadow-xl'
+          : insp.datedBottles
+          ? 'border-amber-500/30 dark:border-amber-500/20 hover:border-amber-500/50 hover:shadow-xl'
+          : `border-slate-200 dark:border-slate-800 hover:border-${baseColor}-500/30 hover:shadow-xl`
       }`}
     >
-      {insp.withoutSeal && (
+      {/* Top Warning Strips */}
+      {insp.withoutSeal && !insp.datedBottles && (
         <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-red-500 to-orange-500 z-20" />
+      )}
+      {insp.datedBottles && !insp.withoutSeal && (
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 z-20" />
+      )}
+      {insp.withoutSeal && insp.datedBottles && (
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-red-500 via-amber-500 to-yellow-400 z-20" />
       )}
 
       {/* Background Icon Accent - Reduced size for better perf */}
@@ -114,9 +127,16 @@ const InventoryCard: React.FC<InventoryCardProps> = ({
             </div>
             
             {insp.withoutSeal && (
-              <div className="bg-red-500 text-slate-900 dark:text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-red-600/50 animate-pulse mt-1">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                SEM SELO
+              <div className="bg-red-500 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-red-600/50 animate-pulse mt-1">
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                <span>SEM SELO</span>
+              </div>
+            )}
+
+            {insp.datedBottles && (
+              <div className="bg-amber-500 text-slate-950 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-600/50 mt-1">
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                <span>FRASCO DATADO</span>
               </div>
             )}
 

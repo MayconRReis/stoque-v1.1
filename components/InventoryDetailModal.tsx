@@ -9,7 +9,9 @@ import {
   Info, 
   Box,
   RefreshCw,
-  Container
+  Container,
+  ShieldAlert,
+  Calendar
 } from 'lucide-react';
 
 interface InventoryDetailModalProps {
@@ -98,12 +100,22 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({ isOp
                 <Info className="w-4 h-4" /> {inspection.supplyDescription}
               </p>
             )}
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3 items-center">
                {row.originOP && (
                  <span className="bg-blue-600/10 text-blue-500 text-[10px] font-black px-3 py-1 rounded-lg border border-blue-500/20 uppercase tracking-widest">OP {row.originOP}</span>
                )}
                {row.lot && (
                  <span className="bg-amber-600/10 text-amber-500 text-[10px] font-black px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest">Lote {row.lot}</span>
+               )}
+               {inspection.withoutSeal && (
+                 <span className="bg-red-500/10 text-red-500 text-[10px] font-black px-3 py-1 rounded-lg border border-red-500/20 uppercase tracking-widest flex items-center gap-1.5 animate-pulse">
+                   <ShieldAlert className="w-3.5 h-3.5" /> Sem Selo
+                 </span>
+               )}
+               {inspection.datedBottles && (
+                 <span className="bg-amber-500/10 text-amber-500 text-[10px] font-black px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-widest flex items-center gap-1.5">
+                   <Calendar className="w-3.5 h-3.5" /> Frasco Datado
+                 </span>
                )}
             </div>
           </div>

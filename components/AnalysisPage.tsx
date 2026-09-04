@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SheetRow, WarehouseSlot, SlotContent, translateSlotContent } from '../types';
-import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container, ShieldAlert } from 'lucide-react';
+import { ClipboardCheck, Box, Check, X, AlertCircle, Info, FlaskConical, Truck, RefreshCw, Container, ShieldAlert, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
 import { ImportPage } from './ImportPage';
@@ -30,6 +30,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
   const [boxes, setBoxes] = useState(0);
   const [cradles, setCradles] = useState(0);
   const [withoutSeal, setWithoutSeal] = useState(false);
+  const [datedBottles, setDatedBottles] = useState(false);
   const [others, setOthers] = useState<{ id: string; name: string; quantity: number }[]>([]);
 
   const addOther = () => {
@@ -76,6 +77,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
     setBoxes(item.inspections?.[0]?.boxes || 0);
     setCradles(item.inspections?.[0]?.cradles || 0);
     setWithoutSeal(item.inspections?.[0]?.withoutSeal || false);
+    setDatedBottles(item.inspections?.[0]?.datedBottles || false);
     if (item.inspections?.[0]?.others) {
       setOthers(item.inspections[0].others.map(o => ({ ...o, id: Math.random().toString() })));
     } else {
@@ -116,6 +118,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
           boxes,
           cradles,
           withoutSeal,
+          datedBottles,
           others: others.map(o => ({ name: o.name.toUpperCase(), quantity: o.quantity }))
         }
       );
@@ -131,6 +134,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
       setBoxes(0);
       setCradles(0);
       setWithoutSeal(false);
+      setDatedBottles(false);
       setOthers([]);
     } catch (error) {
       console.error('Analysis confirmation error:', error);
@@ -327,22 +331,40 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ pendingItems, availa
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setWithoutSeal(!withoutSeal)}
-                      className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
-                        withoutSeal 
-                          ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500' 
-                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
-                      }`}
-                    >
-                      <ShieldAlert className="w-4 h-4" />
-                      Marcar Sem Selo
-                    </button>
+                {(contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                      Identificação Especial
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setWithoutSeal(!withoutSeal)}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                          withoutSeal 
+                            ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500 shadow-sm' 
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
+                        }`}
+                      >
+                        <ShieldAlert className="w-4 h-4 shrink-0" />
+                        <span>Sem Selo</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDatedBottles(!datedBottles)}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                          datedBottles 
+                            ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm' 
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-amber-300 dark:hover:border-amber-900'
+                        }`}
+                      >
+                        <Calendar className="w-4 h-4 shrink-0" />
+                        <span>Datado</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {(contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
                   <div className="space-y-4">

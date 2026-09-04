@@ -82,13 +82,19 @@ export const OnlineOperatorsWidget: React.FC<OnlineOperatorsWidgetProps> = ({
       {/* Popover com lista de operadores conectados */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 sm:right-auto sm:left-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 z-50 backdrop-blur-md"
-          >
+          <>
+            {/* Backdrop no mobile para toque externo */}
+            <div 
+              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-xs sm:hidden"
+              onClick={() => setIsOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="fixed sm:absolute top-[4.25rem] sm:top-full left-3 right-3 sm:left-auto sm:right-0 mt-2 max-w-sm sm:max-w-none sm:w-72 mx-auto sm:mx-0 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 z-50 backdrop-blur-md"
+            >
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2 shrink-0">
@@ -148,7 +154,8 @@ export const OnlineOperatorsWidget: React.FC<OnlineOperatorsWidgetProps> = ({
               })}
             </div>
           </motion.div>
-        )}
+        </>
+      )}
       </AnimatePresence>
     </div>
   );

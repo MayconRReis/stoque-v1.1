@@ -22,7 +22,8 @@ import {
   MapPin,
   ChevronDown,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatOP } from '../lib/formatters';
@@ -99,6 +100,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
   const [boxes, setBoxes] = useState(0);
   const [cradles, setCradles] = useState(0);
   const [withoutSeal, setWithoutSeal] = useState(false);
+  const [datedBottles, setDatedBottles] = useState(false);
   const [others, setOthers] = useState<{ id: string; name: string; quantity: number }[]>([]);
 
   useEffect(() => {
@@ -121,6 +123,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       setBoxes(pallet.inspection.boxes || 0);
       setCradles(pallet.inspection.cradles || 0);
       setWithoutSeal(pallet.inspection.withoutSeal || false);
+      setDatedBottles(pallet.inspection.datedBottles || false);
       setOthers(pallet.inspection.others?.map(o => ({ ...o, id: Math.random().toString(36).substring(2, 9) })) || []);
       setIsAutoFilled(false);
     }
@@ -192,6 +195,7 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
       reason: userRole === 'operator' ? reason : undefined,
       assignedSlot: assignedSlot || pallet?.inspection.assignedSlot,
       withoutSeal,
+      datedBottles,
       supplyDetails: contentType === SlotContent.SUPPLIES ? {
         bottles,
         caps,
@@ -486,20 +490,38 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
             </motion.div>
           )}
 
-          {userRole === 'admin' && mode === 'edit' && (
-            <div className="space-y-4 pt-2">
-              <button
-                type="button"
-                onClick={() => setWithoutSeal(!withoutSeal)}
-                className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
-                  withoutSeal 
-                    ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500' 
-                    : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
-                }`}
-              >
-                <ShieldAlert className="w-4 h-4" />
-                {withoutSeal ? 'Marcado: Sem Selo' : 'Marcar Sem Selo'}
-              </button>
+          {mode === 'edit' && (contentType === SlotContent.SUPPLIES || contentType === SlotContent.BOTTLES) && (
+            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                Identificação Especial
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWithoutSeal(!withoutSeal)}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                    withoutSeal 
+                      ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 dark:text-red-500 shadow-sm' 
+                      : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-red-300 dark:hover:border-red-900'
+                  }`}
+                >
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>Sem Selo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDatedBottles(!datedBottles)}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${
+                    datedBottles 
+                      ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm' 
+                      : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-amber-300 dark:hover:border-amber-900'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>Datado</span>
+                </button>
+              </div>
             </div>
           )}
 
