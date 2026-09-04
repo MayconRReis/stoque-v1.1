@@ -79,7 +79,8 @@ import { MovementModal } from "./components/MovementModal";
 import { ShipmentPage } from './components/ShipmentPage';
 import { ShipmentModal } from './components/ShipmentModal';
 import { ShipmentDetailModal } from './components/ShipmentDetailModal';
-import { supabaseService, mapHistoryRow } from './services/supabaseService';
+import { supabaseService, mapHistoryRow, clientSessionId } from './services/supabaseService';
+import { OnlineOperatorsWidget } from './components/OnlineOperatorsWidget';
 import {
   isBrowserNotificationSupported,
   getBrowserNotificationPermission,
@@ -300,6 +301,17 @@ const App: React.FC = () => {
 
   // Multi-user Presence & Notification Deduplication
   const [onlineOperators, setOnlineOperators] = useState<Array<{ id?: string; name: string; role: string; email?: string; sessionId?: string }>>([]);
+
+  useEffect(() => {
+    if (user && !isPublicView) {
+      setOnlineOperators(prev => {
+        if (!prev.some(o => (user.id && o.id === user.id) || o.name === user.name)) {
+          return [{ id: user.id, name: user.name, role: user.role, email: user.email, sessionId: clientSessionId }, ...prev];
+        }
+        return prev;
+      });
+    }
+  }, [user, isPublicView]);
   const recentNotifKeysRef = useRef<Map<string, number>>(new Map());
   const shouldNotify = useCallback((key: string, cooldownMs = 5000): boolean => {
     const now = Date.now();
@@ -720,10 +732,14 @@ const App: React.FC = () => {
       presenceSubscription = supabaseService.trackPresence(
         { id: user.id, name: user.name, role: user.role, email: user.email },
         (activeUsers) => {
+          const list = [...activeUsers];
+          if (user && !list.some(u => (user.id && u.id === user.id) || u.name === user.name)) {
+            list.push({ id: user.id, name: user.name, role: user.role, email: user.email, sessionId: clientSessionId });
+          }
           const seen = new Set();
-          const unique = activeUsers.filter(u => {
-            const k = u.sessionId || u.id || u.name;
-            if (seen.has(k)) return false;
+          const unique = list.filter(u => {
+            const k = u.id || u.name;
+            if (!k || seen.has(k)) return false;
             seen.add(k);
             return true;
           });
@@ -2505,6 +2521,13 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            {!isPublicView && (
+              <OnlineOperatorsWidget 
+                operators={onlineOperators}
+                currentUser={user}
+              />
+            )}
+
             <button
               onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               className="flex items-center justify-center w-10 h-10 bg-slate-100 dark:bg-slate-900/50 hover:bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-800/50 rounded-full text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-all active:scale-95 shadow-sm group"
@@ -2520,19 +2543,6 @@ const App: React.FC = () => {
                >
                  Acessar App
                </button>
-             )}
-
-             {!isPublicView && onlineOperators.length > 0 && (
-               <div 
-                 className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold select-none cursor-default"
-                 title={`Operadores conectados agora (${onlineOperators.length}):\n${onlineOperators.map(o => `• ${o.name} (${o.role === 'admin' ? 'Administrador' : 'Operador'})`).join('\n')}`}
-               >
-                 <span className="relative flex h-2 w-2">
-                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                 </span>
-                 <span>{onlineOperators.length === 1 ? '1 online' : `${onlineOperators.length} online`}</span>
-               </div>
              )}
              
             {!isPublicView && (

@@ -40,6 +40,9 @@ export const clientSessionId = typeof window !== 'undefined'
   : 'server-' + Math.random().toString(36).substring(2, 7);
 
 let syncChannel: any = null;
+let syncBroadcastCallbacks: ((event: string, payload: any) => void)[] = [];
+let syncPresenceCallbacks: ((users: any[]) => void)[] = [];
+let currentPresenceUser: any = null;
 
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
@@ -2644,9 +2647,11 @@ export const supabaseService = {
     }
   },
 
-  // Instant Multi-User Realtime Broadcast Engine
-  getSyncChannel() {
+  // Instant Multi-User Realtime Broadcast & Presence Engine
+  initSyncRoom(userInfo?: { id?: string; name: string; role: string; email?: string }) {
     if (!isSupabaseConfigured) return null;
+    if (userInfo) currentPresenceUser = userInfo;
+
     if (!syncChannel) {
       syncChannel = supabase.channel('stoque-sync-room', {
         config: {
@@ -2654,17 +2659,76 @@ export const supabaseService = {
           presence: { key: clientSessionId }
         }
       });
-      syncChannel.subscribe((status: string, err: any) => {
-        if (err) console.warn('Sync channel warning:', err);
+
+      // Broadcast listener
+      syncChannel.on('broadcast', { event: '*' }, (msg: any) => {
+        if (msg && msg.event && msg.payload) {
+          if (msg.payload._senderId !== clientSessionId) {
+            syncBroadcastCallbacks.forEach(cb => {
+              try { cb(msg.event, msg.payload); } catch (e) { console.warn(e); }
+            });
+          }
+        }
       });
+
+      const notifyPresence = () => {
+        const state = syncChannel.presenceState();
+        const users: any[] = [];
+        Object.values(state).forEach((presences: any) => {
+          if (Array.isArray(presences)) {
+            presences.forEach(p => users.push(p));
+          }
+        });
+        syncPresenceCallbacks.forEach(cb => {
+          try { cb(users); } catch (e) { console.warn(e); }
+        });
+      };
+
+      syncChannel.on('presence', { event: 'sync' }, notifyPresence);
+      syncChannel.on('presence', { event: 'join' }, notifyPresence);
+      syncChannel.on('presence', { event: 'leave' }, notifyPresence);
+
+      syncChannel.subscribe(async (status: string, err: any) => {
+        if (err) console.warn('Sync channel warning:', err);
+        if (status === 'SUBSCRIBED' && currentPresenceUser) {
+          try {
+            await syncChannel.track({
+              id: currentPresenceUser.id || clientSessionId,
+              name: currentPresenceUser.name,
+              role: currentPresenceUser.role,
+              email: currentPresenceUser.email,
+              sessionId: clientSessionId,
+              onlineAt: new Date().toISOString()
+            });
+          } catch (e) {
+            console.warn('channel.track error on subscribe:', e);
+          }
+        }
+      });
+    } else if (userInfo) {
+      if (syncChannel.state === 'joined') {
+        syncChannel.track({
+          id: userInfo.id || clientSessionId,
+          name: userInfo.name,
+          role: userInfo.role,
+          email: userInfo.email,
+          sessionId: clientSessionId,
+          onlineAt: new Date().toISOString()
+        }).catch((e: any) => console.warn('Track update error:', e));
+      }
     }
+
     return syncChannel;
+  },
+
+  getSyncChannel() {
+    return this.initSyncRoom();
   },
 
   async broadcastAppEvent(event: string, payload: any) {
     if (!isSupabaseConfigured) return;
     try {
-      const channel = this.getSyncChannel();
+      const channel = this.initSyncRoom();
       if (channel) {
         await channel.send({
           type: 'broadcast',
@@ -2683,84 +2747,32 @@ export const supabaseService = {
 
   subscribeToAppBroadcast(callback: (event: string, payload: any) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    try {
-      const channel = this.getSyncChannel();
-      if (!channel) return { unsubscribe: () => {} };
-
-      channel.on('broadcast', { event: '*' }, (msg: any) => {
-        if (msg && msg.event && msg.payload) {
-          if (msg.payload._senderId !== clientSessionId) {
-            callback(msg.event, msg.payload);
-          }
-        }
-      });
-
-      return {
-        unsubscribe: () => {
-          // Keep channel open for other broadcast listeners
-        }
-      };
-    } catch (e) {
-      console.warn('subscribeToAppBroadcast error:', e);
-      return { unsubscribe: () => {} };
-    }
+    syncBroadcastCallbacks.push(callback);
+    this.initSyncRoom();
+    return {
+      unsubscribe: () => {
+        syncBroadcastCallbacks = syncBroadcastCallbacks.filter(cb => cb !== callback);
+      }
+    };
   },
 
   trackPresence(userInfo: { id?: string; name: string; role: string; email?: string }, onPresenceSync?: (activeUsers: any[]) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    try {
-      const channel = this.getSyncChannel();
-      if (!channel) return { unsubscribe: () => {} };
-
-      if (onPresenceSync) {
-        channel.on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          const users: any[] = [];
-          Object.values(state).forEach((presences: any) => {
-            if (Array.isArray(presences)) {
-              presences.forEach(p => users.push(p));
-            }
-          });
-          onPresenceSync(users);
-        });
-      }
-
-      const doTrack = async () => {
-        try {
-          await channel.track({
-            id: userInfo.id || clientSessionId,
-            name: userInfo.name,
-            role: userInfo.role,
-            email: userInfo.email,
-            sessionId: clientSessionId,
-            onlineAt: new Date().toISOString()
-          });
-        } catch (e) {
-          console.warn('channel.track error:', e);
-        }
-      };
-
-      if (channel.state === 'joined') {
-        doTrack();
-      } else {
-        channel.subscribe((status: string) => {
-          if (status === 'SUBSCRIBED') {
-            doTrack();
-          }
-        });
-      }
-
-      return {
-        unsubscribe: () => {
-          try {
-            channel.untrack();
-          } catch {}
-        }
-      };
-    } catch (e) {
-      console.warn('trackPresence error:', e);
-      return { unsubscribe: () => {} };
+    if (onPresenceSync) {
+      syncPresenceCallbacks.push(onPresenceSync);
     }
+    const channel = this.initSyncRoom(userInfo);
+
+    return {
+      unsubscribe: () => {
+        if (onPresenceSync) {
+          syncPresenceCallbacks = syncPresenceCallbacks.filter(cb => cb !== onPresenceSync);
+        }
+        try {
+          if (channel) channel.untrack();
+        } catch {}
+      }
+    };
   }
 };
 
