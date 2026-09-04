@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import Papa from 'papaparse';
 import { disableSupabase, isFetchOrNetworkError } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
@@ -298,6 +298,22 @@ const App: React.FC = () => {
     });
   }, [browserPerm, handleRequestBrowserPermission]);
 
+  // Multi-user Presence & Notification Deduplication
+  const [onlineOperators, setOnlineOperators] = useState<Array<{ id?: string; name: string; role: string; email?: string; sessionId?: string }>>([]);
+  const recentNotifKeysRef = useRef<Map<string, number>>(new Map());
+  const shouldNotify = useCallback((key: string, cooldownMs = 5000): boolean => {
+    const now = Date.now();
+    const last = recentNotifKeysRef.current.get(key);
+    if (last && now - last < cooldownMs) return false;
+    recentNotifKeysRef.current.set(key, now);
+    if (recentNotifKeysRef.current.size > 120) {
+      for (const [k, t] of recentNotifKeysRef.current.entries()) {
+        if (now - t > 15000) recentNotifKeysRef.current.delete(k);
+      }
+    }
+    return true;
+  }, []);
+
   const [detailContext, setDetailContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletContext, setEditPalletContext] = useState<{ row: SheetRow, inspection: InspectionData, idx: number } | null>(null);
   const [editPalletMode, setEditPalletMode] = useState<'edit' | 'assign'>('edit');
@@ -555,9 +571,11 @@ const App: React.FC = () => {
           return [newItem, ...prev];
         });
         if (newItem.status === 'PENDING') {
-          setPendingRows(prev => [newItem, ...prev]);
-          showNotification('Novo pallet aguardando análise', 'info');
-          notifyPendingAnalysis(payload.new, () => navigateToTab('analysis'));
+          setPendingRows(prev => [newItem, ...prev.filter(p => p.id !== newItem.id)]);
+          if (shouldNotify('analysis-' + newItem.id)) {
+            showNotification('Novo pallet aguardando análise', 'info');
+            notifyPendingAnalysis(payload.new, () => navigateToTab('analysis'));
+          }
         }
       } else if (payload.eventType === 'UPDATE') {
         const updatedItem = mapInventoryItem(payload.new);
@@ -579,7 +597,7 @@ const App: React.FC = () => {
     const editRequestsChannel = supabaseService.subscribeToEditRequests((payload) => {
       if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
         setPendingApprovalsCount(prev => prev + 1);
-        if (user?.role === 'admin') {
+        if (user?.role === 'admin' && shouldNotify('approval-' + payload.new.id)) {
           showNotification('Nova solicitação de aprovação', 'info');
           notifyPendingApproval(payload.new, () => navigateToTab('approvals'));
         }
@@ -613,8 +631,10 @@ const App: React.FC = () => {
         console.warn('Silent shipments fetch error:', err);
       });
       if (payload && payload.eventType === 'INSERT' && payload.new.status === 'OPEN') {
-        showNotification('Novo carregamento criado', 'info');
-        notifyShipmentCreated(payload.new, () => navigateToTab('shipments'));
+        if (shouldNotify('shipment-' + payload.new.id)) {
+          showNotification('Novo carregamento criado', 'info');
+          notifyShipmentCreated(payload.new, () => navigateToTab('shipments'));
+        }
       }
     });
 
@@ -625,9 +645,92 @@ const App: React.FC = () => {
           if (prev.some(h => h.id === newHist.id)) return prev;
           return [newHist, ...prev];
         });
-        notifyMovementDone(newHist, () => navigateToTab('history'));
+        if (shouldNotify('history-' + newHist.id)) {
+          notifyMovementDone(newHist, () => navigateToTab('history'));
+        }
       }
     });
+
+    // Realtime Broadcast Channel (Instant sync across active sessions without database lag)
+    const broadcastSubscription = supabaseService.subscribeToAppBroadcast((event, payload) => {
+      if (event === 'inventory:saved') {
+        const item = payload.item;
+        if (!item) return;
+        setData(prev => {
+          const exists = prev.some(r => r.id === item.id);
+          if (exists) return prev.map(r => r.id === item.id ? item : r);
+          return [item, ...prev];
+        });
+        if (item.status === 'PENDING') {
+          setPendingRows(prev => {
+            const exists = prev.some(r => r.id === item.id);
+            if (exists) return prev.map(r => r.id === item.id ? item : r);
+            return [item, ...prev];
+          });
+          if (shouldNotify('analysis-' + item.id)) {
+            showNotification('Novo pallet aguardando análise', 'info');
+            notifyPendingAnalysis(item, () => navigateToTab('analysis'));
+          }
+        } else {
+          setPendingRows(prev => prev.filter(r => r.id !== item.id));
+        }
+      } else if (event === 'inventory:deleted') {
+        setData(prev => prev.filter(r => r.id !== payload.id));
+        setPendingRows(prev => prev.filter(r => r.id !== payload.id));
+      } else if (event === 'slot:updated') {
+        const slot = payload.slot;
+        if (slot) {
+          setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, ...slot } : s));
+        }
+      } else if (event === 'slots:bulk_updated') {
+        const incomingSlots: WarehouseSlot[] = payload.slots || [];
+        const slotMap = new Map(incomingSlots.map(s => [s.id, s]));
+        setSlots(prev => prev.map(s => slotMap.has(s.id) ? { ...s, ...slotMap.get(s.id)! } : s));
+      } else if (event === 'shipment:saved') {
+        supabaseService.getShipments().then(setShipments).catch(() => {});
+        if (payload.shipment?.status === 'OPEN' && shouldNotify('shipment-' + payload.shipment.id)) {
+          showNotification('Novo carregamento criado', 'info');
+          notifyShipmentCreated(payload.shipment, () => navigateToTab('shipments'));
+        }
+      } else if (event === 'shipment:deleted') {
+        setShipments(prev => prev.filter(s => s.id !== payload.shipmentId));
+      } else if (event === 'approval:requested') {
+        setPendingApprovalsCount(prev => prev + 1);
+        if (user?.role === 'admin' && shouldNotify('approval-' + (payload.request?.id || Date.now()))) {
+          showNotification('Nova solicitação de aprovação', 'info');
+          notifyPendingApproval(payload.request, () => navigateToTab('approvals'));
+        }
+      } else if (event === 'approval:resolved') {
+        setPendingApprovalsCount(prev => Math.max(0, prev - 1));
+        refreshCombinedData();
+      } else if (event === 'history:saved') {
+        const entry = payload.entry;
+        if (entry) {
+          setHistory(prev => [entry, ...prev.filter(h => h.id !== entry.id)]);
+          if (shouldNotify('history-' + entry.id)) {
+            notifyMovementDone(entry, () => navigateToTab('history'));
+          }
+        }
+      }
+    });
+
+    // Realtime Operator Presence
+    let presenceSubscription: any = null;
+    if (user && !isPublicView) {
+      presenceSubscription = supabaseService.trackPresence(
+        { id: user.id, name: user.name, role: user.role, email: user.email },
+        (activeUsers) => {
+          const seen = new Set();
+          const unique = activeUsers.filter(u => {
+            const k = u.sessionId || u.id || u.name;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          setOnlineOperators(unique);
+        }
+      );
+    }
 
     return () => {
       inventoryChannel?.unsubscribe?.();
@@ -635,6 +738,8 @@ const App: React.FC = () => {
       slotsChannel?.unsubscribe?.();
       shipmentsChannel?.unsubscribe?.();
       historyChannel?.unsubscribe?.();
+      broadcastSubscription?.unsubscribe?.();
+      presenceSubscription?.unsubscribe?.();
     };
   }, [user, isPublicView]);
 
@@ -1575,6 +1680,13 @@ const App: React.FC = () => {
       }
 
       if (toSlot && toSlot !== 'AGUARDANDO') {
+        const freshSlot = await supabaseService.getSlotById(toSlot);
+        if (freshSlot && freshSlot.status !== SlotContent.EMPTY && (freshSlot.status as any) !== 'VAZIO' && freshSlot.occupiedBy && freshSlot.occupiedBy !== item.description) {
+          showNotification(`A vaga ${toSlot} acabou de ser ocupada por outro operador (${freshSlot.occupiedBy}). Selecione outra vaga disponível.`, 'error');
+          refreshCombinedData();
+          return;
+        }
+
         const targetSlotObj = slots.find(s => s.id === toSlot);
         if (targetSlotObj) {
           const updatedTo = {
@@ -2408,6 +2520,19 @@ const App: React.FC = () => {
                >
                  Acessar App
                </button>
+             )}
+
+             {!isPublicView && onlineOperators.length > 0 && (
+               <div 
+                 className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold select-none cursor-default"
+                 title={`Operadores conectados agora (${onlineOperators.length}):\n${onlineOperators.map(o => `• ${o.name} (${o.role === 'admin' ? 'Administrador' : 'Operador'})`).join('\n')}`}
+               >
+                 <span className="relative flex h-2 w-2">
+                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                 </span>
+                 <span>{onlineOperators.length === 1 ? '1 online' : `${onlineOperators.length} online`}</span>
+               </div>
              )}
              
             {!isPublicView && (

@@ -60,6 +60,9 @@ export function playNotificationSound(): void {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     
     // Tone 1
     const osc1 = ctx.createOscillator();

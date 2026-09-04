@@ -35,6 +35,12 @@ const localStorageHelper = {
   }
 };
 
+export const clientSessionId = typeof window !== 'undefined'
+  ? ((window as any).__stoqueSessionId || ((window as any).__stoqueSessionId = Math.random().toString(36).substring(2, 11)))
+  : 'server-' + Math.random().toString(36).substring(2, 7);
+
+let syncChannel: any = null;
+
 /**
  * SQL for Supabase Setup (Run this in Supabase SQL Editor):
  * 
@@ -1098,6 +1104,7 @@ export const supabaseService = {
       }
     }
     localStorageHelper.update('inventory', item);
+    this.broadcastAppEvent('inventory:saved', { item });
   },
 
   async deleteInventoryItem(id: string) {
@@ -1126,6 +1133,7 @@ export const supabaseService = {
     }
     const current = localStorageHelper.get('inventory');
     localStorageHelper.save('inventory', current.filter((item: any) => item.id !== id));
+    this.broadcastAppEvent('inventory:deleted', { id });
   },
 
   // Slots
@@ -1247,6 +1255,7 @@ export const supabaseService = {
       }
     }
     localStorageHelper.update('warehouse_slots', slot);
+    this.broadcastAppEvent('slot:updated', { slot });
   },
 
   async bulkUpdateSlots(slots: WarehouseSlot[]) {
@@ -1277,6 +1286,7 @@ export const supabaseService = {
     const slotMap = new Map(current.map((s: any) => [s.id, s]));
     slots.forEach(s => slotMap.set(s.id, s));
     localStorageHelper.save('warehouse_slots', Array.from(slotMap.values()));
+    this.broadcastAppEvent('slots:bulk_updated', { slots });
   },
 
   // History
@@ -1450,6 +1460,7 @@ export const supabaseService = {
       }
     }
     localStorageHelper.add('history', entry);
+    this.broadcastAppEvent('history:saved', { entry });
   },
 
   // Auth
@@ -1696,6 +1707,7 @@ export const supabaseService = {
       .single();
     
     if (error) throw error;
+    this.broadcastAppEvent('approval:requested', { request: data });
     return data;
   },
 
@@ -2009,6 +2021,7 @@ export const supabaseService = {
       .eq('id', requestId);
     
     if (statusError) throw statusError;
+    this.broadcastAppEvent('approval:resolved', { requestId, status, adminComment });
   },
 
   // Real-time Subscriptions
@@ -2114,6 +2127,7 @@ export const supabaseService = {
       }
     }
     localStorageHelper.update('shipments', shipment);
+    this.broadcastAppEvent('shipment:saved', { shipment });
   },
 
   async deleteShipment(shipmentId: string) {
@@ -2152,6 +2166,7 @@ export const supabaseService = {
     // Also delete locally
     const current = localStorageHelper.get('shipments');
     localStorageHelper.save('shipments', current.filter((s: any) => s.id !== shipmentId));
+    this.broadcastAppEvent('shipment:deleted', { shipmentId });
   },
 
   async updateInventoryShipment(selections: { rowId: string, palletIdx: number }[], shipmentId: string | null) {
@@ -2323,6 +2338,7 @@ export const supabaseService = {
       }
     }
     localStorageHelper.update('rotative_stock', item);
+    this.broadcastAppEvent('rotative:saved', { item });
   },
 
   async deleteRotativeStockItem(id: string) {
@@ -2338,6 +2354,7 @@ export const supabaseService = {
     }
     const current = localStorageHelper.get('rotative_stock');
     localStorageHelper.save('rotative_stock', current.filter((r: any) => r.id !== id));
+    this.broadcastAppEvent('rotative:deleted', { id });
   },
 
   async freeSlot(slotId: string) {
@@ -2376,11 +2393,14 @@ export const supabaseService = {
     // Update local storage too
     const slots = localStorageHelper.get('warehouse_slots');
     const index = slots.findIndex((s: any) => s.id === slotId);
+    let freedSlot = null;
     if (index !== -1) {
       slots[index].status = 'EMPTY';
       slots[index].occupiedBy = null;
+      freedSlot = slots[index];
       localStorageHelper.save('warehouse_slots', slots);
     }
+    this.broadcastAppEvent('slot:updated', { slot: freedSlot || { id: slotId, status: 'VAZIO', occupiedBy: null } });
   },
 
   async getWarehouseDiagnostic(): Promise<WarehouseDiagnostic> {
@@ -2620,6 +2640,125 @@ export const supabaseService = {
         .subscribe();
     } catch (e) {
       console.warn('Realtime subscription failed for history:', e);
+      return { unsubscribe: () => {} };
+    }
+  },
+
+  // Instant Multi-User Realtime Broadcast Engine
+  getSyncChannel() {
+    if (!isSupabaseConfigured) return null;
+    if (!syncChannel) {
+      syncChannel = supabase.channel('stoque-sync-room', {
+        config: {
+          broadcast: { self: false },
+          presence: { key: clientSessionId }
+        }
+      });
+      syncChannel.subscribe((status: string, err: any) => {
+        if (err) console.warn('Sync channel warning:', err);
+      });
+    }
+    return syncChannel;
+  },
+
+  async broadcastAppEvent(event: string, payload: any) {
+    if (!isSupabaseConfigured) return;
+    try {
+      const channel = this.getSyncChannel();
+      if (channel) {
+        await channel.send({
+          type: 'broadcast',
+          event,
+          payload: {
+            ...payload,
+            _senderId: clientSessionId,
+            _timestamp: Date.now()
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('broadcastAppEvent error:', e);
+    }
+  },
+
+  subscribeToAppBroadcast(callback: (event: string, payload: any) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    try {
+      const channel = this.getSyncChannel();
+      if (!channel) return { unsubscribe: () => {} };
+
+      channel.on('broadcast', { event: '*' }, (msg: any) => {
+        if (msg && msg.event && msg.payload) {
+          if (msg.payload._senderId !== clientSessionId) {
+            callback(msg.event, msg.payload);
+          }
+        }
+      });
+
+      return {
+        unsubscribe: () => {
+          // Keep channel open for other broadcast listeners
+        }
+      };
+    } catch (e) {
+      console.warn('subscribeToAppBroadcast error:', e);
+      return { unsubscribe: () => {} };
+    }
+  },
+
+  trackPresence(userInfo: { id?: string; name: string; role: string; email?: string }, onPresenceSync?: (activeUsers: any[]) => void) {
+    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
+    try {
+      const channel = this.getSyncChannel();
+      if (!channel) return { unsubscribe: () => {} };
+
+      if (onPresenceSync) {
+        channel.on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          const users: any[] = [];
+          Object.values(state).forEach((presences: any) => {
+            if (Array.isArray(presences)) {
+              presences.forEach(p => users.push(p));
+            }
+          });
+          onPresenceSync(users);
+        });
+      }
+
+      const doTrack = async () => {
+        try {
+          await channel.track({
+            id: userInfo.id || clientSessionId,
+            name: userInfo.name,
+            role: userInfo.role,
+            email: userInfo.email,
+            sessionId: clientSessionId,
+            onlineAt: new Date().toISOString()
+          });
+        } catch (e) {
+          console.warn('channel.track error:', e);
+        }
+      };
+
+      if (channel.state === 'joined') {
+        doTrack();
+      } else {
+        channel.subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            doTrack();
+          }
+        });
+      }
+
+      return {
+        unsubscribe: () => {
+          try {
+            channel.untrack();
+          } catch {}
+        }
+      };
+    } catch (e) {
+      console.warn('trackPresence error:', e);
       return { unsubscribe: () => {} };
     }
   }
