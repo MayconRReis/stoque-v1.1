@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { HistoryEntry, HistoryType } from '../types';
+import { HistoryEntry, HistoryType, SheetRow, translateSlotContent, parseSlotContent } from '../types';
 import { RotateCcw } from 'lucide-react';
 
 const RECOVERY_DATA_MARKER = '__PALLET_RECOVERY_DATA__';
@@ -7,14 +7,92 @@ const RECOVERY_DATA_MARKER = '__PALLET_RECOVERY_DATA__';
 interface HistoryItemProps {
   entry: HistoryEntry;
   onRecover?: (entry: HistoryEntry) => void;
+  inventory?: SheetRow[];
 }
 
 const hasRecoveryPayload = (details: string) => details.includes(RECOVERY_DATA_MARKER);
 const stripRecoveryPayload = (details: string) => details.split(RECOVERY_DATA_MARKER)[0].trim();
 
-const HistoryItem: React.FC<HistoryItemProps> = ({ entry, onRecover }) => {
+export const resolveHistoryPalletType = (entry: HistoryEntry, inventory?: SheetRow[]): string => {
+  // 1. Explicit palletType already stored and non-empty
+  if (entry.palletType && entry.palletType.trim() !== '' && entry.palletType.trim() !== '-') {
+    const raw = entry.palletType.trim();
+    if (raw.toUpperCase() === 'CONSOLIDADO') return 'CONSOLIDADO';
+    const parsed = parseSlotContent(raw);
+    const translated = translateSlotContent(parsed);
+    return translated || raw;
+  }
+
+  // 2. Extract from recovery data payload in details
+  if (entry.details && entry.details.includes(RECOVERY_DATA_MARKER)) {
+    try {
+      const payloadStr = entry.details.split(RECOVERY_DATA_MARKER)[1]?.trim();
+      if (payloadStr) {
+        const payload = JSON.parse(payloadStr);
+        if (payload.row?.is_group) return 'CONSOLIDADO';
+        const cType = payload.inspection?.contentType || payload.row?.inspections?.[0]?.contentType;
+        if (cType) return translateSlotContent(cType);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. Search matching item in active inventory
+  if (inventory && inventory.length > 0) {
+    const match = inventory.find(item => 
+      (entry.op && item.originOP && item.originOP.trim() === entry.op.trim()) ||
+      (entry.loadingId && item.loadingId && item.loadingId.trim() === entry.loadingId.trim()) ||
+      (entry.description && item.description && item.description.trim().toUpperCase() === entry.description.trim().toUpperCase())
+    );
+    if (match) {
+      if (match.is_group) return 'CONSOLIDADO';
+      const cType = match.inspections?.[0]?.contentType;
+      if (cType) return translateSlotContent(cType);
+    }
+  }
+
+  // 4. Infer from description and details keywords
+  const text = `${entry.description || ''} ${entry.details || ''}`.toUpperCase();
+  if (text.includes('CONSOLIDADO')) return 'CONSOLIDADO';
+  if (text.includes('FRASCO') || text.includes('BOTTLE')) return 'Frasco';
+  if (
+    text.includes('INSUMO') ||
+    text.includes('TAMPA') ||
+    text.includes('VALVULA') ||
+    text.includes('VÁLVULA') ||
+    text.includes('ROTULO') ||
+    text.includes('RÓTULO') ||
+    text.includes('CAIXA') ||
+    text.includes('BERÇO') ||
+    text.includes('BERCO') ||
+    text.includes('CARTUCHO') ||
+    text.includes('SUPPL')
+  ) return 'Insumo';
+  if (text.includes('CONTAINER SUJO') || text.includes('CONTAINER_SJ')) return 'Container Sujo';
+  if (text.includes('CONTAINER LIMPO') || text.includes('CONTAINER_LP')) return 'Container Limpo';
+  if (text.includes('CONTAINER COM PRODUTO') || text.includes('CONTAINER_CP')) return 'Container Com Produto';
+  if (text.includes('RETRABALHO') || text.includes('REWORK')) return 'Retrabalho';
+  if (text.includes('REPROCESSO') || text.includes('REPROCESS')) return 'Reprocesso';
+  if (text.includes('RETORNO')) return 'Retorno';
+  if (text.includes('USO E CONSUMO') || (text.includes('USO') && text.includes('CONSUMO'))) return 'Uso e Consumo';
+  if (text.includes('DESCARTE')) return 'Descarte';
+
+  // 5. Finished product inference from OP or Product Description
+  if (entry.op && entry.op.trim() !== '' && entry.op.trim() !== '0' && entry.op.trim() !== '-') {
+    return 'Produto Acabado';
+  }
+  if (entry.description && entry.description.trim() !== '') {
+    return 'Produto Acabado';
+  }
+
+  return '-';
+};
+
+const HistoryItem: React.FC<HistoryItemProps> = ({ entry, onRecover, inventory }) => {
   const isRecoverable = entry.type === HistoryType.EXIT && entry.details && hasRecoveryPayload(entry.details);
   const displayDetails = entry.details ? stripRecoveryPayload(entry.details) : '';
+  const resolvedPalletType = resolveHistoryPalletType(entry, inventory);
 
   return (
     <div className="bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:border-slate-700 transition-all group">
@@ -46,7 +124,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ entry, onRecover }) => {
           <div className="flex flex-wrap gap-3 mt-1">
             <span className="text-[9px] font-bold text-blue-500/80">OP {entry.op}</span>
             <span className="text-[9px] font-bold text-amber-500/80">Lote {entry.lot}</span>
-            <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400/80">Tipo: {entry.palletType || '-'}</span>
+            <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400/80">Tipo: {resolvedPalletType}</span>
             {entry.operatorName && (
               <span className="text-[9px] font-bold text-purple-500/80">Op: {entry.operatorName}</span>
             )}

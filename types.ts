@@ -110,6 +110,10 @@ export interface InspectionData {
   datedBottles?: boolean;
   isConsolidated?: boolean;
   reworkObs?: string;
+  // Vaga original ocupada por este pallet antes de ser marcado como "AG VAGA"
+  // (material separado para carregamento, mas vaga ainda não confirmada como livre no sistema).
+  // Usado para tentar restaurar a vaga automaticamente caso o carregamento seja excluído.
+  preShipmentSlot?: string;
 }
 
 export interface SheetRow {

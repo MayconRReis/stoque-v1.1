@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, disableSupabase, isFetchOrNetworkError, isRetryableError } from '../lib/supabase';
-import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES, parseSlotContent, AutocompleteItem } from '../types';
+import { SheetRow, WarehouseSlot, HistoryEntry, StockStatus, SlotContent, HistoryType, Shipment, ShipmentType, ShipmentStatus, RotativeStockItem, DashboardStats, User, WarehouseDiagnostic, SHAREABLE_SLOT_TYPES, parseSlotContent, translateSlotContent, AutocompleteItem } from '../types';
 import { formatOP } from '../lib/formatters';
 
 const localStorageHelper = {
@@ -1934,6 +1934,11 @@ export const supabaseService = {
         const { data: operatorProfile } = await supabase.from('profiles').select('name').eq('id', request.requested_by).single();
         const operatorName = operatorProfile?.name || 'Operador';
         
+        const recoveryContentType = request.after_data.inspections?.[0]?.contentType;
+        const recoveryPalletType = request.after_data.is_group 
+          ? 'CONSOLIDADO' 
+          : (recoveryContentType ? translateSlotContent(recoveryContentType) : 'Produto Acabado');
+
         await supabase.from('history').insert({
           id: request.after_data.id + '-' + Math.random().toString(36).substring(2, 5),
           type: 'ENTRY', // Changed to ENTRY as it's recreating
@@ -1946,7 +1951,8 @@ export const supabaseService = {
           total_pallets: request.after_data.pallets,
           slot: requiresAguardando ? 'AGUARDANDO' : (targetSlot || 'AGUARDANDO'),
           details: `PALLET RECUPERADO. SOLICITADO POR: ${operatorName.toUpperCase()} APROVADO POR: ${adminName.toUpperCase()} - Motivo: ${request.reason}`,
-          operator_name: adminName
+          operator_name: adminName,
+          pallet_type: recoveryPalletType
         });
       } else {
         // Handle potential slot changes
@@ -1977,6 +1983,11 @@ export const supabaseService = {
           
           // Add history for transfer if changed slot
           if (oldSlot && oldSlot !== 'AGUARDANDO' && newSlot && newSlot !== 'AGUARDANDO') {
+            const transContentType = request.after_data.inspections?.[0]?.contentType;
+            const transPalletType = request.after_data.is_group 
+              ? 'CONSOLIDADO' 
+              : (transContentType ? translateSlotContent(transContentType) : 'Produto Acabado');
+
             const { data: adminProfile } = await supabase.from('profiles').select('name').eq('id', adminId).single();
             await supabase.from('history').insert({
               id: request.after_data.id + '-TRANS-' + Math.random().toString(36).substring(2, 5),
@@ -1990,7 +2001,8 @@ export const supabaseService = {
               total_pallets: request.after_data.pallets,
               slot: newSlot,
               details: `TRANSFERÊNCIA DA VAGA ${oldSlot} PARA ${newSlot}. Aprovado por: ${adminProfile?.name || 'Admin'} - Motivo: ${request.reason}`,
-              operator_name: adminProfile?.name || 'Admin'
+              operator_name: adminProfile?.name || 'Admin',
+              pallet_type: transPalletType
             });
           }
         }
@@ -2777,6 +2789,17 @@ export const supabaseService = {
 };
 
 export function mapHistoryRow(entry: any): HistoryEntry {
+  const rawType = entry.pallet_type || entry.palletType;
+  let normalizedType = rawType;
+  if (rawType && typeof rawType === 'string' && rawType.trim() !== '' && rawType.trim() !== '-') {
+    const trimmed = rawType.trim();
+    if (trimmed.toUpperCase() === 'CONSOLIDADO') {
+      normalizedType = 'CONSOLIDADO';
+    } else {
+      normalizedType = translateSlotContent(parseSlotContent(trimmed));
+    }
+  }
+
   return {
     id: entry.id,
     type: entry.type as HistoryType,
@@ -2790,7 +2813,7 @@ export function mapHistoryRow(entry: any): HistoryEntry {
     slot: entry.slot,
     details: entry.details,
     operatorName: entry.operator_name,
-    palletType: entry.pallet_type
+    palletType: normalizedType
   };
 }
 

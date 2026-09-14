@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Shipment, ShipmentType, SheetRow, translateSlotContent, WarehouseSlot, SlotContent, compareWarehouseSlots } from '../types';
-import { 
-  X, 
-  Truck, 
-  Package, 
-  CheckCircle2, 
-  Trash2, 
-  AlertCircle, 
-  Loader2, 
-  Plus, 
-  Warehouse, 
-  FileText, 
+import { Shipment, ShipmentType, SheetRow, translateSlotContent, WarehouseSlot, SlotContent, compareWarehouseSlots, isPendingSlot } from '../types';
+import {
+  X,
+  Truck,
+  Package,
+  CheckCircle2,
+  Trash2,
+  AlertCircle,
+  Loader2,
+  Plus,
+  Warehouse,
+  FileText,
   MessageSquare,
-  Save
+  Save,
+  PackageCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabaseService } from '../services/supabaseService';
@@ -27,6 +28,7 @@ interface ShipmentDetailModalProps {
   linkedPallets: SheetRow[];
   onFinalize: (shipmentId: string) => Promise<void>;
   onRemovePallet: (palletId: string) => Promise<void>;
+  onMoveToWaiting?: (palletId: string) => Promise<void>;
   onAddPallet: (pallet: SheetRow) => Promise<void>;
   onAddUncatalogedPallet?: (palletData: any) => Promise<void>;
   onUpdateObs?: (shipmentId: string, obs: string) => Promise<void>;
@@ -39,10 +41,11 @@ interface ShipmentDetailModalProps {
 export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({ 
   isOpen, 
   onClose, 
-  shipment, 
+  shipment,
   linkedPallets,
   onFinalize,
   onRemovePallet,
+  onMoveToWaiting,
   onAddPallet,
   onAddUncatalogedPallet,
   onUpdateObs,
@@ -60,6 +63,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
   const [isObsModalOpen, setIsObsModalOpen] = useState(false);
   const [obsValue, setObsValue] = useState('');
   const [isSavingObs, setIsSavingObs] = useState(false);
+  const [movingPalletId, setMovingPalletId] = useState<string | null>(null);
 
   // Ordenar pallets em ordem crescente das vagas (da vaga mais próxima para a mais longe)
   const sortedPallets = useMemo(() => {
@@ -340,6 +344,18 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
     }
   };
 
+  const handleMoveToWaiting = async (palletId: string) => {
+    if (!onMoveToWaiting) return;
+    setMovingPalletId(palletId);
+    try {
+      await onMoveToWaiting(palletId);
+    } catch (error) {
+      console.error('Error moving pallet to waiting slot:', error);
+    } finally {
+      setMovingPalletId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!onDelete) return;
     setIsProcessing(true);
@@ -534,7 +550,11 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
                   <p className="text-slate-600 font-bold uppercase text-[9px] tracking-widest">Nenhum pallet vinculado</p>
                 </div>
               ) : (
-                sortedPallets.map(pallet => (
+                sortedPallets.map(pallet => {
+                  const insp = pallet.inspections?.[0];
+                  const isWaiting = isPendingSlot(insp?.assignedSlot);
+                  const isMoving = movingPalletId === pallet.id;
+                  return (
                   <div key={pallet.id} className="bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60 p-4 rounded-2xl flex items-center justify-between group hover:border-slate-700 transition-all">
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 dark:border-slate-800 shrink-0">
@@ -545,19 +565,36 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
                         <h5 className="text-[11px] font-bold text-slate-900 dark:text-white uppercase truncate pr-4">{pallet.description}</h5>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[8px] font-black text-slate-600 uppercase">Lote: {pallet.lot}</span>
-                          <span className="text-[8px] font-black text-slate-600 uppercase">Vaga: {pallet.inspections?.[0]?.assignedSlot || 'N/A'}</span>
-                          <span className="text-[8px] font-black text-slate-600 uppercase">Tipo: {pallet.is_group ? 'CONSOLIDADO' : (pallet.inspections?.[0]?.contentType ? translateSlotContent(pallet.inspections[0].contentType) : '-')}</span>
+                          {isWaiting ? (
+                            <span className="text-[8px] font-black text-amber-500 uppercase bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">AG VAGA</span>
+                          ) : (
+                            <span className="text-[8px] font-black text-slate-600 uppercase">Vaga: {insp?.assignedSlot || 'N/A'}</span>
+                          )}
+                          <span className="text-[8px] font-black text-slate-600 uppercase">Tipo: {pallet.is_group ? 'CONSOLIDADO' : (insp?.contentType ? translateSlotContent(insp.contentType) : '-')}</span>
                         </div>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => onRemovePallet(pallet.id)}
-                      className="w-10 h-10 bg-white dark:bg-slate-900 hover:bg-red-500/10 text-slate-700 hover:text-red-500 border border-slate-200 dark:border-slate-800 hover:border-red-500/30 rounded-xl transition-all flex items-center justify-center shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {onMoveToWaiting && !isWaiting && (
+                        <button
+                          onClick={() => handleMoveToWaiting(pallet.id)}
+                          disabled={isMoving}
+                          title="Material separado: liberar vaga no sistema"
+                          className="w-10 h-10 bg-white dark:bg-slate-900 hover:bg-amber-500/10 text-slate-700 hover:text-amber-500 border border-slate-200 dark:border-slate-800 hover:border-amber-500/30 disabled:opacity-40 rounded-xl transition-all flex items-center justify-center"
+                        >
+                          {isMoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onRemovePallet(pallet.id)}
+                        className="w-10 h-10 bg-white dark:bg-slate-900 hover:bg-red-500/10 text-slate-700 hover:text-red-500 border border-slate-200 dark:border-slate-800 hover:border-red-500/30 rounded-xl transition-all flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

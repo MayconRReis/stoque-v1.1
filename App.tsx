@@ -69,7 +69,8 @@ import {
   ShipmentType,
   ShipmentStatus,
   WarehouseDiagnostic,
-  SHAREABLE_SLOT_TYPES
+  SHAREABLE_SLOT_TYPES,
+  isPendingSlot
 } from './types';
 import { InventoryDetailModal } from './components/InventoryDetailModal';
 import { InventoryBulkConfirmModal } from './components/InventoryBulkConfirmModal';
@@ -430,8 +431,30 @@ const App: React.FC = () => {
   }, [user]);
 
   const createHistoryEntry = useCallback((type: HistoryType, row: SheetRow, details: string, palletNum: number = 1): HistoryEntry => {
-    const inspection = row.inspections?.[palletNum - 1];
-    const palletType = row.is_group ? 'CONSOLIDADO' : (inspection?.contentType ? translateSlotContent(inspection.contentType) : '-');
+    const inspection = row.inspections?.[palletNum - 1] || row.inspections?.[0];
+    let palletType = '-';
+    if (row.is_group) {
+      palletType = 'CONSOLIDADO';
+    } else if (inspection?.contentType) {
+      palletType = translateSlotContent(inspection.contentType);
+    } else if (row.description && (row.description.toUpperCase().includes('FRASCO') || row.description.toUpperCase().includes('BOTTLE'))) {
+      palletType = 'Frasco';
+    } else if (row.description && (
+      row.description.toUpperCase().includes('INSUMO') ||
+      row.description.toUpperCase().includes('TAMPA') ||
+      row.description.toUpperCase().includes('VALVULA') ||
+      row.description.toUpperCase().includes('VÁLVULA') ||
+      row.description.toUpperCase().includes('ROTULO') ||
+      row.description.toUpperCase().includes('RÓTULO') ||
+      row.description.toUpperCase().includes('CAIXA')
+    )) {
+      palletType = 'Insumo';
+    } else if (row.status === StockStatus.PENDING) {
+      palletType = 'Insumo';
+    } else if (row.originOP || row.description) {
+      palletType = 'Produto Acabado';
+    }
+
     return {
       id: Math.random().toString(36).substring(2, 9),
       type,
@@ -1039,6 +1062,9 @@ const App: React.FC = () => {
         });
         // Only add to history if it's a final entry (has slot)
         if (slotId) {
+          const importContentType = row.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+          const importPalletType = row.is_group ? 'CONSOLIDADO' : translateSlotContent(importContentType);
+
           newHistory.push({
             id: Math.random().toString(36).substring(2, 9),
             type: HistoryType.ENTRY,
@@ -1051,7 +1077,8 @@ const App: React.FC = () => {
             totalPallets: 1,
             slot: slotId,
             details: `Importação via CSV por ${user?.name || 'Sistema'}. ID: ${row.loadingId}`,
-            operatorName: user?.name
+            operatorName: user?.name,
+            palletType: importPalletType
           });
         }
       }
@@ -1138,6 +1165,9 @@ const App: React.FC = () => {
         };
       }
 
+      const confirmedContentType = updatedInspection?.contentType || row.inspections?.[0]?.contentType || SlotContent.SUPPLIES;
+      const confirmedPalletType = row.is_group ? 'CONSOLIDADO' : translateSlotContent(confirmedContentType);
+
       const historyEntry: HistoryEntry = {
         id: Math.random().toString(36).substring(2, 9),
         type: HistoryType.ENTRY,
@@ -1150,7 +1180,8 @@ const App: React.FC = () => {
         totalPallets: 1,
         slot: isWaiting ? 'AGUARDANDO' : slotId,
         details: `Entrada confirmada por ${user?.name || 'Operador'}. ID Final: ${finalId}${isWaiting ? ' (Aguardando Vaga)' : ''}`,
-        operatorName: user?.name
+        operatorName: user?.name,
+        palletType: confirmedPalletType
       };
 
       const promises: Promise<any>[] = [
@@ -1351,6 +1382,79 @@ const App: React.FC = () => {
     }
   };
 
+  // Marca um pallet vinculado a um carregamento aberto como "AG VAGA": o material já foi
+  // separado fisicamente, então a vaga é liberada no sistema (podendo ser ocupada por outro
+  // pallet), enquanto o pallet segue no carregamento até ele ser finalizado. A vaga original
+  // fica guardada em `preShipmentSlot` para ser restaurada automaticamente se o carregamento
+  // for excluído antes de finalizar (ver handleDeleteShipment).
+  const handleMoveToWaitingSlot = async (palletId: string) => {
+    try {
+      const [rowId, palletIdxStr] = palletId.split('::');
+      const palletIdx = parseInt(palletIdxStr, 10);
+
+      const rows = await supabaseService.getInventoryItemsByIds([rowId]);
+      const row = rows[0];
+      const insp = row?.inspections?.[palletIdx];
+
+      if (!row || !insp) {
+        showNotification('Pallet não encontrado.', 'error');
+        return;
+      }
+
+      const currentSlot = insp.assignedSlot;
+      if (isPendingSlot(currentSlot)) {
+        showNotification('Este pallet já está aguardando vaga.', 'info');
+        return;
+      }
+
+      // 1. Marca a inspeção como aguardando vaga, guardando a vaga original
+      const updatedInspections = [...row.inspections!];
+      updatedInspections[palletIdx] = {
+        ...insp,
+        preShipmentSlot: currentSlot,
+        assignedSlot: 'AGUARDANDO'
+      };
+      await supabaseService.saveInventoryItem({ ...row, inspections: updatedInspections });
+
+      // 2. Libera a vaga no sistema, caso nenhum outro pallet/índice ainda aponte para ela
+      const others = await supabaseService.findPalletsBySlot(currentSlot!);
+      const stillOccupied = others.some(r =>
+        (r.inspections || []).some((i: any, i2: number) =>
+          i.assignedSlot === currentSlot && (r.id !== row.id || i2 !== palletIdx)
+        )
+      );
+      if (!stillOccupied) {
+        await supabaseService.freeSlot(currentSlot!);
+        setSlots(prev => prev.map(s => s.id === currentSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+      }
+
+      await addToHistory({
+        id: Math.random().toString(36).substring(2, 9),
+        type: HistoryType.TRANSFER,
+        timestamp: new Date().toLocaleString(),
+        loadingId: row.loadingId,
+        description: row.description,
+        op: row.originOP,
+        lot: row.lot,
+        palletNumber: palletIdx + 1,
+        totalPallets: row.pallets,
+        slot: 'AGUARDANDO',
+        details: `Material separado para carregamento. Vaga ${currentSlot} liberada no sistema.`,
+        operatorName: user?.name,
+        palletType: row.is_group ? 'CONSOLIDADO' : (insp.contentType ? translateSlotContent(insp.contentType) : 'Produto Acabado')
+      }, true);
+
+      showNotification(`Vaga ${currentSlot} liberada. Pallet marcado como AG VAGA.`);
+
+      const result = await supabaseService.getInventoryPaginated(0, data.length || PAGE_SIZE);
+      setData(result.data);
+      refreshCombinedData();
+    } catch (error: any) {
+      console.error('Error moving pallet to waiting slot:', error);
+      showNotification(`Erro ao mover pallet para AG Vaga: ${error.message}`, 'error');
+    }
+  };
+
   const handleRemoveFromShipment = async (palletId: string) => {
     try {
       const [rowId, palletIdx] = palletId.split('::');
@@ -1415,6 +1519,10 @@ const App: React.FC = () => {
           }
 
           // Add History
+          const exitPalletType = row.is_group
+            ? 'CONSOLIDADO'
+            : (inspection.contentType ? translateSlotContent(inspection.contentType) : 'Produto Acabado');
+
           await addToHistory({
             id: Math.random().toString(36).substring(2, 9),
             type: HistoryType.EXIT,
@@ -1427,7 +1535,8 @@ const App: React.FC = () => {
             totalPallets: row.pallets,
             slot: inspection.assignedSlot || 'N/A',
             details: `Saída automática via Finalização de Carregamento ${shipmentId}`,
-            operatorName: user?.name
+            operatorName: user?.name,
+            palletType: exitPalletType
           }, true);
         }
 
@@ -1463,13 +1572,83 @@ const App: React.FC = () => {
 
   const handleDeleteShipment = async (shipmentId: string) => {
     try {
+      // 1. Captura os pallets vinculados ANTES de excluir, para saber quais tinham sido
+      // marcados como AG VAGA (preShipmentSlot) enquanto faziam parte deste carregamento.
+      const linkedPallets = await supabaseService.getInventoryItemsByShipmentId(shipmentId);
+
       await supabaseService.deleteShipment(shipmentId);
       setShipments(prev => prev.filter(s => s.id !== shipmentId));
-      
-      // We also need to refresh inventory data to reflect unlinked shipmentIds
-      const result = await supabaseService.getInventoryPaginated(0, data.length || PAGE_SIZE);
+
+      // 2. Para cada pallet que estava AG VAGA por causa deste carregamento, tenta devolvê-lo
+      // à vaga de origem. Se essa vaga já estiver ocupada por outra coisa, ele permanece AG VAGA.
+      for (const row of linkedPallets) {
+        const inspections = row.inspections || [];
+        let rowChanged = false;
+        const restoredInspections = [...inspections];
+
+        for (let idx = 0; idx < inspections.length; idx++) {
+          const insp = inspections[idx];
+          const sId = insp.shipmentId || (insp as any).shipment_id;
+          if (sId !== shipmentId || !insp.preShipmentSlot) continue;
+
+          const originalSlot = insp.preShipmentSlot;
+          const slotNow = await supabaseService.getSlotById(originalSlot);
+          const isFree = !slotNow || slotNow.status === SlotContent.EMPTY;
+          rowChanged = true;
+
+          if (isFree) {
+            restoredInspections[idx] = { ...insp, assignedSlot: originalSlot, preShipmentSlot: undefined };
+            if (slotNow) {
+              await supabaseService.updateSlot({ ...slotNow, status: insp.contentType, occupiedBy: row.description });
+            }
+            await addToHistory({
+              id: Math.random().toString(36).substring(2, 9),
+              type: HistoryType.TRANSFER,
+              timestamp: new Date().toLocaleString(),
+              loadingId: row.loadingId,
+              description: row.description,
+              op: row.originOP,
+              lot: row.lot,
+              palletNumber: idx + 1,
+              totalPallets: row.pallets,
+              slot: originalSlot,
+              details: `Carregamento ${shipmentId} excluído. Pallet retornou à vaga de origem ${originalSlot}.`,
+              operatorName: user?.name,
+              palletType: row.is_group ? 'CONSOLIDADO' : (insp.contentType ? translateSlotContent(insp.contentType) : 'Produto Acabado')
+            }, true);
+          } else {
+            restoredInspections[idx] = { ...insp, preShipmentSlot: undefined };
+            await addToHistory({
+              id: Math.random().toString(36).substring(2, 9),
+              type: HistoryType.TRANSFER,
+              timestamp: new Date().toLocaleString(),
+              loadingId: row.loadingId,
+              description: row.description,
+              op: row.originOP,
+              lot: row.lot,
+              palletNumber: idx + 1,
+              totalPallets: row.pallets,
+              slot: 'AGUARDANDO',
+              details: `Carregamento ${shipmentId} excluído. Vaga de origem ${originalSlot} já está ocupada - pallet permanece AG VAGA.`,
+              operatorName: user?.name,
+              palletType: row.is_group ? 'CONSOLIDADO' : (insp.contentType ? translateSlotContent(insp.contentType) : 'Produto Acabado')
+            }, true);
+          }
+        }
+
+        if (rowChanged) {
+          await supabaseService.saveInventoryItem({ ...row, inspections: restoredInspections });
+        }
+      }
+
+      // 3. Atualiza inventário e vagas em tela
+      const [result, freshSlots] = await Promise.all([
+        supabaseService.getInventoryPaginated(0, data.length || PAGE_SIZE),
+        supabaseService.getSlots()
+      ]);
       setData(result.data);
-      
+      setSlots(freshSlots);
+
       showNotification('Carregamento excluído com sucesso.');
       refreshCombinedData();
     } catch (error: any) {
@@ -2962,7 +3141,7 @@ const App: React.FC = () => {
                         </div>
                     ) : (
                         history.map(entry => (
-                          <HistoryItem key={entry.id} entry={entry} onRecover={handleRecoverPallet} />
+                          <HistoryItem key={entry.id} entry={entry} onRecover={handleRecoverPallet} inventory={data} />
                         )))}
                 </div>
 
@@ -3041,14 +3220,14 @@ const App: React.FC = () => {
           {activeTab === 'inventory' && (
             <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
                 {/* Search and Filter Area */}
-                <div className="flex flex-col md:flex-row gap-3 items-center">
-                    <div className="relative flex-1 w-full">
+                <div className="flex flex-col md:flex-row gap-3 items-center flex-wrap">
+                    <div className="relative flex-1 w-full min-w-[220px]">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 w-4 h-4" />
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={inventorySearch}
                             onChange={(e) => setInventorySearch(e.target.value)}
-                            placeholder="Digite a VAGA, OP, Produto, Lote ou SEM SELO..." 
+                            placeholder="Digite a VAGA, OP, Produto, Lote ou SEM SELO..."
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-11 py-3 text-slate-900 dark:text-white font-semibold text-sm focus:border-blue-600 outline-none transition-all placeholder:text-slate-700"
                         />
                     </div>
@@ -3128,31 +3307,34 @@ const App: React.FC = () => {
                         </>
                       )}
                     </div>
-
-                    {selectedPallets.length > 0 && (
-                        <div className="flex gap-3 w-full md:w-auto">
-
-                            <button 
-                                onClick={() => setIsConsolidateDrawerOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 animate-in zoom-in duration-200"
-                            >
-                                <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
-                            </button>
-                            <button 
-                                onClick={() => setIsShipmentModalOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20 animate-in zoom-in duration-200"
-                            >
-                                <Truck className="w-3.5 h-3.5" /> Carregamento ({selectedPallets.length})
-                            </button>
-                            <button 
-                                onClick={() => setIsBulkConfirmOpen(true)}
-                                className="flex-1 md:flex-none px-5 py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 animate-in zoom-in duration-200"
-                            >
-                                <Send className="w-3.5 h-3.5" /> Enviar ({selectedPallets.length})
-                            </button>
-                        </div>
-                    )}
                 </div>
+
+                {/* Selection Action Bar - separate row so it never competes with the search field for space */}
+                {selectedPallets.length > 0 && (
+                    <div className="flex flex-wrap gap-3 items-center bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mr-1">
+                            {selectedPallets.length} {selectedPallets.length === 1 ? 'selecionado' : 'selecionados'}
+                        </span>
+                        <button
+                            onClick={() => setIsConsolidateDrawerOpen(true)}
+                            className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                        >
+                            <Layers className="w-3.5 h-3.5" /> Consolidar ({selectedPallets.length})
+                        </button>
+                        <button
+                            onClick={() => setIsShipmentModalOpen(true)}
+                            className="flex-1 md:flex-none px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/20"
+                        >
+                            <Truck className="w-3.5 h-3.5" /> Carregamento ({selectedPallets.length})
+                        </button>
+                        <button
+                            onClick={() => setIsBulkConfirmOpen(true)}
+                            className="flex-1 md:flex-none px-5 py-3 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
+                        >
+                            <Send className="w-3.5 h-3.5" /> Enviar ({selectedPallets.length})
+                        </button>
+                    </div>
+                )}
 
                 {filteredInventory.length === 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
@@ -3431,6 +3613,12 @@ const App: React.FC = () => {
         onFinalize={handleFinalizeShipment}
         onRemovePallet={async (palletId) => {
           await handleRemoveFromShipment(palletId);
+          if (shipmentDetailContext) {
+            fetchShipmentDetailPallets(shipmentDetailContext.id);
+          }
+        }}
+        onMoveToWaiting={async (palletId) => {
+          await handleMoveToWaitingSlot(palletId);
           if (shipmentDetailContext) {
             fetchShipmentDetailPallets(shipmentDetailContext.id);
           }
