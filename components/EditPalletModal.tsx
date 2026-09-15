@@ -306,42 +306,46 @@ export const EditPalletModal: React.FC<EditPalletModalProps> = ({
             </div>
           )}
 
+          {/* TIPO - visível também no modo "assign" (alocar vaga) para que o operador confira/corrija
+              a classificação do material antes dela ficar registrada na vaga e no histórico. */}
+          {(mode === 'edit' || mode === 'assign') && (
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                <Package className="w-3 h-3" /> Tipo de Conteúdo
+                {mode === 'assign' && <span className="text-[8px] normal-case font-semibold text-amber-500">(confira antes de alocar)</span>}
+              </label>
+              <div className="relative">
+                <select
+                  value={contentType}
+                  onChange={(e) => setContentType(e.target.value as SlotContent)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg uppercase focus:border-blue-600 outline-none appearance-none transition-all"
+                >
+                  {[
+                    { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo' },
+                    { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto' },
+                    { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo' },
+                    { id: SlotContent.DISCARD, label: 'Descarte' },
+                    { id: SlotContent.MISCELLANEOUS, label: 'Diversos' },
+                    { id: SlotContent.ROTATIVE, label: 'Estoque Rotativo' },
+                    { id: SlotContent.BOTTLES, label: 'Frasco' },
+                    { id: SlotContent.SUPPLIES, label: 'Insumo' },
+                    { id: SlotContent.OTHER, label: 'Outro' },
+                    { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado' },
+                    { id: SlotContent.REPROCESS, label: 'Reprocesso' },
+                    { id: SlotContent.RETURN, label: 'Retorno' },
+                    { id: SlotContent.REWORK, label: 'Retrabalho' },
+                    { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' }
+                  ].sort((a, b) => a.label.localeCompare(b.label)).map((type) => (
+                    <option key={type.id} value={type.id}>{type.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+              </div>
+            </div>
+          )}
+
           {mode === 'edit' && (
             <>
-              {/* TIPO */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                  <Package className="w-3 h-3" /> Tipo de Conteúdo
-                </label>
-                <div className="relative">
-                  <select
-                    value={contentType}
-                    onChange={(e) => setContentType(e.target.value as SlotContent)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white font-bold text-lg uppercase focus:border-blue-600 outline-none appearance-none transition-all"
-                  >
-                    {[
-                      { id: SlotContent.CONTAINER_LP, label: 'Cont. Limpo' },
-                      { id: SlotContent.CONTAINER_CP, label: 'Cont. Produto' },
-                      { id: SlotContent.CONTAINER_SJ, label: 'Cont. Sujo' },
-                      { id: SlotContent.DISCARD, label: 'Descarte' },
-                      { id: SlotContent.MISCELLANEOUS, label: 'Diversos' },
-                      { id: SlotContent.ROTATIVE, label: 'Estoque Rotativo' },
-                      { id: SlotContent.BOTTLES, label: 'Frasco' },
-                      { id: SlotContent.SUPPLIES, label: 'Insumo' },
-                      { id: SlotContent.OTHER, label: 'Outro' },
-                      { id: SlotContent.FINISHED_PRODUCT, label: 'Prod. Acabado' },
-                      { id: SlotContent.REPROCESS, label: 'Reprocesso' },
-                      { id: SlotContent.RETURN, label: 'Retorno' },
-                      { id: SlotContent.REWORK, label: 'Retrabalho' },
-                      { id: SlotContent.USE_CONSUMPTION, label: 'Uso e Consumo' }
-                    ].sort((a, b) => a.label.localeCompare(b.label)).map((type) => (
-                      <option key={type.id} value={type.id}>{type.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                </div>
-              </div>
-
           <div className="space-y-1.5">
             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
               <FileText className="w-3 h-3" /> Nome / Descrição

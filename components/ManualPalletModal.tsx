@@ -33,7 +33,9 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
   const [description, setDescription] = useState('');
   const [op, setOp] = useState('');
   const [lot, setLot] = useState('');
-  const [contentType, setContentType] = useState<SlotContent>(SlotContent.FINISHED_PRODUCT);
+  // Sem valor padrão de propósito: obriga o operador a escolher conscientemente o tipo do
+  // material, em vez de deixar "Produto Acabado" pré-selecionado e passar despercebido.
+  const [contentType, setContentType] = useState<SlotContent | null>(null);
   const [units, setUnits] = useState(0);
   const [palletsCount, setPalletsCount] = useState(1);
   const [assignedSlot, setAssignedSlot] = useState('AGUARDANDO');
@@ -63,7 +65,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
     setDescription('');
     setOp('');
     setLot('');
-    setContentType(SlotContent.FINISHED_PRODUCT);
+    setContentType(null);
     setUnits(0);
     setPalletsCount(1);
     setAssignedSlot('AGUARDANDO');
@@ -206,6 +208,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (!contentType) return;
     setIsProcessing(true);
     try {
       const payload: any = {
@@ -318,19 +321,26 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
             <div className="flex items-center justify-between mb-0.5">
               <div className="flex items-center gap-1.5">
                 <Package className={`w-3.5 h-3.5 ${isShipmentMode ? 'text-fuchsia-400' : 'text-blue-400'}`} />
-                <label className={labelCls}>Tipo de Pallet</label>
+                <label className={labelCls}>Tipo de Pallet <span className="text-red-500">*</span></label>
               </div>
-              <span className={`text-[10px] font-black uppercase tracking-wider ${getContentTypeColor(contentType)}`}>
-                {translateSlotContent(contentType)}
-              </span>
+              {contentType ? (
+                <span className={`text-[10px] font-black uppercase tracking-wider ${getContentTypeColor(contentType)}`}>
+                  {translateSlotContent(contentType)}
+                </span>
+              ) : (
+                <span className="text-[10px] font-black uppercase tracking-wider text-red-500">
+                  Não selecionado
+                </span>
+              )}
             </div>
-            <p className={subLabelCls}>Selecione a classificação do pallet</p>
+            <p className={subLabelCls}>Selecione a classificação do pallet — obrigatório, sem valor padrão</p>
             <div className="relative">
               <select
-                value={contentType}
-                onChange={e => setContentType(e.target.value as SlotContent)}
-                className={`${inputCls} appearance-none`}
+                value={contentType ?? ''}
+                onChange={e => setContentType(e.target.value ? (e.target.value as SlotContent) : null)}
+                className={`${inputCls} appearance-none ${!contentType ? 'border-red-500/60' : ''}`}
               >
+                <option value="" disabled>Selecione o tipo...</option>
                 <option value={SlotContent.FINISHED_PRODUCT}>Produto Acabado</option>
                 <option value={SlotContent.BOTTLES}>Frasco</option>
                 <option value={SlotContent.SUPPLIES}>Insumo</option>
@@ -634,7 +644,7 @@ export const ManualPalletModal: React.FC<ManualPalletModalProps> = ({
         <div className="p-8 pt-4 border-t border-slate-800/80 bg-[#0f1522] shrink-0">
           <button
             onClick={handleSave}
-            disabled={!description.trim() || isProcessing}
+            disabled={!description.trim() || !contentType || isProcessing}
             className={`w-full ${isShipmentMode ? 'bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 shadow-fuchsia-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg text-sm uppercase tracking-wider transition-all active:scale-[0.99]`}
           >
             <Plus className="w-4 h-4" />
