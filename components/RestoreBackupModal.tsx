@@ -5,7 +5,7 @@ import { UploadCloud, X, AlertTriangle, Loader2, FileJson, CheckCircle2, ShieldA
 interface RestoreBackupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRestore: (backupJson: any) => Promise<{ success: boolean; summary: Record<string, number>; skipped?: string[]; failed?: Record<string, string> }>;
+  onRestore: (backupJson: any) => Promise<{ success: boolean; summary: Record<string, number>; skipped?: string[]; failed?: Record<string, string>; warnings?: Record<string, string> }>;
 }
 
 const CONFIRM_WORD = 'RESTAURAR';
@@ -27,6 +27,7 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [failed, setFailed] = useState<Record<string, string>>({});
+  const [warnings, setWarnings] = useState<Record<string, string>>({});
 
   const reset = () => {
     setSelectedFile(null);
@@ -35,6 +36,7 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
     setSummary(null);
     setSkipped([]);
     setFailed({});
+    setWarnings({});
     setIsLoading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -50,6 +52,7 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
     setSummary(null);
     setSkipped([]);
     setFailed({});
+    setWarnings({});
     const file = e.target.files?.[0] || null;
     setSelectedFile(file);
   };
@@ -71,6 +74,7 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
       setSummary(result.summary);
       setSkipped(result.skipped || []);
       setFailed(result.failed || {});
+      setWarnings(result.warnings || {});
       setConfirmText('');
     } catch (err: any) {
       setError(err?.message || 'Erro ao restaurar o backup.');
@@ -152,6 +156,20 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
                         </div>
                       ))}
                       <p className="opacity-90">Copie a mensagem acima e envie para o suporte — o restante dos dados não foi afetado.</p>
+                    </div>
+                  </div>
+                )}
+
+                {Object.keys(warnings).length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex gap-3">
+                    <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
+                    <div className="text-xs font-medium text-amber-900/80 dark:text-amber-200/80 leading-relaxed space-y-2">
+                      {Object.entries(warnings).map(([key, msg]) => (
+                        <div key={key}>
+                          <p className="font-bold">{LABELS[key] || key}</p>
+                          <p className="opacity-90 break-words">{msg}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

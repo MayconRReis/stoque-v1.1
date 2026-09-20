@@ -2629,7 +2629,7 @@ export const supabaseService = {
   // contas reais do Supabase Auth — restaurar essa tabela poderia travar logins. Também não
   // restaura "solicitacoesEdicao" (inventory_edit_requests), já que essas linhas referenciam
   // usuários e itens que podem não coincidir mais após a restauração.
-  async restoreFullBackup(backup: any): Promise<{ success: boolean; summary: Record<string, number>; skipped: string[]; failed: Record<string, string> }> {
+  async restoreFullBackup(backup: any): Promise<{ success: boolean; summary: Record<string, number>; skipped: string[]; failed: Record<string, string>; warnings: Record<string, string> }> {
     if (!isSupabaseConfigured) {
       throw new Error('Restaurar backup requer conexão com o Supabase configurada.');
     }
@@ -2648,6 +2648,9 @@ export const supabaseService = {
     // linha rejeitada pelo banco). Guardamos o erro por tabela em vez de abortar tudo, para que uma
     // falha isolada em uma tabela não impeça a restauração das demais.
     const failed: Record<string, string> = {};
+    // Tabelas restauradas com sucesso, mas em que algum campo do backup teve que ser descartado
+    // porque a coluna correspondente não existe de fato no banco (schema desatualizado).
+    const warnings: Record<string, string> = {};
 
     const chunkArray = <T,>(arr: T[], size: number): T[][] => {
       const out: T[][] = [];
@@ -2668,22 +2671,60 @@ export const supabaseService = {
         const { error: delError } = await supabase.from(table).delete().neq('id', '__stoque_restore_none__');
         if (delError) throw new Error(`Falha ao limpar antes de restaurar: ${delError.message}`);
 
-        let inserted = 0;
-        const chunks = chunkArray(rows, 100);
-        for (let i = 0; i < chunks.length; i++) {
-          const part = chunks[i];
-          if (part.length === 0) continue;
-          const { error: insError } = await supabase.from(table).insert(part);
-          if (insError) {
-            const firstId = part[0]?.id;
-            const lastId = part[part.length - 1]?.id;
-            throw new Error(
-              `${inserted} de ${rows.length} registros já haviam sido restaurados quando este lote (registros ${i * 100 + 1}–${i * 100 + part.length}, ids "${firstId}"…"${lastId}") falhou: ${insError.message}`
-            );
+        // O schema real do banco pode ter ficado para trás do que o código espera (ex.: uma coluna
+        // que só existe no comentário de criação da tabela, mas nunca foi de fato adicionada em
+        // produção). O Postgrest recusa o insert inteiro nesse caso com uma mensagem do tipo
+        // "Could not find the 'x' column of 'y' in the schema cache". Em vez de deixar a tabela já
+        // apagada e travada nesse erro, detectamos a coluna que falta, removemos ela de TODAS as
+        // linhas e tentamos de novo — perdendo só aquele campo específico, não os dados inteiros.
+        const missingColumnPattern = /Could not find the '([^']+)' column/i;
+        const droppedColumns: string[] = [];
+        let workingRows = rows;
+        // Reprocessa do zero sempre que uma coluna inexistente é descartada — como o insert que
+        // falhou não grava nada, é seguro repetir com as linhas já corrigidas.
+        let restartsLeft = 5;
+
+        while (true) {
+          const chunks = chunkArray(workingRows, 100);
+          let inserted = 0;
+          let missingColRetry = false;
+
+          for (let i = 0; i < chunks.length; i++) {
+            const part = chunks[i];
+            if (part.length === 0) continue;
+
+            const { error: insError } = await supabase.from(table).insert(part);
+            if (insError) {
+              const match = insError.message?.match(missingColumnPattern);
+              if (match && !droppedColumns.includes(match[1]) && restartsLeft > 0) {
+                const col = match[1];
+                droppedColumns.push(col);
+                restartsLeft--;
+                workingRows = workingRows.map(r => {
+                  const { [col]: _omit, ...rest } = r;
+                  return rest;
+                });
+                missingColRetry = true;
+                break;
+              }
+
+              const firstId = part[0]?.id;
+              const lastId = part[part.length - 1]?.id;
+              throw new Error(
+                `${inserted} de ${rows.length} registros já haviam sido restaurados quando este lote (registros ${i * 100 + 1}–${i * 100 + part.length}, ids "${firstId}"…"${lastId}") falhou: ${insError.message}`
+              );
+            }
+            inserted += part.length;
           }
-          inserted += part.length;
+
+          if (missingColRetry) continue;
+          break;
         }
+
         summary[label] = rows.length;
+        if (droppedColumns.length > 0) {
+          warnings[label] = `Restaurado, mas o campo "${droppedColumns.join(', ')}" não existe na tabela do banco (o código esperava essa coluna, mas ela nunca foi criada nessa tabela) — os demais dados foram restaurados normalmente, só esse campo específico ficou de fora desses registros.`;
+        }
       } catch (err: any) {
         failed[label] = err?.message || String(err);
       }
@@ -2772,8 +2813,8 @@ export const supabaseService = {
       skipped.push('estoqueRotativo');
     }
 
-    this.broadcastAppEvent('backup:restored', { summary, skipped, failed });
-    return { success: Object.keys(failed).length === 0, summary, skipped, failed };
+    this.broadcastAppEvent('backup:restored', { summary, skipped, failed, warnings });
+    return { success: Object.keys(failed).length === 0, summary, skipped, failed, warnings };
   },
 
   subscribeToRotativeStock(callback: (payload: any) => void) {
