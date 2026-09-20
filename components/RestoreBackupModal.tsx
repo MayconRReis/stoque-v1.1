@@ -1,14 +1,22 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UploadCloud, X, AlertTriangle, Loader2, FileJson, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, X, AlertTriangle, Loader2, FileJson, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 interface RestoreBackupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRestore: (backupJson: any) => Promise<{ success: boolean; summary: Record<string, number> }>;
+  onRestore: (backupJson: any) => Promise<{ success: boolean; summary: Record<string, number>; skipped?: string[]; failed?: Record<string, string> }>;
 }
 
 const CONFIRM_WORD = 'RESTAURAR';
+
+const LABELS: Record<string, string> = {
+  vagas: 'Vagas',
+  inventario: 'Estoque',
+  historico: 'Histórico',
+  carregamentos: 'Carregamentos',
+  estoqueRotativo: 'Estoque Rotativo',
+};
 
 export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, onClose, onRestore }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,12 +25,16 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [failed, setFailed] = useState<Record<string, string>>({});
 
   const reset = () => {
     setSelectedFile(null);
     setConfirmText('');
     setError(null);
     setSummary(null);
+    setSkipped([]);
+    setFailed({});
     setIsLoading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -36,6 +48,8 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setSummary(null);
+    setSkipped([]);
+    setFailed({});
     const file = e.target.files?.[0] || null;
     setSelectedFile(file);
   };
@@ -55,6 +69,8 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
 
       const result = await onRestore(parsed);
       setSummary(result.summary);
+      setSkipped(result.skipped || []);
+      setFailed(result.failed || {});
       setConfirmText('');
     } catch (err: any) {
       setError(err?.message || 'Erro ao restaurar o backup.');
@@ -107,20 +123,50 @@ export const RestoreBackupModal: React.FC<RestoreBackupModalProps> = ({ isOpen, 
           <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             {summary ? (
               <>
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  <div className="text-xs font-medium text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
-                    <p className="mb-2">Backup restaurado com sucesso. Registros substituídos:</p>
-                    <ul className="space-y-0.5">
-                      {Object.entries(summary).map(([key, count]) => (
-                        <li key={key} className="flex justify-between gap-4">
-                          <span className="capitalize">{key}</span>
-                          <span className="font-bold">{count}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {Object.keys(summary).length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    <div className="text-xs font-medium text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
+                      <p className="mb-2">Restaurado com sucesso. Registros substituídos:</p>
+                      <ul className="space-y-0.5">
+                        {Object.entries(summary).map(([key, count]) => (
+                          <li key={key} className="flex justify-between gap-4">
+                            <span>{LABELS[key] || key}</span>
+                            <span className="font-bold">{count}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {Object.keys(failed).length > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
+                    <div className="text-xs font-medium text-rose-900/80 dark:text-rose-200/80 leading-relaxed space-y-2">
+                      <p className="font-bold">Falha ao restaurar as tabelas abaixo (as demais acima foram concluídas normalmente):</p>
+                      {Object.entries(failed).map(([key, msg]) => (
+                        <div key={key}>
+                          <p className="font-bold">{LABELS[key] || key}</p>
+                          <p className="opacity-90 break-words">{msg}</p>
+                        </div>
+                      ))}
+                      <p className="opacity-90">Copie a mensagem acima e envie para o suporte — o restante dos dados não foi afetado.</p>
+                    </div>
+                  </div>
+                )}
+
+                {skipped.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex gap-3">
+                    <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
+                    <div className="text-xs font-medium text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
+                      <p className="mb-1">
+                        Este arquivo não trazia dados (ou trazia uma lista vazia) para: <strong>{skipped.map(k => LABELS[k] || k).join(', ')}</strong>. Por segurança, esses dados <strong>não foram apagados</strong> — o que já estava no sistema para eles continua intacto.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed px-1">
                   Recomendado recarregar a página agora para que todas as telas reflitam os dados restaurados.
                 </p>

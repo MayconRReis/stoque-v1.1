@@ -1297,16 +1297,31 @@ export const supabaseService = {
   async getHistory(): Promise<HistoryEntry[]> {
     if (!isSupabaseConfigured) return localStorageHelper.get('history');
 
-    const { data, error } = await supabase
-      .from('history')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.warn('Supabase getHistory failed, falling back to local storage:', error);
-      return localStorageHelper.get('history');
+    // Busca paginada: uma única query sem .range() é limitada pelo teto padrão de linhas do
+    // PostgREST (geralmente 1000), então tabelas maiores que isso eram truncadas silenciosamente
+    // (por exemplo, num backup completo). Aqui varremos página por página até esgotar os dados.
+    const PAGE = 1000;
+    const all: any[] = [];
+    let fromIdx = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(fromIdx, fromIdx + PAGE - 1);
+
+      if (error) {
+        console.warn('Supabase getHistory failed, falling back to local storage:', error);
+        return localStorageHelper.get('history');
+      }
+
+      all.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+      fromIdx += PAGE;
     }
-    const history = (data || []).map(mapHistoryRow);
+
+    const history = all.map(mapHistoryRow);
     localStorageHelper.save('history', history);
     return history;
   },
@@ -2614,7 +2629,7 @@ export const supabaseService = {
   // contas reais do Supabase Auth — restaurar essa tabela poderia travar logins. Também não
   // restaura "solicitacoesEdicao" (inventory_edit_requests), já que essas linhas referenciam
   // usuários e itens que podem não coincidir mais após a restauração.
-  async restoreFullBackup(backup: any): Promise<{ success: boolean; summary: Record<string, number> }> {
+  async restoreFullBackup(backup: any): Promise<{ success: boolean; summary: Record<string, number>; skipped: string[]; failed: Record<string, string> }> {
     if (!isSupabaseConfigured) {
       throw new Error('Restaurar backup requer conexão com o Supabase configurada.');
     }
@@ -2625,6 +2640,14 @@ export const supabaseService = {
     }
 
     const summary: Record<string, number> = {};
+    // Tabelas que o arquivo dizia conter, mas vieram vazias (0 registros) — nunca apagamos dados
+    // reais para "substituir" por nada. Ficam registradas aqui para avisar o usuário, e a tabela
+    // correspondente no banco é deixada intacta.
+    const skipped: string[] = [];
+    // Tabelas em que a restauração foi tentada mas falhou no meio do caminho (ex.: erro de rede,
+    // linha rejeitada pelo banco). Guardamos o erro por tabela em vez de abortar tudo, para que uma
+    // falha isolada em uma tabela não impeça a restauração das demais.
+    const failed: Record<string, string> = {};
 
     const chunkArray = <T,>(arr: T[], size: number): T[][] => {
       const out: T[][] = [];
@@ -2633,15 +2656,37 @@ export const supabaseService = {
     };
 
     const replaceTable = async (table: string, rows: any[], label: string) => {
-      const { error: delError } = await supabase.from(table).delete().neq('id', '__stoque_restore_none__');
-      if (delError) throw new Error(`Falha ao limpar ${label}: ${delError.message}`);
-
-      for (const part of chunkArray(rows, 300)) {
-        if (part.length === 0) continue;
-        const { error: insError } = await supabase.from(table).insert(part);
-        if (insError) throw new Error(`Falha ao restaurar ${label}: ${insError.message}`);
+      // Proteção contra perda de dados: um backup com essa lista vazia (arquivo antigo, exportação
+      // com falha, etc.) NUNCA deve apagar o que já existe no banco. Só apagamos e substituímos
+      // quando o backup realmente traz pelo menos 1 registro para repor.
+      if (rows.length === 0) {
+        skipped.push(label);
+        return;
       }
-      summary[label] = rows.length;
+
+      try {
+        const { error: delError } = await supabase.from(table).delete().neq('id', '__stoque_restore_none__');
+        if (delError) throw new Error(`Falha ao limpar antes de restaurar: ${delError.message}`);
+
+        let inserted = 0;
+        const chunks = chunkArray(rows, 100);
+        for (let i = 0; i < chunks.length; i++) {
+          const part = chunks[i];
+          if (part.length === 0) continue;
+          const { error: insError } = await supabase.from(table).insert(part);
+          if (insError) {
+            const firstId = part[0]?.id;
+            const lastId = part[part.length - 1]?.id;
+            throw new Error(
+              `${inserted} de ${rows.length} registros já haviam sido restaurados quando este lote (registros ${i * 100 + 1}–${i * 100 + part.length}, ids "${firstId}"…"${lastId}") falhou: ${insError.message}`
+            );
+          }
+          inserted += part.length;
+        }
+        summary[label] = rows.length;
+      } catch (err: any) {
+        failed[label] = err?.message || String(err);
+      }
     };
 
     // Ordem importa pouco aqui pois inventory/warehouse_slots/history/shipments não têm FK
@@ -2656,6 +2701,8 @@ export const supabaseService = {
         occupied_by: s.occupiedBy ?? null,
         updated_at: new Date().toISOString()
       })), 'vagas');
+    } else {
+      skipped.push('vagas');
     }
 
     if (Array.isArray(dados.inventario)) {
@@ -2673,6 +2720,8 @@ export const supabaseService = {
         is_group: item.is_group ?? false,
         parent_group_id: item.parent_group_id ?? null
       })), 'inventario');
+    } else {
+      skipped.push('inventario');
     }
 
     if (Array.isArray(dados.historico)) {
@@ -2691,6 +2740,8 @@ export const supabaseService = {
         operator_name: h.operatorName,
         pallet_type: h.palletType
       })), 'historico');
+    } else {
+      skipped.push('historico');
     }
 
     if (Array.isArray(dados.carregamentos)) {
@@ -2704,6 +2755,8 @@ export const supabaseService = {
         closed_at: s.closedAt,
         obs: s.obs ?? null
       })), 'carregamentos');
+    } else {
+      skipped.push('carregamentos');
     }
 
     if (Array.isArray(dados.estoqueRotativo)) {
@@ -2715,10 +2768,12 @@ export const supabaseService = {
         type: item.type,
         updated_at: item.updatedAt || new Date().toISOString()
       })), 'estoqueRotativo');
+    } else {
+      skipped.push('estoqueRotativo');
     }
 
-    this.broadcastAppEvent('backup:restored', { summary });
-    return { success: true, summary };
+    this.broadcastAppEvent('backup:restored', { summary, skipped, failed });
+    return { success: Object.keys(failed).length === 0, summary, skipped, failed };
   },
 
   subscribeToRotativeStock(callback: (payload: any) => void) {
