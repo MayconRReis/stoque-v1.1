@@ -2608,6 +2608,119 @@ export const supabaseService = {
     }
   },
 
+  // Restaura um backup completo (JSON gerado pela própria exportação de backup) substituindo
+  // TODOS os dados atuais de estoque, histórico, vagas, carregamentos e estoque rotativo.
+  // Por segurança, NÃO mexe em "usuarios" (profiles), pois esses registros estão amarrados às
+  // contas reais do Supabase Auth — restaurar essa tabela poderia travar logins. Também não
+  // restaura "solicitacoesEdicao" (inventory_edit_requests), já que essas linhas referenciam
+  // usuários e itens que podem não coincidir mais após a restauração.
+  async restoreFullBackup(backup: any): Promise<{ success: boolean; summary: Record<string, number> }> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Restaurar backup requer conexão com o Supabase configurada.');
+    }
+
+    const dados = backup?.dados || backup;
+    if (!dados || typeof dados !== 'object') {
+      throw new Error('Arquivo de backup inválido: estrutura de dados não encontrada.');
+    }
+
+    const summary: Record<string, number> = {};
+
+    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+      const out: T[][] = [];
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+      return out;
+    };
+
+    const replaceTable = async (table: string, rows: any[], label: string) => {
+      const { error: delError } = await supabase.from(table).delete().neq('id', '__stoque_restore_none__');
+      if (delError) throw new Error(`Falha ao limpar ${label}: ${delError.message}`);
+
+      for (const part of chunkArray(rows, 300)) {
+        if (part.length === 0) continue;
+        const { error: insError } = await supabase.from(table).insert(part);
+        if (insError) throw new Error(`Falha ao restaurar ${label}: ${insError.message}`);
+      }
+      summary[label] = rows.length;
+    };
+
+    // Ordem importa pouco aqui pois inventory/warehouse_slots/history/shipments não têm FK
+    // estrita entre si neste schema, mas mantemos vagas e estoque antes do histórico por clareza.
+    if (Array.isArray(dados.vagas)) {
+      await replaceTable('warehouse_slots', dados.vagas.map((s: any) => ({
+        id: s.id,
+        rack: s.rack,
+        level: s.level,
+        position: s.position,
+        status: s.status,
+        occupied_by: s.occupiedBy ?? null,
+        updated_at: new Date().toISOString()
+      })), 'vagas');
+    }
+
+    if (Array.isArray(dados.inventario)) {
+      await replaceTable('inventory', dados.inventario.map((item: any) => ({
+        id: item.id,
+        loading_id: item.loadingId,
+        origin_op: item.originOP,
+        description: item.description,
+        lot: item.lot,
+        pallets: item.pallets,
+        date: item.date,
+        status: item.status,
+        inspections: item.inspections || [],
+        operator_name: item.operatorName,
+        is_group: item.is_group ?? false,
+        parent_group_id: item.parent_group_id ?? null
+      })), 'inventario');
+    }
+
+    if (Array.isArray(dados.historico)) {
+      await replaceTable('history', dados.historico.map((h: any) => ({
+        id: h.id,
+        type: h.type,
+        timestamp: h.timestamp,
+        loading_id: h.loadingId,
+        description: h.description,
+        op: h.op,
+        lot: h.lot,
+        pallet_number: h.palletNumber,
+        total_pallets: h.totalPallets,
+        slot: h.slot,
+        details: h.details,
+        operator_name: h.operatorName,
+        pallet_type: h.palletType
+      })), 'historico');
+    }
+
+    if (Array.isArray(dados.carregamentos)) {
+      await replaceTable('shipments', dados.carregamentos.map((s: any) => ({
+        id: s.id,
+        type: s.type,
+        status: s.status,
+        created_at: s.createdAt,
+        scheduled_date: s.scheduledDate,
+        operator_name: s.operatorName,
+        closed_at: s.closedAt,
+        obs: s.obs ?? null
+      })), 'carregamentos');
+    }
+
+    if (Array.isArray(dados.estoqueRotativo)) {
+      await replaceTable('rotative_stock', dados.estoqueRotativo.map((item: any) => ({
+        id: item.id,
+        product_name: item.productName,
+        quantity: item.quantity,
+        slot_id: item.slotId,
+        type: item.type,
+        updated_at: item.updatedAt || new Date().toISOString()
+      })), 'estoqueRotativo');
+    }
+
+    this.broadcastAppEvent('backup:restored', { summary });
+    return { success: true, summary };
+  },
+
   subscribeToRotativeStock(callback: (payload: any) => void) {
     if (!isSupabaseConfigured) return { unsubscribe: () => {} };
     try {

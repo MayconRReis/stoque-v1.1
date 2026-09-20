@@ -43,6 +43,8 @@ import {
   Container,
   Filter,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   TrendingUp,
   Tag,
@@ -52,7 +54,9 @@ import {
   Hash,
   Users,
   Sun,
-  Moon
+  Moon,
+  DatabaseBackup,
+  UploadCloud
 } from 'lucide-react';
 import { 
   SheetRow, 
@@ -111,6 +115,8 @@ import ProductDistributionChart from './components/ProductDistributionChart';
 import InventoryCard from './components/InventoryCard';
 import { ConsolidateDrawer } from './components/ConsolidateDrawer';
 import { RecoveryModal } from './components/RecoveryModal';
+import { BackupReminderModal } from './components/BackupReminderModal';
+import { RestoreBackupModal } from './components/RestoreBackupModal';
 import { User as AppUser } from './types';
 
 const RECOVERY_DATA_MARKER = '__PALLET_RECOVERY_DATA__';
@@ -137,22 +143,26 @@ const Logo: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
   );
 };
 
-const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, activeTab }: { tab: string, icon: React.ElementType, label: string, badge?: number, isActive: boolean, onNavigate: (tab: any) => void, activeTab: string }) => (
-  <button 
-    onClick={() => onNavigate(tab)} 
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${isActive ? 'bg-blue-600 text-slate-900 dark:text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-200 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200'}`}
+const NavItem = memo(({ tab, icon: Icon, label, badge, isActive, onNavigate, activeTab, isCollapsed }: { tab: string, icon: React.ElementType, label: string, badge?: number, isActive: boolean, onNavigate: (tab: any) => void, activeTab: string, isCollapsed?: boolean }) => (
+  // Nota sobre isCollapsed: esta mesma lista de NavItem é usada tanto no drawer mobile quanto
+  // na sidebar fixa de desktop. Por isso o recolhimento (ícone-only) só se aplica com prefixo
+  // "lg:" — no mobile o item continua sempre com o rótulo visível, independente de isCollapsed.
+  <button
+    onClick={() => onNavigate(tab)}
+    title={isCollapsed ? label : undefined}
+    className={`w-full flex items-center gap-3 py-3 rounded-xl transition-all relative group ${isCollapsed ? 'px-4 lg:px-0 lg:justify-center' : 'px-4'} ${isActive ? 'bg-blue-600 text-slate-900 dark:text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-200 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200'}`}
   >
-    <Icon className={`w-4 h-4 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-slate-700 dark:text-slate-300'}`} />
-    <span className="font-semibold text-sm">{label}</span>
+    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-slate-700 dark:text-slate-300'}`} />
+    <span className={`font-semibold text-sm ${isCollapsed ? 'lg:hidden' : ''}`}>{label}</span>
     {badge ? (
-      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-950 text-blue-400 border border-blue-900/30">
+      <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-950 text-blue-400 border border-blue-900/30 ${isCollapsed ? 'lg:hidden' : ''}`}>
         {badge}
       </span>
     ) : null}
     {isActive && (
-      <motion.div 
+      <motion.div
         layoutId="activeTab"
-        className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
+        className={`absolute left-0 w-1 h-6 bg-white rounded-r-full ${isCollapsed ? 'lg:hidden' : ''}`}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       />
     )}
@@ -175,8 +185,31 @@ const App: React.FC = () => {
     });
   }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Sidebar recolhível (somente desktop/lg): mantém só os ícones visíveis, mas os botões
+  // continuam clicáveis e navegáveis. Preferência persistida para lembrar entre sessões.
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('stoque_sidebar_collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('stoque_sidebar_collapsed', isSidebarCollapsed ? '1' : '0');
+    } catch {
+      // localStorage indisponível (modo privado etc.) — apenas ignora a persistência
+    }
+  }, [isSidebarCollapsed]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  
+
+  // Lembrete diário de backup (08:00): mostra modal pedindo para baixar um JSON
+  // com todos os dados do sistema. Reaparece no próximo login se for fechado sem baixar.
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isBackupDownloading, setIsBackupDownloading] = useState(false);
+  const backupModalCheckedRef = useRef(false);
+  const [isRestoreBackupModalOpen, setIsRestoreBackupModalOpen] = useState(false);
+
   const [isManualAddModalOpen, setIsManualAddModalOpen] = useState(false);
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   
@@ -827,6 +860,101 @@ const App: React.FC = () => {
       console.error('Export error:', error);
       showNotification('Erro ao exportar estoque.', 'error');
     }
+  };
+
+  const BACKUP_STORAGE_KEY = 'stoque_last_backup_date';
+
+  const handleDownloadFullBackup = async () => {
+    try {
+      setIsBackupDownloading(true);
+      showNotification('Gerando backup completo...', 'info');
+
+      const [fullInventory, fullHistory, fullShipments, fullSlots, rotativeStock, profiles, editRequests] = await Promise.all([
+        supabaseService.getAllInventoryForExport({ includeGrouped: true }),
+        supabaseService.getHistory(),
+        supabaseService.getShipments(),
+        supabaseService.getSlots(),
+        supabaseService.getRotativeStock().catch(() => []),
+        supabaseService.getProfiles().catch(() => []),
+        supabaseService.getEditRequests().catch(() => []),
+      ]);
+
+      const backupPayload = {
+        geradoEm: new Date().toISOString(),
+        origem: 'Stoque+',
+        versao: 1,
+        dados: {
+          inventario: fullInventory,
+          historico: fullHistory,
+          carregamentos: fullShipments,
+          vagas: fullSlots,
+          estoqueRotativo: rotativeStock,
+          usuarios: profiles,
+          solicitacoesEdicao: editRequests,
+        },
+      };
+
+      const json = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', `stoque_backup_${new Date().toISOString().split('T')[0]}.json`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      try {
+        localStorage.setItem(BACKUP_STORAGE_KEY, new Date().toISOString().split('T')[0]);
+      } catch {
+        // localStorage indisponível — o lembrete pode reaparecer nesta sessão, sem problema
+      }
+
+      setIsBackupModalOpen(false);
+      showNotification('Backup baixado com sucesso!');
+    } catch (error) {
+      console.error('Backup error:', error);
+      showNotification('Erro ao gerar o backup.', 'error');
+    } finally {
+      setIsBackupDownloading(false);
+    }
+  };
+
+  // Verifica uma vez por sessão (a partir das 08:00) se o backup de hoje já foi feito.
+  // Se não foi, mostra o modal de lembrete. Fechar sem baixar não baixa de novo nesta
+  // sessão, mas volta a aparecer no próximo login/carregamento do app.
+  useEffect(() => {
+    if (!user || isPublicView) return;
+    if (backupModalCheckedRef.current) return;
+
+    const checkBackupReminder = () => {
+      const now = new Date();
+      if (now.getHours() < 8) return;
+
+      const todayStr = now.toISOString().split('T')[0];
+      let lastBackupDate: string | null = null;
+      try {
+        lastBackupDate = localStorage.getItem(BACKUP_STORAGE_KEY);
+      } catch {
+        lastBackupDate = null;
+      }
+
+      if (lastBackupDate !== todayStr) {
+        backupModalCheckedRef.current = true;
+        setIsBackupModalOpen(true);
+      }
+    };
+
+    checkBackupReminder();
+  }, [user, isPublicView]);
+
+  const handleRestoreBackup = async (backupJson: any) => {
+    const result = await supabaseService.restoreFullBackup(backupJson);
+    showNotification('Backup restaurado com sucesso!');
+    return result;
   };
 
   const handleShareDashboard = () => {
@@ -2611,35 +2739,55 @@ const App: React.FC = () => {
 
       {/* Sidebar Navigation */}
       {!isPublicView && (
-        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-slate-100 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
-          <div className="p-8 border-b border-slate-300 dark:border-slate-800/60 flex justify-between items-center">
-            <Logo />
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-72 ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-72'} bg-slate-100 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 shadow-2xl z-50 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex-shrink-0 flex flex-col`}>
+          <div className={`border-b border-slate-300 dark:border-slate-800/60 flex items-center justify-between ${isSidebarCollapsed ? 'p-4' : 'p-8'}`}>
+            {/* Logo completa: sempre visível no mobile; some no desktop quando recolhida */}
+            <div className={`min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
+              <Logo />
+            </div>
+            {/* Logo ícone-only: só aparece no desktop, quando recolhida */}
+            <div className={`hidden items-center justify-center w-full ${isSidebarCollapsed ? 'lg:flex' : ''}`}>
+              <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 shrink-0">
+                <Warehouse className="w-5 h-5 text-slate-900 dark:text-white" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsSidebarCollapsed(prev => !prev)}
+                className={`hidden lg:flex items-center justify-center p-1.5 rounded-lg text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ${isSidebarCollapsed ? 'ml-0' : 'ml-1'}`}
+                title={isSidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
-          <nav className="p-4 py-6 space-y-1 flex-1 overflow-y-auto">
-            <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="quicksearch" icon={Search} label="Consulta Rápida" isActive={activeTab === 'quicksearch'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} isActive={activeTab === 'waiting'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+          <nav className={`py-6 space-y-1 flex-1 overflow-y-auto ${isSidebarCollapsed ? 'px-4 lg:px-3' : 'px-4'}`}>
+            <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="quicksearch" icon={Search} label="Consulta Rápida" isActive={activeTab === 'quicksearch'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="waiting" icon={Clock} label="Aguardando Vaga" badge={stats.waitingPallets} isActive={activeTab === 'waiting'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
             
-            <NavItem tab="inventory" icon={Package} label="Estoque Geral" isActive={activeTab === 'inventory'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" isActive={activeTab === 'rotative'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" isActive={activeTab === 'map'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={pendingRows.length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-            <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+            <NavItem tab="inventory" icon={Package} label="Estoque Geral" isActive={activeTab === 'inventory'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="rotative" icon={TrendingUp} label="Estoque Rotativo" isActive={activeTab === 'rotative'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="shipments" icon={Truck} label="Carregamento" badge={shipments.filter(s => s.status === ShipmentStatus.OPEN).length} isActive={activeTab === 'shipments'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="map" icon={Warehouse} label="Mapa de vagas" isActive={activeTab === 'map'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="analysis" icon={ClipboardCheck} label="Análise" badge={pendingRows.length} isActive={activeTab === 'analysis'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+            <NavItem tab="history" icon={History} label="Histórico" isActive={activeTab === 'history'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
             {user?.role === 'admin' && (
               <>
-                <NavItem tab="approvals" icon={ClipboardCheck} label="Aprovações" badge={pendingApprovalsCount} isActive={activeTab === 'approvals'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
-                <NavItem tab="users" icon={Users} label="Usuários" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} />
+                <NavItem tab="approvals" icon={ClipboardCheck} label="Aprovações" badge={pendingApprovalsCount} isActive={activeTab === 'approvals'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
+                <NavItem tab="users" icon={Users} label="Admin" isActive={activeTab === 'users'} activeTab={activeTab} onNavigate={(t) => { setIsSidebarOpen(false); navigateToTab(t); }} isCollapsed={isSidebarCollapsed} />
               </>
             )}
           </nav>
 
-          <div className="p-4 space-y-3">
-            <div className="p-5 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl">
+          <div className={`space-y-3 ${isSidebarCollapsed ? 'p-2 lg:p-3' : 'p-4'}`}>
+            {/* Cartão completo: mobile sempre; desktop só quando expandida */}
+            <div className={`p-5 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-blue-600/10 flex items-center justify-center text-[10px] font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20">
@@ -2650,7 +2798,7 @@ const App: React.FC = () => {
                     <p className="text-[8px] text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">{user?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsLogoutConfirmOpen(true)}
                   className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg"
                   title="Sair do Sistema"
@@ -2669,6 +2817,23 @@ const App: React.FC = () => {
                    </div>
                 </div>
               </div>
+            </div>
+
+            {/* Cartão compacto: só desktop, quando recolhida — avatar + botão de sair, empilhados */}
+            <div className={`hidden flex-col items-center gap-2 ${isSidebarCollapsed ? 'lg:flex' : ''}`}>
+              <div
+                className="w-9 h-9 rounded-xl bg-blue-600/10 flex items-center justify-center text-[10px] font-black text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-900/20"
+                title={`${user?.name || ''} (${user?.role === 'admin' ? 'Administrador' : 'Operador'}) — Ocupação G0: ${stats.occupancyRate}%`}
+              >
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={() => setIsLogoutConfirmOpen(true)}
+                className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center hover:bg-red-500 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg"
+                title="Sair do Sistema"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </aside>
@@ -2701,7 +2866,7 @@ const App: React.FC = () => {
                   {activeTab === 'shipments' && 'Gestão de Carregamentos'}
                   {activeTab === 'rotative' && 'Estoque Rotativo'}
                   {activeTab === 'approvals' && 'Aprovações de Edição'}
-                  {activeTab === 'users' && 'Gerenciamento de Usuários'}
+                  {activeTab === 'users' && 'Admin'}
                 </>
               )}
             </h2>
@@ -3178,7 +3343,21 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'users' && user?.role === 'admin' && (
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="flex flex-wrap gap-3">
+                <button
+                    onClick={() => setIsBackupModalOpen(true)}
+                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-200 dark:border-slate-800 hover:border-blue-500/30 group"
+                >
+                    <DatabaseBackup className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" /> Backup Completo (JSON)
+                </button>
+                <button
+                    onClick={() => setIsRestoreBackupModalOpen(true)}
+                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all border border-slate-200 dark:border-slate-800 hover:border-rose-500/30 group"
+                >
+                    <UploadCloud className="w-3.5 h-3.5 text-rose-500 group-hover:scale-110 transition-transform" /> Restaurar Backup
+                </button>
+              </div>
               <UserManager />
             </div>
           )}
@@ -3665,12 +3844,25 @@ const App: React.FC = () => {
         initialId={movementInitialContext?.id}
         initialPallet={movementInitialContext?.pallet}
       />
-      <RecoveryModal 
+      <RecoveryModal
         isOpen={!!recoveryContext}
         onClose={() => setRecoveryContext(null)}
         onConfirm={confirmRecovery}
         isLoading={isRecovering}
       />
+      <BackupReminderModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        onDownload={handleDownloadFullBackup}
+        isLoading={isBackupDownloading}
+      />
+      {user?.role === 'admin' && (
+        <RestoreBackupModal
+          isOpen={isRestoreBackupModalOpen}
+          onClose={() => setIsRestoreBackupModalOpen(false)}
+          onRestore={handleRestoreBackup}
+        />
+      )}
     </div>
   );
 };
