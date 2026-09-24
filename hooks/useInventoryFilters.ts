@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User as AppUser } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import { isFetchOrNetworkError } from '../lib/supabase';
@@ -20,6 +20,14 @@ export function useInventoryFilters(
   const [inventoryPage, setInventoryPage] = useState(0);
   const [hasMoreInventory, setHasMoreInventory] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Cada busca com filtro dispara uma requisição ao Supabase que pode demorar tempos diferentes.
+  // Se o usuário trocar o filtro rapidamente (ex.: clicar em um tipo, depois em outro), as respostas
+  // podem voltar fora de ordem — a requisição mais antiga (e mais lenta) pode responder DEPOIS da
+  // mais nova, sobrescrevendo o resultado certo com um resultado desatualizado (ou vazio). Isso é o
+  // que fazia os cards "aparecerem e sumirem" ao selecionar um filtro. Esse contador garante que só
+  // a resposta da ÚLTIMA requisição disparada seja aplicada ao estado.
+  const latestFilterRequestId = useRef(0);
 
   const loadMoreInventory = async () => {
     if (isLoadingMore || !hasMoreInventory) return;
@@ -54,6 +62,8 @@ export function useInventoryFilters(
   // Debounced search for server-side filtering
   useEffect(() => {
     const timer = setTimeout(() => {
+      const requestId = ++latestFilterRequestId.current;
+
       const fetchFilteredData = async () => {
         setIsLoadingMore(true);
         try {
@@ -61,20 +71,24 @@ export function useInventoryFilters(
             searchTerm: inventorySearch,
             typeFilter: inventoryTypeFilter
           });
+          // Descarta a resposta se uma busca mais recente já foi disparada enquanto esta estava
+          // em andamento — evita que uma resposta atrasada sobrescreva o filtro atual.
+          if (requestId !== latestFilterRequestId.current) return;
           setData(result.data);
           setHasMoreInventory(result.data.length < result.count);
           setInventoryPage(0);
         } catch (error) {
+          if (requestId !== latestFilterRequestId.current) return;
           if (isFetchOrNetworkError(error)) {
             console.warn('Network issue searching inventory:', error);
           } else {
             console.warn('Error searching inventory:', error);
           }
         } finally {
-          setIsLoadingMore(false);
+          if (requestId === latestFilterRequestId.current) setIsLoadingMore(false);
         }
       };
-      
+
       if (user || isPublicView) {
         fetchFilteredData();
       }

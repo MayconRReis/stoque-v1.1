@@ -383,9 +383,15 @@ export const supabaseService = {
       if (filters?.typeFilter && filters.typeFilter !== 'ALL') {
         filtered = filtered.filter(row => {
           if (filters.typeFilter === 'CONTAINER') {
-             return row.inspections?.some((i: any) => 
+             return row.inspections?.some((i: any) =>
                [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(i.contentType)
              );
+          }
+          if (filters.typeFilter === 'SEM_SELO') {
+            return row.inspections?.some((i: any) => i.withoutSeal);
+          }
+          if (filters.typeFilter === 'DATADOS') {
+            return row.inspections?.some((i: any) => i.datedBottles);
           }
           return row.inspections?.some((i: any) => i.contentType === filters.typeFilter);
         });
@@ -448,8 +454,10 @@ export const supabaseService = {
             });
 
             if (matchedRootIds.size > 0) {
+              // Antes isso cortava para no máximo 30 IDs, então buscas com mais de 30 resultados
+              // perdiam pallets silenciosamente (o card "sumia"). Sem corte agora.
               const idsArray = Array.from(matchedRootIds);
-              query = query.in('id', idsArray.slice(0, 30));
+              query = query.in('id', idsArray);
             } else {
               query = query.eq('id', 'none_found_' + Date.now());
             }
@@ -466,7 +474,7 @@ export const supabaseService = {
         const isContainerSearch = filters.typeFilter === 'CONTAINER';
         try {
           const { data: allWithInsps, error: inspError } = await supabase.from('inventory').select('id, parent_group_id, inspections');
-          
+
           if (allWithInsps && !inspError) {
             const matchedRootIds = new Set<string>();
 
@@ -474,6 +482,9 @@ export const supabaseService = {
               const matches = item.inspections?.some((insp: any) => {
                 if (filters.typeFilter === 'SEM_SELO') {
                   return insp.withoutSeal;
+                }
+                if (filters.typeFilter === 'DATADOS') {
+                  return insp.datedBottles;
                 }
                 if (isContainerSearch) {
                   return [SlotContent.CONTAINER_SJ, SlotContent.CONTAINER_LP, SlotContent.CONTAINER_CP].includes(insp.contentType);
@@ -489,10 +500,12 @@ export const supabaseService = {
                  }
               }
             });
-            
+
             if (matchedRootIds.size > 0) {
+              // Idem: sem o corte de 30, senão filtros como "Garrafas" ou "Insumos" com mais de 30
+              // pallets no depósito mostravam só uma fatia aleatória e o resto "sumia" da tela.
               const idsArray = Array.from(matchedRootIds);
-              query = query.in('id', idsArray.slice(0, 30));
+              query = query.in('id', idsArray);
             } else {
               query = query.eq('id', 'none_found_' + Date.now());
             }
