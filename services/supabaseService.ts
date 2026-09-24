@@ -225,7 +225,26 @@ export const supabaseService = {
       
       inventory.push(newParent);
       localStorageHelper.save('inventory', inventory);
-      
+
+      // Mesma correção do fluxo online: libera as vagas dos filhos que não são o primeiro (a do
+      // primeiro fica com o grupo consolidado); sem isso as vagas ficavam presas como ocupadas.
+      const placeholderSlots = [null, undefined, '', 'AGUARDANDO', 'N/A', 'SEM VAGA'];
+      const firstChildSlots = new Set(
+        (firstChild.inspections || []).map((i: any) => i.assignedSlot).filter((s: any) => !placeholderSlots.includes(s))
+      );
+      const slotsToFree = new Set<string>();
+      children.slice(1).forEach((child: any) => {
+        (child.inspections || []).forEach((insp: any) => {
+          const slotId = insp.assignedSlot;
+          if (!placeholderSlots.includes(slotId) && !firstChildSlots.has(slotId)) {
+            slotsToFree.add(slotId);
+          }
+        });
+      });
+      for (const slotId of slotsToFree) {
+        await this.freeSlot(slotId);
+      }
+
       return { success: true, group_id: parentId, loading_id: loadingId, data: mapInventoryRow(newParent) };
     }
     
@@ -266,7 +285,27 @@ export const supabaseService = {
 
     const { error: updateError } = await supabase.from('inventory').update({ parent_group_id: parentId }).in('id', childIds);
     if (updateError) throw updateError;
-    
+
+    // O pallet consolidado herda a vaga do primeiro filho (é a que fica com o grupo). As vagas dos
+    // demais filhos precisam ser liberadas aqui — sem isso, elas ficam marcadas como ocupadas para
+    // sempre, mesmo que o pallet que as ocupava não exista mais como item independente.
+    const placeholderSlots = [null, undefined, '', 'AGUARDANDO', 'N/A', 'SEM VAGA'];
+    const firstChildSlots = new Set(
+      (firstChild.inspections || []).map((i: any) => i.assignedSlot).filter((s: any) => !placeholderSlots.includes(s))
+    );
+    const slotsToFree = new Set<string>();
+    children.slice(1).forEach((child: any) => {
+      (child.inspections || []).forEach((insp: any) => {
+        const slotId = insp.assignedSlot;
+        if (!placeholderSlots.includes(slotId) && !firstChildSlots.has(slotId)) {
+          slotsToFree.add(slotId);
+        }
+      });
+    });
+    for (const slotId of slotsToFree) {
+      await this.freeSlot(slotId);
+    }
+
     const { error: historyError } = await supabase.from('history').insert({
       id: historyId,
       type: 'transfer',
@@ -293,26 +332,83 @@ export const supabaseService = {
       let inventory = localStorageHelper.get('inventory');
       const groupIndex = inventory.findIndex((item: any) => item.id === groupId);
       if (groupIndex === -1) throw new Error('Grupo não encontrado.');
-      
+
+      const restoredChildren = inventory.filter((item: any) => item.parent_group_id === groupId);
       inventory.forEach((item: any) => {
         if (item.parent_group_id === groupId) {
           item.parent_group_id = null;
         }
       });
-      
+
       inventory.splice(groupIndex, 1);
       localStorageHelper.save('inventory', inventory);
+
+      // Mesma correção do fluxo online: reocupa vagas livres reivindicadas pelos pallets restaurados.
+      const placeholderSlots = [null, undefined, '', 'AGUARDANDO', 'N/A', 'SEM VAGA'];
+      const slots = localStorageHelper.get('warehouse_slots');
+      const slotMap = new Map(slots.map((s: any) => [s.id, s]));
+      const claimedSlotIds = new Set<string>();
+      restoredChildren.forEach((child: any) => {
+        (child.inspections || []).forEach((insp: any) => {
+          if (!placeholderSlots.includes(insp.assignedSlot)) claimedSlotIds.add(insp.assignedSlot);
+        });
+      });
+      for (const child of restoredChildren) {
+        for (const insp of (child.inspections || [])) {
+          const slotId = insp.assignedSlot;
+          if (!slotId || !claimedSlotIds.has(slotId)) continue;
+          const slot = slotMap.get(slotId) as any;
+          if (slot && (!slot.status || slot.status === 'EMPTY')) {
+            slot.status = insp.contentType;
+            slot.occupiedBy = child.description || child.originOP || null;
+            claimedSlotIds.delete(slotId);
+          }
+        }
+      }
+      localStorageHelper.save('warehouse_slots', Array.from(slotMap.values()));
+
       return { success: true };
     }
     
     const { data: parent, error: parentError } = await supabase.from('inventory').select('*').eq('id', groupId).single();
     if (parentError || !parent) throw new Error('Grupo não encontrado.');
 
+    // Busca os filhos antes de restaurá-los, para saber quais vagas eles reivindicam (a consolidação
+    // libera a vaga de todo filho que não seja o primeiro — ver consolidatePallets acima).
+    const { data: restoredChildren, error: childrenFetchError } = await supabase.from('inventory').select('*').eq('parent_group_id', groupId);
+    if (childrenFetchError) throw childrenFetchError;
+
     const { error: updateError } = await supabase.from('inventory').update({ parent_group_id: null }).eq('parent_group_id', groupId);
     if (updateError) throw updateError;
 
     const { error: deleteError } = await supabase.from('inventory').delete().eq('id', groupId);
     if (deleteError) throw deleteError;
+
+    // Reocupa as vagas dos pallets restaurados, quando ainda estiverem livres — sem isso, um pallet
+    // desconsolidado volta a aparecer "atribuído" a uma vaga que o mapa do depósito mostra como vazia.
+    const placeholderSlots = [null, undefined, '', 'AGUARDANDO', 'N/A', 'SEM VAGA'];
+    const claimedSlotIds = new Set<string>();
+    (restoredChildren || []).forEach((child: any) => {
+      (child.inspections || []).forEach((insp: any) => {
+        if (!placeholderSlots.includes(insp.assignedSlot)) claimedSlotIds.add(insp.assignedSlot);
+      });
+    });
+    if (claimedSlotIds.size > 0) {
+      const { data: slotsState } = await supabase.from('warehouse_slots').select('id, status').in('id', Array.from(claimedSlotIds));
+      const freeSlotIds = new Set((slotsState || []).filter((s: any) => !s.status || s.status === 'EMPTY').map((s: any) => s.id));
+      for (const child of (restoredChildren || [])) {
+        for (const insp of (child.inspections || [])) {
+          if (insp.assignedSlot && freeSlotIds.has(insp.assignedSlot)) {
+            await supabase.from('warehouse_slots').update({
+              status: insp.contentType,
+              occupied_by: child.description || child.origin_op || null,
+              updated_at: new Date().toISOString()
+            }).eq('id', insp.assignedSlot);
+            freeSlotIds.delete(insp.assignedSlot);
+          }
+        }
+      }
+    }
 
     const { error: historyError } = await supabase.from('history').insert({
       id: historyId,
