@@ -347,7 +347,18 @@ const App: React.FC = () => {
     }
   }, [user, isPublicView]);
   const recentNotifKeysRef = useRef<Map<string, number>>(new Map());
+  // Operações em lote (restaurar backup, finalizar carregamento) inserem/alteram muitas linhas de
+  // uma vez, e cada uma delas dispara os canais realtime abaixo — sem essa trava, cada pallet ou
+  // registro viraria uma notificação (toast + som) separada. Enquanto isso está "true", os canais
+  // continuam atualizando o estado local normalmente, só não disparam notificação por item; quem
+  // chamou a operação em lote mostra UMA notificação-resumo no final.
+  const suppressRealtimeNotificationsRef = useRef(false);
+  // Junta várias mudanças de carregamentos que chegam em rajada (ex.: dezenas de linhas mudando
+  // de uma vez numa restauração de backup) numa única busca da lista completa, em vez de refazer
+  // a busca inteira a cada linha alterada.
+  const shipmentsRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldNotify = useCallback((key: string, cooldownMs = 5000): boolean => {
+    if (suppressRealtimeNotificationsRef.current) return false;
     const now = Date.now();
     const last = recentNotifKeysRef.current.get(key);
     if (last && now - last < cooldownMs) return false;
@@ -695,9 +706,12 @@ const App: React.FC = () => {
     });
 
     const shipmentsChannel = supabaseService.subscribeToShipments((payload) => {
-      supabaseService.getShipments().then(setShipments).catch(err => {
-        console.warn('Silent shipments fetch error:', err);
-      });
+      if (shipmentsRefetchTimerRef.current) clearTimeout(shipmentsRefetchTimerRef.current);
+      shipmentsRefetchTimerRef.current = setTimeout(() => {
+        supabaseService.getShipments().then(setShipments).catch(err => {
+          console.warn('Silent shipments fetch error:', err);
+        });
+      }, 400);
       if (payload && payload.eventType === 'INSERT' && payload.new.status === 'OPEN') {
         if (shouldNotify('shipment-' + payload.new.id)) {
           showNotification('Novo carregamento criado', 'info');
@@ -755,7 +769,10 @@ const App: React.FC = () => {
         const slotMap = new Map(incomingSlots.map(s => [s.id, s]));
         setSlots(prev => prev.map(s => slotMap.has(s.id) ? { ...s, ...slotMap.get(s.id)! } : s));
       } else if (event === 'shipment:saved') {
-        supabaseService.getShipments().then(setShipments).catch(() => {});
+        if (shipmentsRefetchTimerRef.current) clearTimeout(shipmentsRefetchTimerRef.current);
+        shipmentsRefetchTimerRef.current = setTimeout(() => {
+          supabaseService.getShipments().then(setShipments).catch(() => {});
+        }, 400);
         if (payload.shipment?.status === 'OPEN' && shouldNotify('shipment-' + payload.shipment.id)) {
           showNotification('Novo carregamento criado', 'info');
           notifyShipmentCreated(payload.shipment, () => navigateToTab('shipments'));
@@ -805,6 +822,7 @@ const App: React.FC = () => {
     }
 
     return () => {
+      if (shipmentsRefetchTimerRef.current) clearTimeout(shipmentsRefetchTimerRef.current);
       inventoryChannel?.unsubscribe?.();
       editRequestsChannel?.unsubscribe?.();
       slotsChannel?.unsubscribe?.();
@@ -951,9 +969,36 @@ const App: React.FC = () => {
     checkBackupReminder();
   }, [user, isPublicView]);
 
+  const RESTORE_LABELS: Record<string, string> = {
+    vagas: 'vagas',
+    inventario: 'itens de estoque',
+    historico: 'registros de histórico',
+    carregamentos: 'carregamentos',
+    estoqueRotativo: 'itens de estoque rotativo',
+  };
+
   const handleRestoreBackup = async (backupJson: any) => {
-    const result = await supabaseService.restoreFullBackup(backupJson);
-    showNotification('Backup restaurado com sucesso!');
+    // A restauração apaga e reinsere centenas/milhares de linhas de uma vez; sem essa trava, cada
+    // linha inserida dispararia sua própria notificação via os canais realtime (toast + som). Uma
+    // única notificação-resumo no final é o que faz sentido para uma operação em lote como essa.
+    suppressRealtimeNotificationsRef.current = true;
+    let result;
+    try {
+      result = await supabaseService.restoreFullBackup(backupJson);
+    } finally {
+      suppressRealtimeNotificationsRef.current = false;
+    }
+
+    const parts = Object.entries(result.summary)
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => `${count} ${RESTORE_LABELS[key] || key}`);
+
+    if (Object.keys(result.failed || {}).length > 0) {
+      showNotification(`Backup restaurado parcialmente: ${parts.join(', ') || 'nenhum registro'}. Confira os detalhes no modal.`, 'error');
+    } else {
+      showNotification(`Backup restaurado: ${parts.join(', ') || 'nenhum registro novo'}.`);
+    }
+
     return result;
   };
 
@@ -1211,12 +1256,18 @@ const App: React.FC = () => {
         }
       }
 
-      // Bulk updates in Supabase
-      await Promise.all([
-        supabaseService.bulkUpdateSlots(updatedSlots),
-        ...newRows.map(r => supabaseService.saveInventoryItem(r)),
-        ...newHistory.map(h => supabaseService.addHistoryEntry(h))
-      ]);
+      // Bulk updates in Supabase — suprime notificações por item nos canais realtime (senão cada
+      // pallet importado dispararia sua própria notificação); uma única no final já basta.
+      suppressRealtimeNotificationsRef.current = true;
+      try {
+        await Promise.all([
+          supabaseService.bulkUpdateSlots(updatedSlots),
+          ...newRows.map(r => supabaseService.saveInventoryItem(r)),
+          ...newHistory.map(h => supabaseService.addHistoryEntry(h))
+        ]);
+      } finally {
+        suppressRealtimeNotificationsRef.current = false;
+      }
 
       // Update local state
       setSlots(updatedSlots);
@@ -1632,56 +1683,67 @@ const App: React.FC = () => {
       await supabaseService.saveShipment(updatedShipment);
 
       // 3. Process exit for each pallet
-      for (const { row, palletIndices } of itemsToProcess) {
-        // Sort indices descending to remove from array without affecting previous indices
-        const sortedIndices = [...palletIndices].sort((a, b) => b - a);
-        
-        for (const idx of sortedIndices) {
-          const inspection = row.inspections![idx];
-          
-          // Update Slot
-          if (inspection.assignedSlot && inspection.assignedSlot !== 'AGUARDANDO') {
-            await supabaseService.freeSlot(inspection.assignedSlot);
-            // Updating local state too specifically for E/F reorganization logic that might run next
-            setSlots(prev => prev.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+      // Evita que cada pallet baixado dispare sua própria notificação (toast + som) via o canal
+      // realtime do histórico — aqui é uma única operação (finalizar o carregamento), então só
+      // uma notificação-resumo é mostrada no final, com o total de pallets.
+      let totalPalletsExited = 0;
+      suppressRealtimeNotificationsRef.current = true;
+      try {
+        for (const { row, palletIndices } of itemsToProcess) {
+          // Sort indices descending to remove from array without affecting previous indices
+          const sortedIndices = [...palletIndices].sort((a, b) => b - a);
+
+          for (const idx of sortedIndices) {
+            const inspection = row.inspections![idx];
+
+            // Update Slot
+            if (inspection.assignedSlot && inspection.assignedSlot !== 'AGUARDANDO') {
+              await supabaseService.freeSlot(inspection.assignedSlot);
+              // Updating local state too specifically for E/F reorganization logic that might run next
+              setSlots(prev => prev.map(s => s.id === inspection.assignedSlot ? { ...s, status: SlotContent.EMPTY, occupiedBy: undefined } : s));
+            }
+
+            // Add History
+            const exitPalletType = row.is_group
+              ? 'CONSOLIDADO'
+              : (inspection.contentType ? translateSlotContent(inspection.contentType) : 'Produto Acabado');
+
+            await addToHistory({
+              id: Math.random().toString(36).substring(2, 9),
+              type: HistoryType.EXIT,
+              timestamp: new Date().toLocaleString(),
+              loadingId: row.loadingId,
+              description: row.description,
+              op: row.originOP,
+              lot: row.lot,
+              palletNumber: idx + 1,
+              totalPallets: row.pallets,
+              slot: inspection.assignedSlot || 'N/A',
+              details: `Saída automática via Finalização de Carregamento ${shipmentId}`,
+              operatorName: user?.name,
+              palletType: exitPalletType
+            }, true);
+            totalPalletsExited++;
           }
 
-          // Add History
-          const exitPalletType = row.is_group
-            ? 'CONSOLIDADO'
-            : (inspection.contentType ? translateSlotContent(inspection.contentType) : 'Produto Acabado');
-
-          await addToHistory({
-            id: Math.random().toString(36).substring(2, 9),
-            type: HistoryType.EXIT,
-            timestamp: new Date().toLocaleString(),
-            loadingId: row.loadingId,
-            description: row.description,
-            op: row.originOP,
-            lot: row.lot,
-            palletNumber: idx + 1,
-            totalPallets: row.pallets,
-            slot: inspection.assignedSlot || 'N/A',
-            details: `Saída automática via Finalização de Carregamento ${shipmentId}`,
-            operatorName: user?.name,
-            palletType: exitPalletType
-          }, true);
+          // Update or Delete Inventory Item
+          const remainingInspections = row.inspections!.filter((_, i) => !palletIndices.includes(i));
+          if (remainingInspections.length === 0) {
+            await supabaseService.deleteInventoryItem(row.id);
+          } else {
+            const updatedRow = {
+              ...row,
+              inspections: remainingInspections,
+              };
+            await supabaseService.saveInventoryItem(updatedRow);
+          }
         }
-
-        // Update or Delete Inventory Item
-        const remainingInspections = row.inspections!.filter((_, i) => !palletIndices.includes(i));
-        if (remainingInspections.length === 0) {
-          await supabaseService.deleteInventoryItem(row.id);
-        } else {
-          const updatedRow = { 
-            ...row, 
-            inspections: remainingInspections, 
-            };
-          await supabaseService.saveInventoryItem(updatedRow);
-        }
+      } finally {
+        suppressRealtimeNotificationsRef.current = false;
       }
 
-      showNotification(`Carregamento ${shipmentId} finalizado com sucesso!`);
+      const palletLabel = totalPalletsExited === 1 ? '1 pallet' : `${totalPalletsExited} pallets`;
+      showNotification(`Carregamento ${shipmentId} finalizado com sucesso! ${palletLabel} baixado(s) do estoque.`);
       refreshCombinedData();
       
       // Auto-reorganize E/F stacks as many pallets might have left

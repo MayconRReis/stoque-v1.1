@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { User, Lock, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 
 interface LoginProps {
@@ -57,7 +58,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Nome de Usuário</label>
               <div className="relative group">
-                <i className="fa-solid fa-user absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors"></i>
+                <User className="w-4 h-4 absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="text" 
                   value={username}
@@ -72,7 +73,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Senha</label>
               <div className="relative group">
-                <i className="fa-solid fa-lock absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors"></i>
+                <Lock className="w-4 h-4 absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="password" 
                   value={password}
@@ -86,7 +87,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                <i className="fa-solid fa-circle-exclamation text-red-500"></i>
+                <AlertCircle className="w-4 h-4 text-red-500" />
                 <p className="text-[10px] font-black text-red-500 uppercase tracking-tight">{error}</p>
               </div>
             )}
@@ -97,9 +98,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               className="w-full py-6 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:bg-slate-800 disabled:text-slate-600 text-slate-900 dark:text-white rounded-[28px] font-black text-sm uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-900/20 active:scale-[0.98]"
             >
               {loading ? (
-                <i className="fa-solid fa-circle-notch animate-spin"></i>
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <>Entrar no Sistema <i className="fa-solid fa-arrow-right"></i></>
+                <>Entrar no Sistema <ArrowRight className="w-4 h-4" /></>
               )}
             </button>
           </form>
